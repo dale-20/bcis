@@ -1,0 +1,40 @@
+{
+  "name": "bcis-subscription-billing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=24.0.0 <25", "npm": ">=11" },
+  "overrides": {
+    "exceljs": { "uuid": "^11.1.1" }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0", "@playwright/test": "^1.58.0",
+    "@testing-library/react": "^16.3.0", "@testing-library/jest-dom": "^6.9.1",
+    "@types/node": "^24.0.0", "@types/pg": "^8.15.0", "@types/react": "^19.2.0", "@types/react-dom": "^19.2.0",
+    "concurrently": "^9.2.1", "eslint": "^9.39.0", "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^16.5.0", "jsdom": "^27.4.0", "typescript": "~5.9.3", "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18", "axe-core": "^4.11.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "predev": "npm run build -w @bcis/shared",
+    "dev": "concurrently --kill-others --names shared,api,desktop \"npm run dev -w @bcis/shared\" \"npm run dev -w @bcis/api\" \"npm run dev -w @bcis/desktop\"",
+    "dev:api": "npm run build -w @bcis/shared && npm run dev -w @bcis/api",
+    "dev:desktop": "npm run build -w @bcis/shared && npm run dev -w @bcis/desktop",
+    "build": "npm run build -w @bcis/shared && npm run build -w @bcis/api && npm run build -w @bcis/desktop",
+    "typecheck": "npm run build -w @bcis/shared && npm run typecheck --workspaces --if-present && tsc -p tsconfig.tooling.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "npm run build -w @bcis/shared && vitest run",
+    "test:integration": "npm run build -w @bcis/shared && vitest run --config vitest.integration.config.ts",
+    "test:e2e": "npm run build && playwright test",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "db:local:init": "node scripts/local-db.mjs init",
+    "db:local:start": "node scripts/local-db.mjs start",
+    "db:local:stop": "node scripts/local-db.mjs stop",
+    "db:generate": "npm run db:generate -w @bcis/api",
+    "db:migrate": "npm run db:migrate -w @bcis/api",
+    "start:api": "npm run start -w @bcis/api",
+    "start:desktop": "npm run start -w @bcis/desktop"
+  }
+}

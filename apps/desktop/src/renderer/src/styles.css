@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', 'Segoe UI', sans-serif;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-navy: #0f2747;
+  --color-canvas: #f6f8fb;
+  --color-surface: #ffffff;
+  --color-foreground: #0f172a;
+  --color-secondary: #526278;
+  --color-muted: #edf1f7;
+  --color-border: #dbe2ec;
+  --color-ring: #2563eb;
+  --color-success: #047857;
+  --color-success-muted: #e9f6ef;
+  --color-danger: #b91c1c;
+  --color-danger-muted: #fef0ef;
+  --color-sidebar-text: #c4d0e0;
+  --color-sidebar-hover: #1a3659;
+  --color-sidebar-line: #31465f;
+  --color-sidebar-active: #25446b;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { @apply m-0 bg-canvas font-sans text-sm text-foreground antialiased; }
+  button, a { -webkit-app-region: no-drag; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; }
+  ::selection { @apply bg-primary text-primary-foreground; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-ring; }
+  svg { @apply size-5 shrink-0; }
+  h1, h2, p { margin: 0; }
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-lg font-semibold; }
+}
+
+@layer components {
+  .app-shell { @apply flex min-h-screen; }
+  .sidebar { @apply flex w-60 shrink-0 flex-col bg-navy text-sidebar-text; }
+  .brand { @apply flex items-center gap-3 px-6 py-7 text-xl font-semibold text-white no-underline; }
+  .brand small { @apply mt-1 block text-xs font-normal text-sidebar-text; }
+  .brand-mark { @apply flex size-10 items-center justify-center rounded-lg bg-sidebar-active text-white; }
+  .brand-mark svg { @apply size-6; }
+  .sidebar nav { @apply flex-1 px-3; }
+  .nav-description { @apply mb-3 px-3 text-xs text-sidebar-text; }
+  .nav-item { @apply mb-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm; }
+  .nav-item:disabled { @apply text-sidebar-text opacity-60; }
+  .nav-item.active { @apply bg-sidebar-active font-medium text-white; }
+  .nav-item svg { @apply size-4; }
+  .nav-separator { @apply mx-3 my-5 border-t border-sidebar-line; }
+  .sidebar-footer { @apply mx-5 flex items-center gap-3 border-t border-sidebar-line py-5 text-xs; }
+  .sidebar-footer span { @apply mt-1 block text-sidebar-text; }
+  .main-shell { @apply flex min-w-0 flex-1 flex-col; }
+  .topbar { @apply flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-9 text-xs text-secondary; }
+  .environment-label { @apply rounded border border-border px-2 py-1 text-xs; }
+  main { @apply w-full max-w-6xl flex-1 px-9 py-9; }
+  .page-heading { @apply mb-7; }
+  .page-heading p { @apply mt-2 text-secondary; }
+  .connection-panel { @apply overflow-hidden rounded-xl border border-border bg-surface; }
+  .connection-summary { @apply flex items-start gap-4 px-7 py-7; }
+  .connection-summary p { @apply mt-2 max-w-prose leading-6 text-secondary; }
+  .connection-icon { @apply flex size-11 shrink-0 items-center justify-center rounded-full; }
+  .connection-icon.is-pending { @apply bg-muted text-secondary; }
+  .connection-icon.is-ready { @apply bg-success-muted text-success; }
+  .connection-icon.is-error { @apply bg-danger-muted text-danger; }
+  .connection-details { @apply m-0 border-t border-border px-7; }
+  .connection-details > div { @apply grid grid-cols-2 items-center gap-4 border-b border-border py-5 last:border-b-0; }
+  .connection-details dt { @apply flex items-center gap-3 font-medium; }
+  .connection-details dt svg { @apply size-4 text-secondary; }
+  .connection-details dd { @apply m-0 min-w-0; }
+  .status-label { @apply block font-medium; }
+  .endpoint, .detail-note { @apply mt-1 block break-words text-xs text-secondary; }
+  .endpoint { @apply tabular-nums; }
+  .connection-actions { @apply flex items-center justify-between gap-4 border-t border-border px-7 py-4; }
+  .connection-actions p { @apply text-xs text-secondary; }
+  .scope-note { @apply mt-8 max-w-prose; }
+  .scope-note h2 { @apply text-sm font-semibold; }
+  .scope-note p { @apply mt-2 leading-6 text-secondary; }
+  .scope-note .scope-footnote { @apply mt-3 text-xs; }
+  .app-footer { @apply flex justify-between gap-4 px-9 py-5 text-xs text-secondary; }
+  @media (max-width: 1050px) {
+    .sidebar { @apply w-52; }
+    main { @apply px-6 py-7; }
+    .topbar, .app-footer { @apply px-6; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@bcis/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@bcis/shared": "0.1.0", "@fastify/helmet": "^13.0.2", "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1", "exceljs": "^4.4.0", "fastify": "^5.7.0", "pdfmake": "^0.3.0",
+    "pg": "^8.16.3", "zod": "^4.3.6"
+  },
+  "devDependencies": { "drizzle-kit": "^0.31.8", "tsx": "^4.21.0" }
+}
