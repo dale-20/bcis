@@ -1,14 +1,8 @@
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
-import type { AuthContext, AuthService, RequestMetadata } from './service.js';
-import type { PermissionCode } from './permissions.js';
+import type { FastifyPluginAsync } from 'fastify';
+import type { AuthService } from './service.js';
 import { changePasswordSchema, loginSchema } from './schemas.js';
 import { AppError } from '../errors.js';
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    authContext: AuthContext | null;
-  }
-}
+import { authenticateWith, requestMetadata, requirePermission } from './guards.js';
 
 interface AuthPluginOptions { authService: AuthService }
 
@@ -43,39 +37,8 @@ const userListResponse = {
   },
 } as const;
 
-function metadata(request: FastifyRequest): RequestMetadata {
-  const userAgent = request.headers['user-agent'];
-  return {
-    requestId: request.id,
-    ipAddress: request.ip,
-    ...(typeof userAgent === 'string' ? { userAgent } : {}),
-  };
-}
-
-function bearerToken(request: FastifyRequest): string {
-  const authorization = request.headers.authorization;
-  const match = authorization ? /^Bearer ([A-Za-z0-9_-]{43})$/.exec(authorization) : null;
-  if (!match?.[1]) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
-  return match[1];
-}
-
 export const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, options) => {
-  app.decorateRequest('authContext', null);
-
-  const authenticate = async (request: FastifyRequest) => {
-    request.authContext = await options.authService.authenticate(bearerToken(request));
-  };
-  const requirePermission = (permission: PermissionCode) => async (request: FastifyRequest) => {
-    const context = request.authContext;
-    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
-    if (context.mustChangePassword) {
-      throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'Change the demo password before using protected operations');
-    }
-    if (!context.permissions.includes(permission)) {
-      await options.authService.auditDenied(context, permission, metadata(request));
-      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to perform this action');
-    }
-  };
+  const authenticate = authenticateWith(options.authService);
 
   app.post('/auth/login', {
     schema: {
@@ -87,7 +50,7 @@ export const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opt
     },
   }, async (request) => {
     const input = loginSchema.parse(request.body);
-    const result = await options.authService.login(input.username, input.password, metadata(request));
+    const result = await options.authService.login(input.username, input.password, requestMetadata(request));
     return { ...result, expiresAt: result.expiresAt.toISOString() };
   });
 
@@ -113,7 +76,7 @@ export const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opt
   }, async (request, reply) => {
     const context = request.authContext;
     if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
-    await options.authService.logout(context, metadata(request));
+    await options.authService.logout(context, requestMetadata(request));
     return reply.code(204).send();
   });
 
@@ -135,12 +98,12 @@ export const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opt
     const context = request.authContext;
     if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
     const input = changePasswordSchema.parse(request.body);
-    await options.authService.changePassword(context, input.currentPassword, input.newPassword, metadata(request));
+    await options.authService.changePassword(context, input.currentPassword, input.newPassword, requestMetadata(request));
     return reply.code(204).send();
   });
 
   app.get('/admin/users', {
-    preHandler: [authenticate, requirePermission('user.manage')],
+    preHandler: [authenticate, requirePermission(options.authService, 'user.manage')],
     schema: {
       response: {
         200: userListResponse,

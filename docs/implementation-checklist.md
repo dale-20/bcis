@@ -26,12 +26,12 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 3 — Core operational data (PDF §§3.2–3.3, 5)
 
-- [ ] Subscribers: identity, unique account number, contacts, addresses, area, collector, billing/due day, status, notes; archive instead of deleting history.
-- [ ] One subscriber may own multiple services and addresses. Unique service numbers and foreign keys for owned records.
-- [ ] Internet/Cable/Combo plans: code/name/price/fees/description/active status; speed/channel attributes where applicable.
-- [ ] Service accounts: plan, installation address, activation/billing start dates, billing/due day, current rate/status/collector.
-- [ ] Preserve historical billed rates when plans change. Retain all service state history.
-- [ ] Global search by subscriber name/account/contact/address, invoice/receipt number, and GCash reference.
+- [ ] Subscribers: identity, unique account number, contacts, addresses, area, collector, billing/due day, status, notes; create/list/detail are complete, while edit and archive remain pending.
+- [x] One subscriber may own multiple services and addresses. Unique service numbers and foreign keys for owned records.
+- [x] Internet/Cable/Combo plans: code/name/price/fees/description/active status; speed/channel attributes where applicable.
+- [x] Service accounts: plan, installation address, activation/billing start dates, billing/due day, current rate/status/collector.
+- [x] Persist the service account's current rate when created and retain initial service history; finalized invoice rate preservation remains a billing milestone.
+- [ ] Global search: subscriber name/account/contact/address/service number is complete; invoice/receipt/GCash lookup awaits those financial modules.
 - [ ] Profile tabs: overview, services, billing, payments, ledger, collection, history, documents, audit.
 
 ## Milestone 4 — Billing and ledger (PDF §§3.4–3.5, 5)

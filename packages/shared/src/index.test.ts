@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiUrlSchema, centavosSchema, readinessSchema } from './index.js';
+import { apiUrlSchema, centavosSchema, readinessSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
 
 describe('centavo transport contract', () => {
   it.each(['0', '1', '99900', '300000', '9007199254740993', '9223372036854775807'])('preserves exact integer %s', (value) => {
@@ -7,6 +7,36 @@ describe('centavo transport contract', () => {
   });
   it.each(['-1', '1.01', '01', '1e3', 'NaN', '', '9223372036854775808', 999.5, 99900])('rejects noncanonical or unsafe value %s', (value) => {
     expect(centavosSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('subscriber contracts', () => {
+  const valid = {
+    accountNumber: 'BCIS-00051', firstName: 'Synthetic', lastName: 'Subscriber', billingDay: 1, dueDay: 11, status: 'ACTIVE',
+    contacts: [{ type: 'MOBILE', value: '0917 000 0051', isPrimary: true }],
+    addresses: [{ type: 'SERVICE', line1: '51 Test Street', barangay: 'Casisang', municipality: 'Malaybalay City', province: 'Bukidnon', isPrimary: true }],
+    services: [{ serviceAccountNumber: 'SVC-00051-1', planId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d0', installationAddressIndex: 0, collectionAreaId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d1', assignedCollectorId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d2', billingStartDate: '2026-10-01', billingDay: 1, dueDay: 11, status: 'ACTIVE' }],
+  } as const;
+
+  it('accepts a complete nested subscriber command', () => {
+    expect(subscriberCreateSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects invalid address references and missing primary records', () => {
+    const result = subscriberCreateSchema.safeParse({
+      ...valid,
+      contacts: [{ ...valid.contacts[0], isPrimary: false }],
+      services: [{ ...valid.services[0], installationAddressIndex: 4 }],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.map((issue) => issue.message)).toEqual(expect.arrayContaining([
+      'Select exactly one primary contact', 'Select an existing service address',
+    ]));
+  });
+
+  it('bounds server pagination', () => {
+    expect(subscriberListQuerySchema.parse({ page: '2', pageSize: '20' })).toMatchObject({ page: 2, pageSize: 20 });
+    expect(subscriberListQuerySchema.safeParse({ page: 1, pageSize: 101 }).success).toBe(false);
   });
 });
 describe('API contracts', () => {

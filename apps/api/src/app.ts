@@ -6,6 +6,7 @@ import type { Database } from './db/client.js';
 import { AuthService } from './auth/service.js';
 import { authPlugin } from './auth/plugin.js';
 import { AppError } from './errors.js';
+import { subscriberPlugin } from './subscribers/plugin.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -28,6 +29,7 @@ export async function buildApp(options: AppOptions) {
     requestTimeout: 5000,
   });
   await app.register(helmet);
+  app.decorateRequest('authContext', null);
   app.addHook('onRequest', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
   });
@@ -55,7 +57,10 @@ export async function buildApp(options: AppOptions) {
     void reply.code(500).send({ error: 'INTERNAL_ERROR', message: 'Internal server error', requestId: request.id });
   });
   const authService = options.authService ?? (options.database ? new AuthService(options.database) : undefined);
-  if (authService) await app.register(authPlugin, { authService });
+  if (authService) {
+    await app.register(authPlugin, { authService });
+    if (options.database) await app.register(subscriberPlugin, { authService, database: options.database });
+  }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);
   return app;
 }

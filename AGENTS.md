@@ -2,7 +2,7 @@
 
 ## Scope and workflow
 
-The current authorized increment includes the foundation plus the normalized mandatory schema and Milestone 2 API security: password login/change, opaque sessions, seeded synthetic roles, server-side RBAC, append-only audit, and protected routes. The full laboratory checklist is in `docs/implementation-checklist.md`; a table or dependency alone does not complete its later workflow milestone.
+The current implemented scope includes the foundation, normalized mandatory schema, Milestone 2 API security, and the subscriber portion of Milestone 3: secure desktop login, subscriber directory/profile/create workflows, multiple services and addresses, active plan/area/collector references, server pagination, and synthetic operational data. The full laboratory checklist is in `docs/implementation-checklist.md`; a table or dependency alone does not complete its later workflow milestone.
 
 - Read `docs/requirements.pdf` and the checklist before changing domain behavior.
 - Work in small feature increments: shared contract, migration/domain/API, tests, then UI.

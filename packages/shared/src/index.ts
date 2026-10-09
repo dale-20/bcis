@@ -3,10 +3,6 @@ import { z } from 'zod';
 export const SCHEMA_VERSION = 2;
 export const HEALTH_CHANNEL = 'bcis:connection:get';
 
-// Integer centavos travel as strings so JSON never rounds authoritative amounts.
-export const centavosSchema = z.string().max(19).regex(/^(0|[1-9]\d*)$/)
-  .pipe(z.string().refine((value) => BigInt(value) <= 9_223_372_036_854_775_807n, 'Amount exceeds PostgreSQL bigint range'));
-
 export const apiUrlSchema = z.url().pipe(z.string().refine((value) => {
   const url = new URL(value);
   return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password
@@ -36,6 +32,7 @@ export const connectionResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), endpoint: apiUrlSchema, reason: z.enum(['unreachable', 'invalid_response']) }),
 ]);
 export type ConnectionResult = z.infer<typeof connectionResultSchema>;
-export interface DesktopBridge {
-  getConnection: () => Promise<ConnectionResult>;
-}
+
+export * from './money.js';
+export * from './subscribers.js';
+export * from './desktop.js';

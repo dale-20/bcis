@@ -1,6 +1,6 @@
 # BCIS Subscription Billing & Collection
 
-Windows desktop and API foundation for Bukidnon Cable and Internet Services. It includes a normalized PostgreSQL schema, secure password sessions, server-side RBAC, append-only audit records, an Electron connection shell, and verification tools. Billing and payment posting workflows are not implemented yet.
+Windows desktop and API for Bukidnon Cable and Internet Services. It includes secure password sessions, server-side RBAC, append-only audit records, a searchable subscriber directory, detailed subscriber profiles, multi-service account creation, service plans, service addresses, collection areas, assigned collectors, and verification tools. Billing and payment posting workflows are not implemented yet.
 
 ## Requirements
 
@@ -22,9 +22,9 @@ npm run dev
 
 `setup` creates ignored app `.env` files without overwriting existing values. Before seeding, set `DEMO_ACCOUNT_PASSWORD` in `apps/api/.env` to a unique value of at least 12 characters. `db:local:init` creates an isolated cluster in `.local/postgres`, generates a random local password, and replaces only placeholder API URLs. It does not modify the existing Windows PostgreSQL service. `db:local:start` listens only on `127.0.0.1:55432` and creates `bcis_dev` and separate `bcis_test` databases. Credentials and logs stay ignored in `.local/`.
 
-The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md). They share the configured seed password only for initial access. The API requires each account to call `POST /auth/change-password` before permission-protected operations. Re-running the seed intentionally resets those seven demo passwords and restores the password-change requirement; do not use it to manage real users.
+The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md), seven service plans, three collection areas, two collectors, 50 subscribers, and 65 service accounts. The identities share the configured seed password only for initial access. The API requires each account to replace that password before permission-protected operations. Re-running the seed intentionally resets the seven demo passwords and restores the password-change requirement; do not use it to manage real users.
 
-The Electron window polls the API every 15 seconds and supports **Check again**. Green readiness requires a real database connection and applied migration. API-offline, database-unavailable and missing-migration states remain distinct. Disabled navigation names future modules; no financial results are fabricated.
+The Electron application provides secure login, forced replacement of the seed password, subscriber search/filter/sort/pagination, detailed subscriber profiles, and transactional subscriber creation. The System connection screen checks live API/database readiness. Disabled navigation names future financial modules; no financial results are fabricated.
 
 Stop the foreground development processes with Ctrl+C, then stop the isolated database:
 
@@ -51,7 +51,7 @@ Create separate empty `bcis_dev` and `bcis_test` databases with your database ad
 | `npm run start:api` / `npm run start:desktop` | Run built API/desktop on separate terminals |
 | `npm run db:generate` | Generate a reviewed migration after schema edits |
 | `npm run db:migrate` | Apply committed migrations explicitly |
-| `npm run db:seed:demo` | Idempotently seed roles, grants, and seven synthetic demo accounts |
+| `npm run db:seed:demo` | Idempotently seed authorization plus synthetic plans, routes, collectors, subscribers, and services |
 
 Run integration tests before E2E. Both use the separate synthetic `TEST_DATABASE_URL`; do not run them concurrently. Integration tests recreate only the `public` and Drizzle schemas in that disposable database. Tests intentionally fail if the test URL is missing, equals `DATABASE_URL`, or does not end in `_test`. Schema, authentication, and authorization tests are not proof of later financial posting correctness.
 
@@ -65,6 +65,8 @@ Invoke-RestMethod http://127.0.0.1:3001/health/ready
 `/health` checks API liveness (200). `/health/ready` checks PostgreSQL and migration compatibility (200 ready, 503 degraded). The API remains alive during database failure so the desktop can explain the problem. Financial posting endpoints remain deferred.
 
 Authentication endpoints are `POST /auth/login`, `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout`. Send the login token as `Authorization: Bearer TOKEN`; the database stores only its hash. `GET /admin/users` is the first permission-protected route and requires `user.manage`. The Cashier role receives HTTP 403 when it calls that route directly, and the denial is audited.
+
+Subscriber endpoints are `GET /subscribers`, `GET /subscribers/:id`, and `POST /subscribers`. Listing supports bounded server-side pagination plus name, account, contact, address, and service-number search. `GET /reference-data` supplies active plans, areas, and collectors. Admin-only catalog creation uses `POST /service-plans`, `POST /collection-areas`, and `POST /collectors`. See [subscriber operations](docs/subscriber-operations.md) for the contracts and current limits.
 
 ## Three-client LAN setup
 
@@ -92,6 +94,7 @@ Before any customer-data deployment, add HTTPS at the LAN boundary, a restricted
 - [Architecture and contracts](docs/architecture.md)
 - [Database schema](docs/database-schema.md)
 - [Permission matrix](docs/permission-matrix.md)
+- [Subscriber operations](docs/subscriber-operations.md)
 - [Engineering conventions](AGENTS.md)
 - [Stack standards and official references](docs/engineering-standards.md)
 - [Milestone evidence](docs/milestone-1-report.md)

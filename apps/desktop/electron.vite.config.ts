@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ command }) => ({
   main: { plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })] },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })],
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {

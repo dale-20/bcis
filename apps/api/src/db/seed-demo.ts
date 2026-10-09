@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { seedAuthorization } from '../auth/seed.js';
 import { apiEnvPath, loadEnvironment } from '../config.js';
 import { createDatabase } from './client.js';
+import { seedOperationalDemoData } from './seed-operational.js';
 
 config({ path: apiEnvPath, quiet: true });
 const seedEnvironment = z.object({
@@ -13,7 +14,8 @@ const database = createDatabase(loadEnvironment());
 
 try {
   await seedAuthorization(database, seedEnvironment.DEMO_ACCOUNT_PASSWORD);
-  console.log('Seeded seven synthetic demo accounts. Change their shared password after first login.');
+  await seedOperationalDemoData(database);
+  console.log('Seeded seven demo accounts and synthetic plans, routes, collectors, subscribers, addresses, and services.');
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Demo authorization seed failed');
   process.exitCode = 1;

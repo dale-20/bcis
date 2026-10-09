@@ -1,33 +1,56 @@
-import { useQuery } from '@tanstack/react-query';
-import { Building2, Cable, CircleDollarSign, FileBarChart2, LayoutDashboard, ReceiptText, Settings2, Users, Wallet, Wifi } from 'lucide-react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Building2, Cable, CircleDollarSign, FileBarChart2, LayoutDashboard, LogOut, ReceiptText, Settings2, Users, Wallet, Wifi } from 'lucide-react';
+import type { AuthenticatedUser } from '@bcis/shared';
 import { ConnectionPanel } from './components/ConnectionPanel';
+import { AuthScreen } from './features/auth/AuthScreen';
+import { SubscribersPage } from './features/subscribers/SubscribersPage';
+import { changePassword, getSession, login, logout } from './services/api';
 import { getConnection } from './services/connection';
 
-const futureModules = [
-  { label: 'Dashboard', icon: LayoutDashboard }, { label: 'Subscribers', icon: Users },
-  { label: 'Billing', icon: ReceiptText }, { label: 'Payments', icon: Wallet },
-  { label: 'Collections', icon: CircleDollarSign }, { label: 'Receivables', icon: FileBarChart2 },
-  { label: 'Services', icon: Cable }, { label: 'Reports', icon: FileBarChart2 },
+const deferredModules = [
+  { label: 'Dashboard', icon: LayoutDashboard },
+  { label: 'Billing', icon: ReceiptText },
+  { label: 'Payments', icon: Wallet },
+  { label: 'Collections', icon: CircleDollarSign },
+  { label: 'Receivables', icon: FileBarChart2 },
+  { label: 'Services', icon: Cable },
+  { label: 'Reports', icon: FileBarChart2 },
 ];
 
-export function App() {
+function SystemConnection() {
   const query = useQuery({ queryKey: ['connection'], queryFn: getConnection, refetchInterval: 15000 });
+  return <div className="content-enter"><div className="page-heading"><h1>System connection</h1><p>Check this workstation’s connection to the office server.</p></div><ConnectionPanel result={query.data} pending={query.isPending} refreshing={query.isFetching} error={query.isError} onRetry={() => { void query.refetch(); }} /></div>;
+}
+function Workspace({ user, onLogout }: { user: AuthenticatedUser; onLogout: () => Promise<void> }) {
+  const [view, setView] = useState<'subscribers' | 'connection'>('subscribers');
   return <div className="app-shell">
     <aside className="sidebar">
-      <a className="brand" href="#main"><span className="brand-mark"><Wifi aria-hidden="true" /></span><span>BCIS<small>Billing &amp; Collection</small></span></a>
-      <nav aria-label="Main navigation"><p className="nav-description">Workspace</p>{futureModules.map(({ label, icon: Icon }) => <button key={label} className="nav-item" disabled title="Available in a later milestone"><Icon aria-hidden="true" /><span>{label}</span></button>)}
-        <div className="nav-separator" /><div className="nav-item active" aria-current="page"><Settings2 aria-hidden="true" /><span>System connection</span></div>
+      <button className="brand" onClick={() => setView('subscribers')}><span className="brand-mark"><Wifi aria-hidden="true" /></span><span>BCIS<small>Billing &amp; Collection</small></span></button>
+      <nav aria-label="Main navigation"><p className="nav-description">Workspace</p>
+        <button className={`nav-item ${view === 'subscribers' ? 'active' : ''}`} onClick={() => setView('subscribers')} aria-current={view === 'subscribers' ? 'page' : undefined}><Users aria-hidden="true" /><span>Subscribers</span></button>
+        {deferredModules.map(({ label, icon: Icon }) => <button key={label} className="nav-item" disabled title="Available in a later milestone"><Icon aria-hidden="true" /><span>{label}</span></button>)}
+        <div className="nav-separator" /><button className={`nav-item ${view === 'connection' ? 'active' : ''}`} onClick={() => setView('connection')} aria-current={view === 'connection' ? 'page' : undefined}><Settings2 aria-hidden="true" /><span>System connection</span></button>
       </nav>
-      <div className="sidebar-footer"><Building2 aria-hidden="true" /><div>Office desktop<span>Development environment</span></div></div>
+      <div className="sidebar-footer"><Building2 aria-hidden="true" /><div>Office desktop<span>Secure API session</span></div></div>
     </aside>
     <div className="main-shell">
-      <header className="topbar"><span>Bukidnon Cable and Internet Services</span><span className="environment-label">Foundation · v0.1.0</span></header>
-      <main id="main" tabIndex={-1}>
-        <div className="page-heading"><h1>System connection</h1><p>Check this workstation’s connection to your office server.</p></div>
-        <ConnectionPanel result={query.data} pending={query.isPending} refreshing={query.isFetching} error={query.isError} onRetry={() => { void query.refetch(); }} />
-        <section className="scope-note" aria-labelledby="scope-title"><h2 id="scope-title">Your workspace starts here</h2><p>This foundation connects your desktop to the central BCIS environment. Subscriber management, billing, payments, and reports will be added in later milestones.</p><p className="scope-footnote">No subscriber or financial records are available in this build.</p></section>
-      </main>
-      <footer className="app-footer"><span>BCIS Subscription Billing &amp; Collection</span><span>Milestone 1 · Project foundation</span></footer>
+      <header className="topbar"><span>Bukidnon Cable and Internet Services</span><div className="user-menu"><span className="user-avatar" aria-hidden="true">{user.displayName.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><span><strong>{user.displayName}</strong><small>{user.roles.map((role) => role.replaceAll('_', ' ')).join(', ')}</small></span><button className="icon-button" onClick={() => { void onLogout(); }} aria-label="Sign out"><LogOut aria-hidden="true" /></button></div></header>
+      <main id="main" tabIndex={-1}>{view === 'subscribers' ? <SubscribersPage user={user} /> : <SystemConnection />}</main>
+      <footer className="app-footer"><span>BCIS Subscription Billing &amp; Collection</span><span>Subscriber operations · Secure session</span></footer>
     </div>
   </div>;
+}
+export function App() {
+  const client = useQueryClient();
+  const session = useQuery({ queryKey: ['session'], queryFn: getSession, staleTime: Infinity, retry: false });
+  const [authError, setAuthError] = useState<string | null>(null);
+  const loginMutation = useMutation({ mutationFn: login, onSuccess: (user) => { client.setQueryData(['session'], user); setAuthError(null); }, onError: (error) => setAuthError(error.message) });
+  const passwordMutation = useMutation({ mutationFn: changePassword, onSuccess: (user) => { client.setQueryData(['session'], user); setAuthError(null); }, onError: (error) => setAuthError(error.message) });
+  const logoutMutation = useMutation({ mutationFn: logout, onSettled: () => { client.clear(); client.setQueryData(['session'], null); } });
+
+  if (session.isPending) return <div className="app-boot" aria-live="polite"><span className="brand-mark"><Wifi aria-hidden="true" /></span><p>Opening BCIS…</p></div>;
+  if (session.isError) return <div className="app-boot error-state"><h1>BCIS could not start</h1><p>{session.error.message}</p></div>;
+  if (!session.data || session.data.mustChangePassword) return <AuthScreen user={session.data} pending={loginMutation.isPending || passwordMutation.isPending} error={authError} onLogin={async (values) => { setAuthError(null); await loginMutation.mutateAsync(values); }} onChangePassword={async (values) => { setAuthError(null); await passwordMutation.mutateAsync(values); }} />;
+  return <Workspace user={session.data} onLogout={async () => { await logoutMutation.mutateAsync(); }} />;
 }

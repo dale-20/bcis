@@ -22,11 +22,11 @@ Manage Internet, Cable, and Combo subscriptions with trustworthy billing, collec
 
 ## Capabilities and Constraints
 
-This increment implements only foundation and live connection status. Authentication and all financial workflows remain future work. No fabricated totals, subscribers, payments, or operational claims appear in the shell.
+The application implements secure login, forced seed-password replacement, server-side permissions, subscriber search with server pagination, subscriber profiles, multiple service accounts and addresses, and atomic subscriber creation using active plans, collection areas, and collectors. Demo operational records are clearly synthetic. Billing, payments, collections reconciliation, reports, catalog management screens, subscriber editing, and archival workflows remain future work.
 
 ## Brand Commitments
 
-PDF section 4.1 specifies a clean, trustworthy, dense commercial ISP interface: navy, blue accents, light canvas, white surfaces, professional sans-serif typography, and text plus color statuses. No generic KPI dashboard or decorative effects for this connection screen.
+PDF section 4.1 specifies a clean, trustworthy, dense commercial ISP interface: navy, blue accents, light canvas, white surfaces, professional sans-serif typography, and text plus color statuses. Operational screens favor scannable tables, clear hierarchy, restrained motion, and direct actions.
 
 ## Evidence on Hand
 
