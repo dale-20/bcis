@@ -95,7 +95,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await database.query('UPDATE application_metadata SET schema_version = 99');
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByText('Migration required', { exact: true })).toBeVisible();
-    await database.query('UPDATE application_metadata SET schema_version = 2');
+    await database.query('UPDATE application_metadata SET schema_version = 3');
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByRole('heading', { name: 'Connected to BCIS' })).toBeVisible();
     server.kill();
@@ -104,7 +104,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Unable to reach BCIS' })).toBeVisible();
     expect(pageErrors).toEqual([]);
   } finally {
-    await database.query('UPDATE application_metadata SET schema_version = 2');
+    await database.query('UPDATE application_metadata SET schema_version = 3');
     await database.end();
     await desktop?.close();
     server.kill();

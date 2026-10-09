@@ -7,6 +7,7 @@ import { AuthService } from './auth/service.js';
 import { authPlugin } from './auth/plugin.js';
 import { AppError } from './errors.js';
 import { subscriberPlugin } from './subscribers/plugin.js';
+import { billingPlugin } from './billing/plugin.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -59,7 +60,10 @@ export async function buildApp(options: AppOptions) {
   const authService = options.authService ?? (options.database ? new AuthService(options.database) : undefined);
   if (authService) {
     await app.register(authPlugin, { authService });
-    if (options.database) await app.register(subscriberPlugin, { authService, database: options.database });
+    if (options.database) {
+      await app.register(subscriberPlugin, { authService, database: options.database });
+      await app.register(billingPlugin, { authService, database: options.database });
+    }
   }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);
   return app;

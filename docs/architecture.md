@@ -29,15 +29,17 @@ Shared output is built before dependents. Development watches shared output alon
 
 `GET /health`: HTTP 200, `{ service: "bcis-api", status: "ok", timestamp: ISO-8601 UTC }`. Liveness only; does not claim database readiness.
 
-`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 2. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
+`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 3. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
 
 `POST /auth/login` exchanges a validated username/password for an opaque bearer token. `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout` require that token. `GET /admin/users` additionally requires `user.manage`. Permission hooks execute in Fastify before the handler and record denied attempts.
 
 `GET /subscribers` provides bounded server-side filtering, sorting, and pagination. `GET /subscribers/:id` returns the complete subscriber profile. `POST /subscribers` validates and creates identity, contacts, addresses, service accounts, initial service events, and audit evidence in one transaction. `GET /reference-data` returns active service plans, areas, and collectors. Catalog creation endpoints require their respective server permissions.
 
+`POST /billing/cycles/generate` serializes one calendar month with a PostgreSQL advisory transaction lock, snapshots each active service account's exact current centavo rate, posts the invoice and ledger debit, audits the run, and finalizes the cycle in one transaction. `GET /billing/cycles/:id` returns the immutable invoice snapshot. `GET /subscribers/:id/ledger` reproduces chronological running balances from stored debit/credit entries.
+
 PostgreSQL stores salted scrypt password hashes and SHA-256 session-token hashes. A session has a 30-minute sliding idle deadline and an eight-hour absolute deadline. Login uses the same public error for missing users, wrong passwords, inactive users, and locked accounts. Five failed attempts lock an account for 15 minutes. The documented role policy is in `permission-matrix.md`.
 
-The initial migration creates the singleton version sentinel. Migration 0001 creates the normalized domain model, append-only audit trigger, and advances the version to 2. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration execution is explicit; API startup never mutates the schema.
+The initial migration creates the singleton version sentinel. Migration 0001 creates the normalized domain model and append-only audit trigger. Migration 0002 adds invoice numbering, monthly-cycle constraints, finalized-invoice immutability triggers, and advances the version to 3. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration execution is explicit; API startup never mutates the schema.
 
 ## IPC and desktop security
 
@@ -47,7 +49,7 @@ Renderer has no Node integration, DB connection, arbitrary fetch, shell, filesys
 
 ## Current limitations and future invariants
 
-- Authentication, RBAC, normalized storage, audit boundaries, and subscriber list/profile/create services are implemented. Subscriber editing/archival, billing/payment/collection posting, report generation, backup execution/restore, and installer remain future milestones.
+- Authentication, RBAC, normalized storage, audit boundaries, subscriber operations, and monthly invoice/ledger posting are implemented. Subscriber editing/archival, payment/collection posting, billing UI, report generation, backup execution/restore, and installer remain future milestones.
 - ExcelJS/pdfmake, Table and React Hook Form are dependencies for later milestones; they are not fake report/table/form implementations.
 - Money is represented by canonical nonnegative integer centavo strings at the transport boundary, within PostgreSQL bigint range. Signed ledger movements, allocation arithmetic and payment rules require later domain design/tests.
 - Ten database pool connections support concurrent clients structurally. Three parallel health reads verify the foundation, and direct API tests verify Cashier denial; financial concurrency acceptance remains pending.

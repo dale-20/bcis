@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiUrlSchema, centavosSchema, readinessSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
+import { apiUrlSchema, billingPeriodSchema, centavosSchema, readinessSchema, signedCentavosSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
 
 describe('centavo transport contract', () => {
   it.each(['0', '1', '99900', '300000', '9007199254740993', '9223372036854775807'])('preserves exact integer %s', (value) => {
@@ -7,6 +7,21 @@ describe('centavo transport contract', () => {
   });
   it.each(['-1', '1.01', '01', '1e3', 'NaN', '', '9223372036854775808', 999.5, 99900])('rejects noncanonical or unsafe value %s', (value) => {
     expect(centavosSchema.safeParse(value).success).toBe(false);
+  });
+  it.each(['0', '99900', '-99900', '-9223372036854775808'])('accepts signed centavos %s', (value) => {
+    expect(signedCentavosSchema.parse(value)).toBe(value);
+  });
+  it.each(['-0', '1.5', '9223372036854775808', '-9223372036854775809'])('rejects noncanonical signed centavos %s', (value) => {
+    expect(signedCentavosSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('billing period contract', () => {
+  it.each(['2026-01', '9999-12'])('accepts calendar month %s', (period) => {
+    expect(billingPeriodSchema.parse(period)).toBe(period);
+  });
+  it.each(['0000-01', '2026-00', '2026-13', '26-01'])('rejects invalid period %s', (period) => {
+    expect(billingPeriodSchema.safeParse(period).success).toBe(false);
   });
 });
 

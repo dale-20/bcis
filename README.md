@@ -1,6 +1,6 @@
 # BCIS Subscription Billing & Collection
 
-Windows desktop and API for Bukidnon Cable and Internet Services. It includes secure password sessions, server-side RBAC, append-only audit records, a searchable subscriber directory, detailed subscriber profiles, multi-service account creation, service plans, service addresses, collection areas, assigned collectors, and verification tools. Billing and payment posting workflows are not implemented yet.
+Windows desktop and API for Bukidnon Cable and Internet Services. It includes secure password sessions, server-side RBAC, append-only audit records, subscriber operations, transactional monthly billing, immutable finalized invoices, and reproducible subscriber ledgers. Payment posting workflows are not implemented yet.
 
 ## Requirements
 
@@ -68,6 +68,8 @@ Authentication endpoints are `POST /auth/login`, `GET /auth/me`, `POST /auth/cha
 
 Subscriber endpoints are `GET /subscribers`, `GET /subscribers/:id`, and `POST /subscribers`. Listing supports bounded server-side pagination plus name, account, contact, address, and service-number search. `GET /reference-data` supplies active plans, areas, and collectors. Admin-only catalog creation uses `POST /service-plans`, `POST /collection-areas`, and `POST /collectors`. See [subscriber operations](docs/subscriber-operations.md) for the contracts and current limits.
 
+Billing endpoints are `POST /billing/cycles/generate`, `GET /billing/cycles/:id`, and `GET /subscribers/:id/ledger`. Generation requires `billing.generate`; invoice and ledger views require `billing.view`. See [billing and ledger](docs/billing-ledger.md) for date, centavo, duplicate, and immutability rules.
+
 ## Three-client LAN setup
 
 1. Run one API and PostgreSQL on the designated server. Set `API_HOST=0.0.0.0` in its `apps/api/.env`.
@@ -95,6 +97,7 @@ Before any customer-data deployment, add HTTPS at the LAN boundary, a restricted
 - [Database schema](docs/database-schema.md)
 - [Permission matrix](docs/permission-matrix.md)
 - [Subscriber operations](docs/subscriber-operations.md)
+- [Billing and ledger](docs/billing-ledger.md)
 - [Engineering conventions](AGENTS.md)
 - [Stack standards and official references](docs/engineering-standards.md)
 - [Milestone evidence](docs/milestone-1-report.md)

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, date, index, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, check, date, index, jsonb, pgEnum, pgSequence, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { serviceAccounts } from './services.js';
 import { subscribers } from './subscribers.js';
 import { users } from './security.js';
@@ -8,6 +8,7 @@ export const billingCycleStatus = pgEnum('billing_cycle_status', ['OPEN', 'GENER
 export const invoiceStatus = pgEnum('invoice_status', ['DRAFT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID', 'CREDITED']);
 export const invoiceItemType = pgEnum('invoice_item_type', ['SUBSCRIPTION', 'INSTALLATION', 'RECONNECTION', 'DISCOUNT', 'PENALTY', 'ADJUSTMENT']);
 export const adjustmentStatus = pgEnum('adjustment_status', ['PENDING', 'APPROVED', 'POSTED', 'REJECTED', 'REVERSED']);
+export const invoiceNumberSequence = pgSequence('invoice_number_seq', { startWith: 1, increment: 1, minValue: 1 });
 
 export const billingCycles = pgTable('billing_cycles', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -20,6 +21,7 @@ export const billingCycles = pgTable('billing_cycles', {
 }, (table) => [
   uniqueIndex('billing_cycles_period_uq').on(table.periodStart, table.periodEnd),
   check('billing_cycles_date_order', sql`${table.periodStart} <= ${table.periodEnd}`),
+  check('billing_cycles_calendar_month', sql`${table.periodStart} = date_trunc('month', ${table.periodStart}::timestamp)::date AND ${table.periodEnd} = (date_trunc('month', ${table.periodStart}::timestamp) + interval '1 month - 1 day')::date`),
 ]);
 
 export const invoices = pgTable('invoices', {
@@ -45,6 +47,7 @@ export const invoices = pgTable('invoices', {
   index('invoices_subscriber_status_idx').on(table.subscriberId, table.status),
   index('invoices_due_status_idx').on(table.dueDate, table.status),
   check('invoices_amounts_valid', sql`${table.totalCentavos} >= 0 AND ${table.balanceCentavos} >= 0 AND ${table.balanceCentavos} <= ${table.totalCentavos}`),
+  check('invoices_finalization_consistent', sql`(${table.status} = 'DRAFT' AND ${table.finalizedAt} IS NULL AND ${table.finalizedByUserId} IS NULL) OR (${table.status} <> 'DRAFT' AND ${table.finalizedAt} IS NOT NULL AND ${table.finalizedByUserId} IS NOT NULL)`),
 ]);
 
 export const invoiceItems = pgTable('invoice_items', {

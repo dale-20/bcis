@@ -22,7 +22,7 @@ Manage Internet, Cable, and Combo subscriptions with trustworthy billing, collec
 
 ## Capabilities and Constraints
 
-The application implements secure login, forced seed-password replacement, server-side permissions, subscriber search with server pagination, subscriber profiles, multiple service accounts and addresses, and atomic subscriber creation using active plans, collection areas, and collectors. Demo operational records are clearly synthetic. Billing, payments, collections reconciliation, reports, catalog management screens, subscriber editing, and archival workflows remain future work.
+The application implements secure login, server-side permissions, subscriber operations, atomic monthly invoice generation, immutable billed values, duplicate-period protection, and reproducible subscriber ledgers. Demo operational records are clearly synthetic. Payments, billing screens, collections reconciliation, reports, catalog management screens, subscriber editing, and archival workflows remain future work.
 
 ## Brand Commitments
 
