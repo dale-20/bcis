@@ -1,3 +1,8 @@
 export function isTrustedFrame(senderUrl: string, rendererUrl: string, isMainFrame: boolean): boolean {
-  return isMainFrame && senderUrl === rendererUrl;
+  if (!isMainFrame) return false;
+  try {
+    return new URL(senderUrl).href === new URL(rendererUrl).href;
+  } catch {
+    return false;
+  }
 }
