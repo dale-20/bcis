@@ -34,6 +34,7 @@
     "db:local:stop": "node scripts/local-db.mjs stop",
     "db:generate": "npm run db:generate -w @bcis/api",
     "db:migrate": "npm run db:migrate -w @bcis/api",
+    "db:seed:demo": "npm run db:seed:demo -w @bcis/api",
     "start:api": "npm run start -w @bcis/api",
     "start:desktop": "npm run start -w @bcis/desktop"
   }

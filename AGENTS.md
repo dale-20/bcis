@@ -2,7 +2,7 @@
 
 ## Scope and workflow
 
-The current authorized increment is **Milestone 1 only**: project foundation, database migration, health API, and Electron connection screen. Stop after its verification and commit. The full laboratory checklist is in `docs/implementation-checklist.md`; future items are not completed by installing dependencies.
+The current authorized increment includes the foundation plus the normalized mandatory schema and Milestone 2 API security: password login/change, opaque sessions, seeded synthetic roles, server-side RBAC, append-only audit, and protected routes. The full laboratory checklist is in `docs/implementation-checklist.md`; a table or dependency alone does not complete its later workflow milestone.
 
 - Read `docs/requirements.pdf` and the checklist before changing domain behavior.
 - Work in small feature increments: shared contract, migration/domain/API, tests, then UI.
@@ -26,7 +26,7 @@ The current authorized increment is **Milestone 1 only**: project foundation, da
 - TypeScript strict mode; no unexplained `any`. Validate all external input server-side with Zod.
 - Use TanStack Query for server state, TanStack Table for future operational tables, and presentational components without service calls.
 - Keep `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, restrictive CSP, IPC sender validation, and navigation/popup blocking.
-- Three LAN clients use one API and PostgreSQL. Production authorization belongs on the server. Milestone 1 exposes only public health endpoints; authentication/RBAC must precede business endpoints.
+- Three LAN clients use one API and PostgreSQL. Production authorization belongs on the server. Health and login are public; every business endpoint requires an active session and an explicit permission.
 - Database schema changes require reviewed, committed Drizzle migrations. Use foreign keys, unique constraints, and relevant indexes as entities are added.
 
 ## Clean code rules

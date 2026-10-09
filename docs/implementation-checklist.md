@@ -1,6 +1,6 @@
 # Laboratory implementation checklist
 
-Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numbering 1–17). Read in full, including mandatory acceptance tests and final submission criteria. **Current scope: Milestone 1 only.** Unchecked items are intentionally deferred, not implemented by the foundation scaffold.
+Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numbering 1–17). Read in full, including mandatory acceptance tests and final submission criteria. Checked items have automated evidence; unchecked items remain deferred.
 
 ## Milestone 1 — Analysis and foundation (PDF §§2, 6 Phase 1)
 
@@ -18,11 +18,11 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 2 — Authentication and authorization (PDF §§3.1, 4.4, 5)
 
-- [ ] Users, roles, permissions, role_permissions, user_roles; secure password hashing, active/inactive accounts.
-- [ ] Login, logout/session lock, safe session storage, failed-login handling, protected API routes.
-- [ ] Server-side granular permissions: subscriber.view, billing.generate, payment.create/reverse, collection.reconcile, report.export, user.manage, backup.restore.
-- [ ] Roles: owner/super admin (full), administrator (operational management), cashier (search/receive/receipt/approved GCash), collection supervisor (routes/batches/remittance), accounting/auditor (reports/reversal review/audit), technician (service operations only), viewer (read-only dashboard/reports).
-- [ ] Synthetic seeded administrator, role matrix, direct API authorization tests (AT-10); hiding buttons is never authorization.
+- [x] Users, roles, permissions, role_permissions, user_roles; secure password hashing, active/inactive accounts.
+- [x] Login, logout, safe hashed session storage, idle/absolute expiry, failed-login lockout, password replacement, protected API routes.
+- [x] Server-side granular permissions: subscriber.view, billing.generate, payment.create/reverse, collection.reconcile, report.export, user.manage, backup.restore.
+- [x] Roles: owner/super admin (full), administrator (operational/user management), cashier (search/receive/approved GCash), collection supervisor (routes/batches/remittance), accounting/auditor (reports/audit), technician (service operations only), viewer (read-only dashboard/reports).
+- [x] Seven synthetic demo identities, documented role matrix, direct API authorization tests proving Cashier denial (AT-10 security portion); hiding buttons is never authorization.
 
 ## Milestone 3 — Core operational data (PDF §§3.2–3.3, 5)
 

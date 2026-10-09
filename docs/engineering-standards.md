@@ -36,6 +36,16 @@ Fastify recommends schema-based request validation and response serialization. I
 
 BCIS adds Zod at typed external boundaries while retaining the same rule: structural validation first, authorization and database work afterward. Every route declares its output contract so internal fields cannot leak by accident.
 
+## Authentication and sessions
+
+OWASP recommends Argon2id for new password stores and scrypt when Argon2id is unavailable, with a minimum scrypt profile of `N=2^17`, `r=8`, `p=1`. It also recommends generic authentication errors, server-side session state, cryptographically random opaque identifiers, idle and absolute timeouts, and session invalidation after security-sensitive events.
+
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+
+BCIS uses Node's built-in scrypt implementation with that minimum profile to avoid a native runtime dependency. Password hashes carry their parameters and a random salt. Bearer tokens are 256 random bits; only SHA-256 token hashes are stored. Permission checks always run in Fastify, denied actions are audited, and seeded shared passwords block privileged operations until replaced.
+
 ## PostgreSQL and Drizzle
 
 PostgreSQL documents constraints as the database mechanism for rejecting invalid state. Unique constraints create unique indexes, while foreign keys do not automatically index referencing columns. Serializable transactions can abort with serialization failures and require whole-transaction retry. Explicit locks can deadlock, so lock order and bounded retry matter.

@@ -1,18 +1,28 @@
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
 import { healthSchema, readinessSchema, type Readiness } from '@bcis/shared';
+import { ZodError } from 'zod';
+import type { Database } from './db/client.js';
+import { AuthService } from './auth/service.js';
+import { authPlugin } from './auth/plugin.js';
+import { AppError } from './errors.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
   closeDatabase?: () => Promise<void>;
   logLevel?: string;
+  database?: Database;
+  authService?: AuthService;
 }
 
 export async function buildApp(options: AppOptions) {
   const app = Fastify({
     logger: options.logLevel === 'silent' ? false : {
       level: options.logLevel ?? 'info',
-      redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+      redact: [
+        'req.headers.authorization', 'req.headers.cookie', 'req.body.password',
+        'req.body.currentPassword', 'req.body.newPassword', 'res.headers["set-cookie"]',
+      ],
     },
     bodyLimit: 1_048_576,
     requestTimeout: 5000,
@@ -32,10 +42,20 @@ export async function buildApp(options: AppOptions) {
     reply.code(status === 'ready' ? 200 : 503);
     return readinessSchema.parse({ service: 'bcis-api', status, database, timestamp: new Date().toISOString() });
   });
-  app.setErrorHandler((_error, request, reply) => {
-    request.log.error({ requestId: request.id }, 'Request failed');
-    void reply.code(500).send({ error: 'Internal server error', requestId: request.id });
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof AppError) {
+      void reply.code(error.statusCode).send({ error: error.code, message: error.message, requestId: request.id });
+      return;
+    }
+    if (error instanceof ZodError || (typeof error === 'object' && error !== null && 'validation' in error)) {
+      void reply.code(400).send({ error: 'VALIDATION_ERROR', message: 'Request validation failed', requestId: request.id });
+      return;
+    }
+    request.log.error({ err: error instanceof Error ? error : new Error('Unknown request failure'), requestId: request.id }, 'Request failed');
+    void reply.code(500).send({ error: 'INTERNAL_ERROR', message: 'Internal server error', requestId: request.id });
   });
+  const authService = options.authService ?? (options.database ? new AuthService(options.database) : undefined);
+  if (authService) await app.register(authPlugin, { authService });
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);
   return app;
 }

@@ -1,6 +1,6 @@
 # BCIS Subscription Billing & Collection
 
-Windows desktop foundation for Bukidnon Cable and Internet Services. **Milestone 1 only:** Electron/React shell, Fastify health API, PostgreSQL/Drizzle migration, typed preload, real connection status, and verification tools. Billing and payment workflows are not implemented yet.
+Windows desktop and API foundation for Bukidnon Cable and Internet Services. It includes a normalized PostgreSQL schema, secure password sessions, server-side RBAC, append-only audit records, an Electron connection shell, and verification tools. Billing and payment posting workflows are not implemented yet.
 
 ## Requirements
 
@@ -16,10 +16,13 @@ npm run setup
 npm run db:local:init
 npm run db:local:start
 npm run db:migrate
+npm run db:seed:demo
 npm run dev
 ```
 
-`setup` creates ignored app `.env` files without overwriting existing values. `db:local:init` creates an isolated cluster in `.local/postgres`, generates a random local password, and replaces only placeholder API URLs. It does not modify the existing Windows PostgreSQL service. `db:local:start` listens only on `127.0.0.1:55432` and creates `bcis_dev` and separate `bcis_test` databases. Credentials and logs stay ignored in `.local/`.
+`setup` creates ignored app `.env` files without overwriting existing values. Before seeding, set `DEMO_ACCOUNT_PASSWORD` in `apps/api/.env` to a unique value of at least 12 characters. `db:local:init` creates an isolated cluster in `.local/postgres`, generates a random local password, and replaces only placeholder API URLs. It does not modify the existing Windows PostgreSQL service. `db:local:start` listens only on `127.0.0.1:55432` and creates `bcis_dev` and separate `bcis_test` databases. Credentials and logs stay ignored in `.local/`.
+
+The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md). They share the configured seed password only for initial access. The API requires each account to call `POST /auth/change-password` before permission-protected operations.
 
 The Electron window polls the API every 15 seconds and supports **Check again**. Green readiness requires a real database connection and applied migration. API-offline, database-unavailable and missing-migration states remain distinct. Disabled navigation names future modules; no financial results are fabricated.
 
@@ -48,17 +51,20 @@ Create separate empty `bcis_dev` and `bcis_test` databases with your database ad
 | `npm run start:api` / `npm run start:desktop` | Run built API/desktop on separate terminals |
 | `npm run db:generate` | Generate a reviewed migration after schema edits |
 | `npm run db:migrate` | Apply committed migrations explicitly |
+| `npm run db:seed:demo` | Idempotently seed roles, grants, and seven synthetic demo accounts |
 
-Run integration tests before E2E. Both use the separate synthetic `TEST_DATABASE_URL`; do not run them concurrently. Integration tests remove only the foundation table and Drizzle journal in that disposable database. Tests intentionally fail if the test URL is missing or does not end in `_test`. A foundation readiness read is not proof of financial posting correctness.
+Run integration tests before E2E. Both use the separate synthetic `TEST_DATABASE_URL`; do not run them concurrently. Integration tests recreate only the `public` and Drizzle schemas in that disposable database. Tests intentionally fail if the test URL is missing, equals `DATABASE_URL`, or does not end in `_test`. Schema, authentication, and authorization tests are not proof of later financial posting correctness.
 
-## API health
+## API endpoints
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:3001/health
 Invoke-RestMethod http://127.0.0.1:3001/health/ready
 ```
 
-`/health` checks API liveness (200). `/health/ready` checks PostgreSQL and migration compatibility (200 ready, 503 degraded). The API remains alive during database failure so the desktop can explain the problem. No authentication/business endpoints are included in this increment.
+`/health` checks API liveness (200). `/health/ready` checks PostgreSQL and migration compatibility (200 ready, 503 degraded). The API remains alive during database failure so the desktop can explain the problem. Financial posting endpoints remain deferred.
+
+Authentication endpoints are `POST /auth/login`, `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout`. Send the login token as `Authorization: Bearer TOKEN`; the database stores only its hash. `GET /admin/users` is the first permission-protected route and requires `user.manage`. The Cashier role receives HTTP 403 when it calls that route directly, and the denial is audited.
 
 ## Three-client LAN setup
 
@@ -68,7 +74,7 @@ Invoke-RestMethod http://127.0.0.1:3001/health/ready
 4. On each client, set `MAIN_VITE_API_URL=http://SERVER_PRIVATE_IP:3001` in `apps/desktop/.env` before development/build. For a built client, set `$env:BCIS_API_URL='http://SERVER_PRIVATE_IP:3001'` before `npm run start:desktop`.
 5. Verify `/health/ready` and the desktop indicator from all three PCs. Actual three-PC financial concurrency remains a later acceptance gate.
 
-Only health data is available now. Before any customer-data deployment, implement authentication/server RBAC, restricted DB roles, HTTPS/session security, audit, backup/restore and the remaining checklist. Installer packaging is deferred.
+Before any customer-data deployment, add HTTPS at the LAN boundary, a restricted production database role, the remaining financial services, verified backup/restore, and installer packaging.
 
 ## Troubleshooting
 
@@ -84,9 +90,11 @@ Only health data is available now. Before any customer-data deployment, implemen
 
 - [Laboratory checklist](docs/implementation-checklist.md)
 - [Architecture and contracts](docs/architecture.md)
+- [Database schema](docs/database-schema.md)
+- [Permission matrix](docs/permission-matrix.md)
 - [Engineering conventions](AGENTS.md)
 - [Stack standards and official references](docs/engineering-standards.md)
 - [Milestone evidence](docs/milestone-1-report.md)
 - [Supplied requirements](docs/requirements.pdf)
 
-Use synthetic subscriber/payment information only. The 12-hour project timebox does not change the requirement to stop after Milestone 1 in this delivery.
+Use synthetic subscriber/payment information only. A created table does not mean its workflow is complete; follow the implementation checklist and automated evidence.

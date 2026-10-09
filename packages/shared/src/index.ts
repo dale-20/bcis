@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const HEALTH_CHANNEL = 'bcis:connection:get';
 
 // Integer centavos travel as strings so JSON never rounds authoritative amounts.

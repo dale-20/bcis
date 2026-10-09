@@ -1,4 +1,4 @@
-# Architecture and Milestone 1 contracts
+# Architecture and API security contracts
 
 ```mermaid
 flowchart LR
@@ -13,7 +13,7 @@ flowchart LR
   F -. future .-> S[Attachments / audit / backups]
 ```
 
-Each desktop has its own main/preload/renderer processes. The diagram groups the boundary for readability. PostgreSQL is reachable by the API, not by any renderer or desktop client. The API owns transactions and authorization. There is no offline financial posting in this milestone.
+Each desktop has its own main/preload/renderer processes. The diagram groups the boundary for readability. PostgreSQL is reachable by the API, not by any renderer or desktop client. The API owns transactions, sessions, permissions, and audit records. There is no offline financial posting.
 
 ## Workspace responsibilities
 
@@ -29,9 +29,13 @@ Shared output is built before dependents. Development watches shared output alon
 
 `GET /health`: HTTP 200, `{ service: "bcis-api", status: "ok", timestamp: ISO-8601 UTC }`. Liveness only; does not claim database readiness.
 
-`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 1. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
+`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 2. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
 
-The singleton schema table and positive-version check are the only domain-independent database structures. A generated migration creates it and inserts version 1. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration runner is explicit; API startup never mutates the schema.
+`POST /auth/login` exchanges a validated username/password for an opaque bearer token. `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout` require that token. `GET /admin/users` additionally requires `user.manage`. Permission hooks execute in Fastify before the handler and record denied attempts.
+
+PostgreSQL stores salted scrypt password hashes and SHA-256 session-token hashes. A session has a 30-minute sliding idle deadline and an eight-hour absolute deadline. Login uses the same public error for missing users, wrong passwords, inactive users, and locked accounts. Five failed attempts lock an account for 15 minutes. The documented role policy is in `permission-matrix.md`.
+
+The initial migration creates the singleton version sentinel. Migration 0001 creates the normalized domain model, append-only audit trigger, and advances the version to 2. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration execution is explicit; API startup never mutates the schema.
 
 ## IPC and desktop security
 
@@ -41,10 +45,10 @@ Renderer has no Node integration, DB connection, arbitrary fetch, shell, filesys
 
 ## Current limitations and future invariants
 
-- Public health endpoints are the only implemented API surface. No login, RBAC, posting, subscriber/financial schema, audit domain, report generation, seed dataset, backup/restore or installer is delivered yet.
+- Authentication, RBAC, normalized storage, and audit boundaries are implemented. Subscriber/billing/payment/collection posting services, report generation, backup execution/restore, login UI, and installer remain future milestones.
 - ExcelJS/pdfmake, Table and React Hook Form are dependencies for later milestones; they are not fake report/table/form implementations.
 - Money is represented by canonical nonnegative integer centavo strings at the transport boundary, within PostgreSQL bigint range. Signed ledger movements, allocation arithmetic and payment rules require later domain design/tests.
-- Ten database pool connections support concurrent clients structurally. Three parallel health reads verify the foundation, not the PDF's financial concurrency acceptance test.
+- Ten database pool connections support concurrent clients structurally. Three parallel health reads verify the foundation, and direct API tests verify Cashier denial; financial concurrency acceptance remains pending.
 - Local project cluster is loopback-only on 55432. Production uses a restricted API database role and separately managed migrations; the development cluster owner is not a production account.
 - Production LAN transport should use HTTPS and host firewall rules. Client server-address override does not weaken sender validation or expose database credentials.
 

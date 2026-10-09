@@ -17,7 +17,8 @@ const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
 const app = await buildApp({ probeDatabase: database.probe, logLevel: 'silent' });
 
 beforeAll(async () => {
-  await database.pool.query('DROP TABLE IF EXISTS application_metadata');
+  await database.pool.query('DROP SCHEMA IF EXISTS public CASCADE');
+  await database.pool.query('CREATE SCHEMA public');
   await database.pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
 });
 afterAll(async () => { await app.close(); await database.close(); });
@@ -52,9 +53,9 @@ describe.sequential('real PostgreSQL foundation', () => {
   });
   it('reports a wrong schema version and recovers after correction', async () => {
     try {
-      await database.db.update(applicationMetadata).set({ schemaVersion: 2 });
+      await database.db.update(applicationMetadata).set({ schemaVersion: 99 });
       expect(await database.probe()).toBe('migration_required');
-    } finally { await database.db.update(applicationMetadata).set({ schemaVersion: 1 }); }
+    } finally { await database.db.update(applicationMetadata).set({ schemaVersion: 2 }); }
     expect(await database.probe()).toBe('connected');
   });
   it('reports unreachable PostgreSQL without pretending the API died', async () => {

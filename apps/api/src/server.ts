@@ -6,7 +6,7 @@ async function start() {
   const environment = loadEnvironment();
   const database = createDatabase(environment);
   const app = await buildApp({
-    probeDatabase: database.probe, closeDatabase: database.close, logLevel: environment.LOG_LEVEL,
+    probeDatabase: database.probe, closeDatabase: database.close, logLevel: environment.LOG_LEVEL, database,
   });
   database.pool.on('error', () => app.log.error('Idle database connection failed'));
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
