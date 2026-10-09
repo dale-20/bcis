@@ -22,7 +22,7 @@ npm run dev
 
 `setup` creates ignored app `.env` files without overwriting existing values. Before seeding, set `DEMO_ACCOUNT_PASSWORD` in `apps/api/.env` to a unique value of at least 12 characters. `db:local:init` creates an isolated cluster in `.local/postgres`, generates a random local password, and replaces only placeholder API URLs. It does not modify the existing Windows PostgreSQL service. `db:local:start` listens only on `127.0.0.1:55432` and creates `bcis_dev` and separate `bcis_test` databases. Credentials and logs stay ignored in `.local/`.
 
-The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md). They share the configured seed password only for initial access. The API requires each account to call `POST /auth/change-password` before permission-protected operations.
+The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md). They share the configured seed password only for initial access. The API requires each account to call `POST /auth/change-password` before permission-protected operations. Re-running the seed intentionally resets those seven demo passwords and restores the password-change requirement; do not use it to manage real users.
 
 The Electron window polls the API every 15 seconds and supports **Check again**. Green readiness requires a real database connection and applied migration. API-offline, database-unavailable and missing-migration states remain distinct. Disabled navigation names future modules; no financial results are fabricated.
 

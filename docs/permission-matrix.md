@@ -47,5 +47,5 @@ Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hash
 
 ## Synthetic demo identities
 
-Run `npm run db:seed:demo` with a unique `DEMO_ACCOUNT_PASSWORD` to create these development-only accounts: `owner.demo`, `admin.demo`, `cashier.demo`, `collections.demo`, `auditor.demo`, `technician.demo`, and `viewer.demo`. The seed is blocked when `NODE_ENV=production`. All accounts must replace the shared seed password through `/auth/change-password` before a permission-protected operation succeeds.
+Run `npm run db:seed:demo` with a unique `DEMO_ACCOUNT_PASSWORD` to create these development-only accounts: `owner.demo`, `admin.demo`, `cashier.demo`, `collections.demo`, `auditor.demo`, `technician.demo`, and `viewer.demo`. The seed is blocked when `NODE_ENV=production`. All accounts must replace the shared seed password through `/auth/change-password` before a permission-protected operation succeeds. Re-running the seed resets only these demo identities to the configured password and restores their password-change flags.
 
