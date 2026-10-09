@@ -8,7 +8,7 @@ import { seedOperationalDemoData } from './seed-operational.js';
 config({ path: apiEnvPath, quiet: true });
 const seedEnvironment = z.object({
   NODE_ENV: z.enum(['development', 'test']).default('development'),
-  DEMO_ACCOUNT_PASSWORD: z.string().min(12).max(128),
+  DEMO_ACCOUNT_PASSWORD: z.string().min(8).max(128),
 }).parse(process.env);
 const database = createDatabase(loadEnvironment());
 

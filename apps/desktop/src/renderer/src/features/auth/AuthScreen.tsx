@@ -46,7 +46,7 @@ export function AuthScreen({ user, pending, error, onLogin, onChangePassword }: 
           await onChangePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
         })}>
           <PasswordField label="Current password" registration={changeForm.register('currentPassword', { required: 'Current password is required' })} error={changeForm.formState.errors.currentPassword?.message} />
-          <PasswordField label="New password" autoComplete="new-password" registration={changeForm.register('newPassword', { required: 'New password is required', minLength: { value: 12, message: 'Use at least 12 characters' } })} error={changeForm.formState.errors.newPassword?.message} />
+          <PasswordField label="New password" autoComplete="new-password" registration={changeForm.register('newPassword', { required: 'New password is required', minLength: { value: 8, message: 'Use at least 8 characters' } })} error={changeForm.formState.errors.newPassword?.message} />
           <PasswordField label="Confirm new password" autoComplete="new-password" registration={changeForm.register('confirmPassword', { required: 'Confirm the new password' })} error={changeForm.formState.errors.confirmPassword?.message} />
           <Button className="auth-submit" disabled={pending}>{pending ? 'Updating password…' : <>Update password <ArrowRight aria-hidden="true" /></>}</Button>
         </form> : <form onSubmit={loginForm.handleSubmit(onLogin)}>

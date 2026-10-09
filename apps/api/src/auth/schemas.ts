@@ -8,17 +8,14 @@ export const loginSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(256),
-  newPassword: z.string().min(12).max(128),
+  newPassword: z.string().min(8).max(128),
 }).strict().superRefine((value, context) => {
   if (Buffer.byteLength(value.newPassword, 'utf8') > 128) {
     context.addIssue({ code: 'custom', path: ['newPassword'], message: 'Password exceeds 128 UTF-8 bytes' });
   }
-  if (value.currentPassword === value.newPassword) {
-    context.addIssue({ code: 'custom', path: ['newPassword'], message: 'New password must be different' });
-  }
 });
 
-export const demoPasswordSchema = z.string().min(12).max(128).superRefine((value, context) => {
+export const demoPasswordSchema = z.string().min(8).max(128).superRefine((value, context) => {
   if (Buffer.byteLength(value, 'utf8') > 128) context.addIssue({ code: 'custom', message: 'Password exceeds 128 UTF-8 bytes' });
 });
 

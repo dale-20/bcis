@@ -87,7 +87,7 @@ export const authPlugin: FastifyPluginAsync<AuthPluginOptions> = async (app, opt
         type: 'object', required: ['currentPassword', 'newPassword'], additionalProperties: false,
         properties: {
           currentPassword: { type: 'string', minLength: 1, maxLength: 256 },
-          newPassword: { type: 'string', minLength: 12, maxLength: 128 },
+          newPassword: { type: 'string', minLength: 8, maxLength: 128 },
         },
       },
       response: {

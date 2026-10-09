@@ -28,7 +28,7 @@ export const authenticatedUserSchema = z.object({
 export type AuthenticatedUser = z.infer<typeof authenticatedUserSchema>;
 
 export const loginInputSchema = z.object({ username: z.string().trim().min(3).max(64), password: z.string().min(1).max(256) });
-export const changePasswordInputSchema = z.object({ currentPassword: z.string().min(1).max(256), newPassword: z.string().min(12).max(128) });
+export const changePasswordInputSchema = z.object({ currentPassword: z.string().min(1).max(256), newPassword: z.string().min(8).max(128) });
 export const apiFailureSchema = z.object({ code: z.string(), message: z.string() });
 export type ApiFailure = z.infer<typeof apiFailureSchema>;
 export type DesktopResult<T> = { ok: true; data: T } | { ok: false; error: ApiFailure };
