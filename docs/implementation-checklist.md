@@ -13,8 +13,8 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 - [x] Implement a secure Electron window, narrow typed preload, and real API connection indicator.
 - [x] Configure Vitest unit/API/component tests, real PostgreSQL integration tests, and Playwright Electron tests.
 - [x] Provide setup/start/build/migration scripts and local/LAN setup instructions.
-- [ ] Verify typecheck, lint, unit/API tests, clean/repeat migrations, PostgreSQL integration, and Electron smoke tests; record results.
-- [ ] Commit verified Milestone 1 with meaningful history.
+- [x] Verify typecheck, lint, unit/API tests, clean/repeat migrations, PostgreSQL integration, and Electron smoke tests; record results.
+- [x] Commit verified Milestone 1 with meaningful history (`b36cdab`; later security and subscriber increments retain the same gates).
 
 ## Milestone 2 — Authentication and authorization (PDF §§3.1, 4.4, 5)
 

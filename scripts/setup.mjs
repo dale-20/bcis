@@ -6,4 +6,4 @@ for (const app of ['api', 'desktop']) {
   try { await access(target); console.log(`${app}: existing .env preserved`); }
   catch { await copyFile(`${target}.example`, target); console.log(`${app}: .env created`); }
 }
-console.log('Next: npm run db:local:init, npm run db:local:start, npm run db:migrate, npm run dev');
+console.log('Next: npm run db:local:init, npm run db:local:start, npm run db:migrate, npm run db:seed:demo, npm run dev');

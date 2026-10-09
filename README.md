@@ -45,8 +45,8 @@ Create separate empty `bcis_dev` and `bcis_test` databases with your database ad
 | `npm run dev` | Build/watch shared contracts; start API and Electron/Vite together |
 | `npm run dev:api` / `npm run dev:desktop` | Run one side during diagnosis or LAN development |
 | `npm run check` | Typecheck, ESLint, Vitest unit/API/component checks |
-| `npm run test:integration` | Reset foundation tables in dedicated `_test` DB; test migrations, constraints, rollback, readiness and simultaneous reads |
-| `npm run test:e2e` | Build, launch real Electron and API on 3101 against migrated `_test` DB, test connection/failure/security/a11y; writes screenshots |
+| `npm run test:integration` | Reset the dedicated `_test` DB; test clean/repeat migrations, constraints, rollback, RBAC, subscribers, and simultaneous reads |
+| `npm run test:e2e` | Build and launch real Electron/API against `_test`; test login, subscribers, connection failures, security, and accessibility |
 | `npm run build` | Compile shared/API and production Electron bundles |
 | `npm run start:api` / `npm run start:desktop` | Run built API/desktop on separate terminals |
 | `npm run db:generate` | Generate a reviewed migration after schema edits |

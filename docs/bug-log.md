@@ -7,5 +7,7 @@
 | Initial typecheck rejected an unused React import | Automatic JSX transform does not require React default import | Removed unused import and configured automatic JSX for Vitest | Strict typecheck and renderer component tests |
 | Drizzle generator could not launch esbuild in sandbox | Windows process restriction (`spawn EPERM`) | Ran the same authorized generator in allowed execution context | Generated SQL and migration integration tests |
 | Dependency audit reported six moderate transitive findings | Older esbuild via Drizzle loader and uuid via ExcelJS | Targeted uuid override; no forced downgrade of Drizzle or ExcelJS. Legacy Drizzle development dependency remains tracked. | Audit and export-library smoke check recorded in milestone report |
+| Built Electron opened without the typed bridge | The sandboxed CommonJS preload externalized the shared ESM workspace package | Bundled `@bcis/shared` into the preload while retaining the narrow bridge | Built Electron login/subscriber E2E and exact bridge-key assertion |
+| Subscriber list omitted contacts, addresses, and service counts | Correlated computed columns did not resolve the related rows in the list query | Replaced them with explicit primary-record joins and distinct service aggregates | PostgreSQL list assertion plus built Electron directory workflow |
 
-Financial acceptance defects will be tracked when those workflows exist. These foundation checks do not prove allocation, receipts, reversals, RBAC, or financial concurrency.
+Financial acceptance defects will be tracked when those workflows exist. These foundation checks do not prove allocation, receipts, reversals, or financial concurrency.
