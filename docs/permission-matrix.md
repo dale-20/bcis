@@ -42,6 +42,9 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /auth/change-password` | Valid bearer session | Password change recorded; other active sessions revoked |
 | `POST /auth/logout` | Valid bearer session | Session revoked and logout recorded |
 | `GET /admin/users` | Valid session, changed demo password, `user.manage` | Missing permission recorded as `authorization.denied` |
+| `POST /payments` | Valid session and `payment.create` | Posting or pending GCash submission is audited atomically |
+| `POST /payments/:id/gcash-verification` | Valid session and `payment.verify_gcash` | Verification/rejection records verifier, time, and audit evidence |
+| `POST /payments/:id/reverse` | Valid session and `payment.reverse` | Reversal reason, actor, restored value, receipt void, and audit are atomic |
 
 Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hashes. Sessions expire after 30 minutes idle or eight hours absolute time, and inactive users cannot authenticate. Passwords use salted scrypt with production parameters `N=131072`, `r=8`, `p=1`; hashes and tokens are excluded from audit payloads and response objects.
 

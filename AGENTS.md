@@ -2,7 +2,7 @@
 
 ## Scope and workflow
 
-The current implemented scope includes the foundation, API security, subscriber operations, and the billing core: monthly cycle generation, finalized invoice snapshots, subscription line items, duplicate-period protection, ledger debit posting, and reproducible running balances. The full laboratory checklist is in `docs/implementation-checklist.md`; a table or dependency alone does not complete its later workflow milestone.
+The current implemented scope includes the foundation, API security, subscriber operations, monthly billing, and the payment core: transactional Cash/verified-GCash posting, oldest-first allocation, receipts, unapplied credit, reversals, immutable financial history, audit, and reproducible ledgers. The full laboratory checklist is in `docs/implementation-checklist.md`; a table or dependency alone does not complete its later workflow milestone.
 
 - Read `docs/requirements.pdf` and the checklist before changing domain behavior.
 - Work in small feature increments: shared contract, migration/domain/API, tests, then UI.

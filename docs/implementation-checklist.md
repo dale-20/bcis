@@ -47,15 +47,15 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 ## Milestone 5 — Payments and receipts (PDF §§3.6–3.7, 3.11, 4.4)
 
 - [ ] Cash, GCash, Bank Transfer, Cheque, Other; payment datetime, amount, receipt, actor, method, reference, notes, optional proof.
-- [ ] Oldest unpaid invoice first; explicit authorized manual allocation policy if permitted. Exact, partial, and advance payment tests (AT-01–04).
-- [ ] Unallocated advance value remains customer credit, never disappears; document future-credit application policy.
+- [x] Oldest unpaid invoice first; explicit authorized manual allocation policy if permitted. Exact, partial, and advance payment tests (AT-01–04).
+- [x] Unallocated advance value remains customer credit, never disappears; document future-credit application policy.
 - [ ] Unique non-reusable receipt numbers, including voids; dedicated receipt print layout.
-- [ ] Preserve original payment and add linked reversal restoring balances, allocations/credit, and audit (AT-06).
-- [ ] GCash queue: proof/reference/sender/amount capture, duplicate reference control (AT-05), authorized verify/reject, verifier identity/time.
-- [ ] Only verified GCash can post. Uploaded screenshot alone never marks an account paid.
+- [x] Preserve original payment and add linked reversal restoring balances, allocations/credit, and audit (AT-06).
+- [x] GCash queue: proof/reference/sender/amount capture, duplicate reference control (AT-05), authorized verify/reject, verifier identity/time.
+- [x] Only verified GCash can post. Uploaded screenshot alone never marks an account paid.
 - [ ] Validate proof file type, size, safe paths; restricted attachment access.
 - [ ] Cashier flow: search, balance, amount/method, allocation preview, atomic post, receipt.
-- [ ] All financial posting, numbering, credit, allocations and audit commit/rollback together; concurrent retry/idempotency tests.
+- [x] All financial posting, numbering, credit, allocations and audit commit/rollback together; concurrent retry/idempotency tests.
 
 ## Milestone 6 — Collections (PDF §3.8)
 

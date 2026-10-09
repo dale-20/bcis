@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { SCHEMA_VERSION } from '@bcis/shared';
 import { createDatabase } from '../src/db/client.js';
 import { applicationMetadata } from '../src/db/schema.js';
 import { buildApp } from '../src/app.js';
@@ -41,7 +42,7 @@ describe.sequential('real PostgreSQL foundation', () => {
   });
   it('rolls back a multi-step transaction after a constraint failure', async () => {
     await expect(database.db.transaction(async (transaction) => {
-      await transaction.update(applicationMetadata).set({ schemaVersion: 3 });
+      await transaction.update(applicationMetadata).set({ schemaVersion: SCHEMA_VERSION });
       await transaction.execute(sql`INSERT INTO application_metadata (singleton, schema_version) VALUES (false, 1)`);
     })).rejects.toThrow();
     expect(await database.probe()).toBe('connected');
@@ -55,7 +56,7 @@ describe.sequential('real PostgreSQL foundation', () => {
     try {
       await database.db.update(applicationMetadata).set({ schemaVersion: 99 });
       expect(await database.probe()).toBe('migration_required');
-    } finally { await database.db.update(applicationMetadata).set({ schemaVersion: 3 }); }
+    } finally { await database.db.update(applicationMetadata).set({ schemaVersion: SCHEMA_VERSION }); }
     expect(await database.probe()).toBe('connected');
   });
   it('reports unreachable PostgreSQL without pretending the API died', async () => {

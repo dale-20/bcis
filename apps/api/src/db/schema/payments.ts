@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, index, integer, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar, text } from 'drizzle-orm/pg-core';
+import { bigint, check, index, integer, pgEnum, pgSequence, pgTable, primaryKey, timestamp, uniqueIndex, uuid, varchar, text } from 'drizzle-orm/pg-core';
 import { invoices } from './billing.js';
 import { subscribers } from './subscribers.js';
 import { users } from './security.js';
@@ -9,9 +9,11 @@ export const paymentStatus = pgEnum('payment_status', ['PENDING_VERIFICATION', '
 export const proofStatus = pgEnum('proof_status', ['PENDING', 'VERIFIED', 'REJECTED']);
 export const receiptStatus = pgEnum('receipt_status', ['ISSUED', 'VOID']);
 export const creditStatus = pgEnum('credit_status', ['AVAILABLE', 'PARTIALLY_USED', 'USED', 'REVERSED']);
+export const receiptNumberSequence = pgSequence('receipt_number_seq', { startWith: 1, increment: 1, minValue: 1 });
 
 export const payments = pgTable('payments', {
   id: uuid('id').primaryKey().defaultRandom(),
+  idempotencyKey: varchar('idempotency_key', { length: 100 }).notNull(),
   subscriberId: uuid('subscriber_id').notNull().references(() => subscribers.id, { onDelete: 'restrict' }),
   paymentDate: timestamp('payment_date', { withTimezone: true }).notNull(),
   amountCentavos: bigint('amount_centavos', { mode: 'bigint' }).notNull(),
@@ -28,6 +30,7 @@ export const payments = pgTable('payments', {
   index('payments_subscriber_date_idx').on(table.subscriberId, table.paymentDate),
   index('payments_date_method_idx').on(table.paymentDate, table.method),
   index('payments_reference_idx').on(table.referenceNumber),
+  uniqueIndex('payments_idempotency_key_uq').on(table.idempotencyKey),
   uniqueIndex('payments_gcash_reference_uq').on(sql`lower(${table.referenceNumber})`).where(sql`${table.method} = 'GCASH' AND ${table.referenceNumber} IS NOT NULL`),
   check('payments_amount_positive', sql`${table.amountCentavos} > 0`),
   check('payments_gcash_reference_required', sql`${table.method} <> 'GCASH' OR ${table.referenceNumber} IS NOT NULL`),
