@@ -30,6 +30,8 @@ import {
   DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
   BILLING_CYCLES_LIST_CHANNEL, BILLING_PREVIEW_CHANNEL, BILLING_GENERATE_CHANNEL, BILLING_CYCLE_GET_CHANNEL,
   INVOICES_LIST_CHANNEL, INVOICE_GET_CHANNEL,
+  INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
+  SUBSCRIBER_LEDGER_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -71,5 +73,9 @@ const bridge: DesktopBridge = Object.freeze({
   getBillingCycle: (id: string) => ipcRenderer.invoke(BILLING_CYCLE_GET_CHANNEL, id),
   listInvoices: (query: Parameters<DesktopBridge['listInvoices']>[0]) => ipcRenderer.invoke(INVOICES_LIST_CHANNEL, query),
   getInvoice: (id: string) => ipcRenderer.invoke(INVOICE_GET_CHANNEL, id),
+  postInvoiceAdjustment: (id: string, input: Parameters<DesktopBridge['postInvoiceAdjustment']>[1]) => ipcRenderer.invoke(INVOICE_ADJUST_CHANNEL, { id, input }),
+  voidInvoice: (id: string, input: Parameters<DesktopBridge['voidInvoice']>[1]) => ipcRenderer.invoke(INVOICE_VOID_CHANNEL, { id, input }),
+  processOverdueInvoices: (input: Parameters<DesktopBridge['processOverdueInvoices']>[0]) => ipcRenderer.invoke(BILLING_OVERDUE_PROCESS_CHANNEL, input),
+  getSubscriberLedger: (id: string, query: Parameters<DesktopBridge['getSubscriberLedger']>[1]) => ipcRenderer.invoke(SUBSCRIBER_LEDGER_CHANNEL, { id, query }),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

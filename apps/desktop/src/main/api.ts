@@ -37,6 +37,10 @@ import {
   invoiceDetailSchema, invoiceListResponseSchema,
   type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
   type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
+  invoiceMutationResultSchema, overdueResultSchema,
+  type PostInvoiceAdjustment, type ProcessOverdue, type InvoiceMutationResult, type OverdueResult, type VoidInvoice,
+  postInvoiceAdjustmentSchema, processOverdueSchema, voidInvoiceSchema,
+  subscriberLedgerSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
 } from '@bcis/shared';
 import { z } from 'zod';
 
@@ -210,6 +214,26 @@ export class DesktopApiClient {
 
   getInvoice(id: string): Promise<DesktopResult<InvoiceDetail>> {
     return this.call(`/invoices/${encodeURIComponent(id)}`, { method: 'GET' }, invoiceDetailSchema);
+  }
+
+  postInvoiceAdjustment(id: string, input: PostInvoiceAdjustment): Promise<DesktopResult<InvoiceMutationResult>> {
+    return this.call(`/invoices/${encodeURIComponent(id)}/adjustments`, { method: 'POST', body: JSON.stringify(postInvoiceAdjustmentSchema.parse(input)) }, invoiceMutationResultSchema);
+  }
+
+  voidInvoice(id: string, input: VoidInvoice): Promise<DesktopResult<InvoiceMutationResult>> {
+    return this.call(`/invoices/${encodeURIComponent(id)}/void`, { method: 'POST', body: JSON.stringify(voidInvoiceSchema.parse(input)) }, invoiceMutationResultSchema);
+  }
+
+  processOverdueInvoices(input: ProcessOverdue): Promise<DesktopResult<OverdueResult>> {
+    return this.call('/billing/overdue/process', { method: 'POST', body: JSON.stringify(processOverdueSchema.parse(input)) }, overdueResultSchema);
+  }
+
+  getSubscriberLedger(id: string, query: SubscriberLedgerQuery): Promise<DesktopResult<SubscriberLedger>> {
+    const parsedQuery = subscriberLedgerQuerySchema.parse(query);
+    const parameters = new URLSearchParams();
+    if (parsedQuery.from) parameters.set('from', parsedQuery.from);
+    if (parsedQuery.to) parameters.set('to', parsedQuery.to);
+    return this.call(`/subscribers/${encodeURIComponent(id)}/ledger?${parameters.toString()}`, { method: 'GET' }, subscriberLedgerSchema);
   }
 
   async downloadReport(query: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {

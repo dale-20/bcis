@@ -161,7 +161,10 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     const [original] = await database.db.select().from(payments).where(eq(payments.id, exactPaymentId));
     const [reversal] = await database.db.select().from(paymentReversals).where(eq(paymentReversals.paymentId, exactPaymentId));
     const [receipt] = await database.db.select().from(receipts).where(eq(receipts.paymentId, exactPaymentId));
-    expect(invoice).toMatchObject({ status: 'UNPAID', balanceCentavos: 99_900n });
+    expect(invoice).toMatchObject({
+      status: invoice && invoice.dueDate < new Date().toISOString().slice(0, 10) ? 'OVERDUE' : 'UNPAID',
+      balanceCentavos: 99_900n,
+    });
     expect(original?.status).toBe('REVERSED');
     expect(reversal).toMatchObject({ reason: 'Synthetic correction' });
     expect(receipt).toMatchObject({ status: 'VOID', voidReason: 'Synthetic correction' });

@@ -47,8 +47,12 @@ import { dashboardQuerySchema, reportRequestSchema, type Dashboard, type Dashboa
 import {
   billingCycleDetailSchema, billingCycleListSchema, billingGenerationResultSchema, billingPreviewSchema,
   generateBillingCycleInputSchema, invoiceDetailSchema, invoiceListQuerySchema, invoiceListResponseSchema,
+  postInvoiceAdjustmentSchema, processOverdueSchema, invoiceMutationResultSchema, overdueResultSchema, voidInvoiceSchema,
   type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
   type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
+  type PostInvoiceAdjustment, type ProcessOverdue, type InvoiceMutationResult, type OverdueResult, type VoidInvoice,
+  subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
+  subscriberLedgerSchema,
 } from './billing.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
@@ -87,6 +91,10 @@ export const BILLING_GENERATE_CHANNEL = 'bcis:billing:generate';
 export const BILLING_CYCLE_GET_CHANNEL = 'bcis:billing-cycle:get';
 export const INVOICES_LIST_CHANNEL = 'bcis:invoices:list';
 export const INVOICE_GET_CHANNEL = 'bcis:invoice:get';
+export const INVOICE_ADJUST_CHANNEL = 'bcis:invoice:adjust';
+export const INVOICE_VOID_CHANNEL = 'bcis:invoice:void';
+export const BILLING_OVERDUE_PROCESS_CHANNEL = 'bcis:billing:overdue-process';
+export const SUBSCRIBER_LEDGER_CHANNEL = 'bcis:subscriber-ledger:get';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -154,6 +162,9 @@ export const billingGenerationResultDesktopSchema = desktopResult(billingGenerat
 export const billingCycleDetailResultSchema = desktopResult(billingCycleDetailSchema);
 export const invoiceListResultSchema = desktopResult(invoiceListResponseSchema);
 export const invoiceDetailResultSchema = desktopResult(invoiceDetailSchema);
+export const invoiceMutationResultDesktopSchema = desktopResult(invoiceMutationResultSchema);
+export const overdueResultDesktopSchema = desktopResult(overdueResultSchema);
+export const subscriberLedgerDesktopResultSchema = desktopResult(subscriberLedgerSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -193,6 +204,10 @@ export interface DesktopBridge {
   getBillingCycle: (id: string) => Promise<DesktopResult<BillingCycleDetail>>;
   listInvoices: (query: InvoiceListQuery) => Promise<DesktopResult<InvoiceListResponse>>;
   getInvoice: (id: string) => Promise<DesktopResult<InvoiceDetail>>;
+  postInvoiceAdjustment: (id: string, input: PostInvoiceAdjustment) => Promise<DesktopResult<InvoiceMutationResult>>;
+  voidInvoice: (id: string, input: VoidInvoice) => Promise<DesktopResult<InvoiceMutationResult>>;
+  processOverdueInvoices: (input: ProcessOverdue) => Promise<DesktopResult<OverdueResult>>;
+  getSubscriberLedger: (id: string, query: SubscriberLedgerQuery) => Promise<DesktopResult<SubscriberLedger>>;
 }
 
 export const desktopRequestSchemas = {
@@ -222,5 +237,9 @@ export const desktopRequestSchemas = {
   billingCycleId: z.uuid(),
   invoiceList: invoiceListQuerySchema,
   invoiceId: z.uuid(),
+  invoiceAdjustment: z.object({ id: z.uuid(), input: postInvoiceAdjustmentSchema }),
+  invoiceVoid: z.object({ id: z.uuid(), input: voidInvoiceSchema }),
+  overdueProcess: processOverdueSchema,
+  subscriberLedger: z.object({ id: z.uuid(), query: subscriberLedgerQuerySchema }),
 };
 

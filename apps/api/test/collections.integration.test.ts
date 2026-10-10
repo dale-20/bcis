@@ -188,6 +188,12 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const statement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-01-01&to=2026-12-31&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(statement.statusCode, statement.body).toBe(200);
     expect(statement.json<ReportData>().title).toContain('Subscriber statement');
+    const rangedStatement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-09-01&to=2026-09-30&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(rangedStatement.statusCode, rangedStatement.body).toBe(200);
+    expect(rangedStatement.json<ReportData>().totals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Opening balance', value: expect.stringMatching(/\$|₱/) }),
+      expect.objectContaining({ label: 'Closing balance', value: expect.any(String) }),
+    ]));
     const denied = await app.inject({ method: 'GET', url: '/reports/data?report=AR_AGING&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.cashier}` } });
     expect(denied.statusCode).toBe(403);
   });

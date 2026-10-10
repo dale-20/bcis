@@ -54,6 +54,10 @@ import {
   generateBillingCycleInputSchema, invoiceDetailResultSchema, invoiceListQuerySchema, invoiceListResultSchema,
   type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
   type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
+  invoiceMutationResultDesktopSchema, overdueResultDesktopSchema,
+  type PostInvoiceAdjustment, type ProcessOverdue, type InvoiceMutationResult, type OverdueResult, type VoidInvoice,
+  postInvoiceAdjustmentSchema, processOverdueSchema, voidInvoiceSchema,
+  subscriberLedgerDesktopResultSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
 } from '@bcis/shared';
 
 export class DesktopServiceError extends Error {
@@ -239,5 +243,25 @@ export async function listInvoices(query: InvoiceListQuery): Promise<InvoiceList
 
 export async function getInvoice(id: string): Promise<InvoiceDetail> {
   return unwrap(invoiceDetailResultSchema.parse(await bridge().getInvoice(id)));
+}
+
+export async function postInvoiceAdjustment(id: string, input: PostInvoiceAdjustment): Promise<InvoiceMutationResult> {
+  const command = postInvoiceAdjustmentSchema.parse(input);
+  return unwrap(invoiceMutationResultDesktopSchema.parse(await bridge().postInvoiceAdjustment(id, command)));
+}
+
+export async function voidInvoice(id: string, input: VoidInvoice): Promise<InvoiceMutationResult> {
+  const command = voidInvoiceSchema.parse(input);
+  return unwrap(invoiceMutationResultDesktopSchema.parse(await bridge().voidInvoice(id, command)));
+}
+
+export async function processOverdueInvoices(input: ProcessOverdue): Promise<OverdueResult> {
+  const command = processOverdueSchema.parse(input);
+  return unwrap(overdueResultDesktopSchema.parse(await bridge().processOverdueInvoices(command)));
+}
+
+export async function getSubscriberLedger(id: string, input: SubscriberLedgerQuery = {}): Promise<SubscriberLedger> {
+  const query = subscriberLedgerQuerySchema.parse(input);
+  return unwrap(subscriberLedgerDesktopResultSchema.parse(await bridge().getSubscriberLedger(id, query)));
 }
 

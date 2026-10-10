@@ -8,6 +8,12 @@ import {
   invoiceDetailSchema,
   invoiceListQuerySchema,
   invoiceListResponseSchema,
+  invoiceMutationResultSchema,
+  overdueResultSchema,
+  postInvoiceAdjustmentSchema,
+  processOverdueSchema,
+  subscriberLedgerQuerySchema,
+  voidInvoiceSchema,
   subscriberLedgerSchema,
 } from '@bcis/shared';
 import type { AuthService } from '../auth/service.js';
@@ -42,8 +48,8 @@ const ledgerEntryResponse = { type: 'object', required: ['id', 'occurredAt', 're
   id: { type: 'string', format: 'uuid' }, occurredAt: { type: 'string', format: 'date-time' }, referenceType: { type: 'string' }, referenceId: { type: 'string', format: 'uuid' }, referenceNumber: { type: 'string' },
   description: { type: 'string' }, debitCentavos: { type: 'string' }, creditCentavos: { type: 'string' }, runningBalanceCentavos: { type: 'string' },
 } } as const;
-const ledgerResponse = { type: 'object', required: ['subscriberId', 'entries', 'closingBalanceCentavos'], additionalProperties: false, properties: {
-  subscriberId: { type: 'string', format: 'uuid' }, entries: { type: 'array', items: ledgerEntryResponse }, closingBalanceCentavos: { type: 'string' },
+const ledgerResponse = { type: 'object', required: ['subscriberId', 'from', 'to', 'openingBalanceCentavos', 'entries', 'closingBalanceCentavos'], additionalProperties: false, properties: {
+  subscriberId: { type: 'string', format: 'uuid' }, from: { anyOf: [{ type: 'string', format: 'date' }, { type: 'null' }] }, to: { anyOf: [{ type: 'string', format: 'date' }, { type: 'null' }] }, openingBalanceCentavos: { type: 'string' }, entries: { type: 'array', items: ledgerEntryResponse }, closingBalanceCentavos: { type: 'string' },
 } } as const;
 const uuidParams = { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } } as const;
 const cycleSummaryResponse = { type: 'object', required: ['id', 'period', 'periodStart', 'periodEnd', 'status', 'finalizedAt', 'invoiceCount', 'totalInvoicedCentavos'], additionalProperties: false, properties: {
@@ -97,8 +103,38 @@ export const billingPlugin: FastifyPluginAsync<BillingPluginOptions> = async (ap
 
   app.get('/invoices/:id', {
     preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
-    schema: { params: uuidParams, response: { 200: { ...invoiceListItemResponse, required: [...invoiceListItemResponse.required, 'finalizedAt', 'items', 'ledgerEntry'], properties: { ...invoiceListItemResponse.properties, finalizedAt: { type: 'string', format: 'date-time' }, items: { type: 'array', items: itemResponse }, ledgerEntry: { anyOf: [{ type: 'object', required: ['id', 'referenceNumber'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, referenceNumber: { type: 'string' } } }, { type: 'null' }] } } }, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+    schema: { params: uuidParams, response: { 200: { ...invoiceListItemResponse, required: [...invoiceListItemResponse.required, 'finalizedAt', 'items', 'ledgerEntry', 'adjustments', 'voidedAt', 'voidReason'], properties: { ...invoiceListItemResponse.properties, finalizedAt: { type: 'string', format: 'date-time' }, items: { type: 'array', items: itemResponse }, ledgerEntry: { anyOf: [{ type: 'object', required: ['id', 'referenceNumber'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, referenceNumber: { type: 'string' } } }, { type: 'null' }] }, adjustments: { type: 'array', items: { type: 'object', required: ['id', 'amountCentavos', 'reason', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, amountCentavos: { type: 'string' }, reason: { type: 'string' }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } }, voidedAt: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] }, voidReason: { anyOf: [{ type: 'string' }, { type: 'null' }] } } }, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
   }, async (request) => invoiceDetailSchema.parse(await service.invoice((request.params as { id: string }).id)));
+
+  const mutationResponse = { type: 'object', required: ['invoiceId', 'status', 'balanceCentavos'], additionalProperties: false, properties: { invoiceId: { type: 'string', format: 'uuid' }, status: { type: 'string' }, balanceCentavos: { type: 'string' } } } as const;
+  app.post('/invoices/:id/adjustments', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.adjust')],
+    schema: { params: uuidParams, body: { type: 'object' }, response: { 200: mutationResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return invoiceMutationResultSchema.parse(await service.adjust((request.params as { id: string }).id, postInvoiceAdjustmentSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/invoices/:id/void', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.adjust')],
+    schema: { params: uuidParams, body: { type: 'object', required: ['reason'], additionalProperties: false, properties: { reason: { type: 'string', minLength: 8, maxLength: 255 } } }, response: { 200: mutationResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const input = voidInvoiceSchema.parse(request.body);
+    return invoiceMutationResultSchema.parse(await service.void((request.params as { id: string }).id, input.reason, context.userId, request.id));
+  });
+
+  app.post('/billing/overdue/process', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.generate')],
+    schema: { body: { type: 'object', required: ['asOf'], additionalProperties: false, properties: { asOf: { type: 'string', format: 'date' } } }, response: { 200: { type: 'object', required: ['asOf', 'invoicesMarkedOverdue'], additionalProperties: false, properties: { asOf: { type: 'string', format: 'date' }, invoicesMarkedOverdue: { type: 'integer' } } }, 400: errorResponse, 401: errorResponse, 403: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const input = processOverdueSchema.parse(request.body);
+    return overdueResultSchema.parse(await service.processOverdue(input.asOf, context.userId, request.id));
+  });
 
   app.get('/billing/cycles/:id', {
     preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
@@ -110,9 +146,9 @@ export const billingPlugin: FastifyPluginAsync<BillingPluginOptions> = async (ap
 
   app.get('/subscribers/:id/ledger', {
     preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
-    schema: { params: uuidParams, response: { 200: ledgerResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+    schema: { params: uuidParams, querystring: { type: 'object', additionalProperties: false, properties: { from: { type: 'string', format: 'date' }, to: { type: 'string', format: 'date' } } }, response: { 200: ledgerResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
   }, async (request) => {
     const id = (request.params as { id: string }).id;
-    return subscriberLedgerSchema.parse(await service.ledger(id));
+    return subscriberLedgerSchema.parse(await service.ledger(id, subscriberLedgerQuerySchema.parse(request.query)));
   });
 };

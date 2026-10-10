@@ -35,6 +35,8 @@ import {
   DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
   BILLING_CYCLES_LIST_CHANNEL, BILLING_PREVIEW_CHANNEL, BILLING_GENERATE_CHANNEL, BILLING_CYCLE_GET_CHANNEL,
   INVOICES_LIST_CHANNEL, INVOICE_GET_CHANNEL,
+  INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
+  SUBSCRIBER_LEDGER_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -112,6 +114,10 @@ void app.whenReady().then(() => {
   ipcMain.handle(BILLING_CYCLE_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getBillingCycle(desktopRequestSchemas.billingCycleId.parse(input)); });
   ipcMain.handle(INVOICES_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.listInvoices(desktopRequestSchemas.invoiceList.parse(input)); });
   ipcMain.handle(INVOICE_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getInvoice(desktopRequestSchemas.invoiceId.parse(input)); });
+  ipcMain.handle(INVOICE_ADJUST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.invoiceAdjustment.parse(input); return api.postInvoiceAdjustment(command.id, command.input); });
+  ipcMain.handle(INVOICE_VOID_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.invoiceVoid.parse(input); return api.voidInvoice(command.id, command.input); });
+  ipcMain.handle(BILLING_OVERDUE_PROCESS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.processOverdueInvoices(desktopRequestSchemas.overdueProcess.parse(input)); });
+  ipcMain.handle(SUBSCRIBER_LEDGER_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberLedger.parse(input); return api.getSubscriberLedger(command.id, command.query); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

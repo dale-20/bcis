@@ -65,17 +65,21 @@ Delivered: subscriber identity, notes, contacts, and addresses support audited e
 
 ## Increment 3 - Billing, invoices, adjustments, and ledger
 
+**Status: COMPLETE (2026-10-11).** Billing cycle and invoice workspaces are connected to real PostgreSQL queries through Fastify and the validated Electron preload. Admin/Owner can preview and generate; read-only roles can inspect; Cashier is denied preview, generation, adjustment, void, and overdue processing.
+
 **Goal:** Let Admin run and inspect monthly billing without using API tools.
 
-- Add billing-cycle list, preview, generation progress/result, duplicate-run explanation, and cycle detail.
-- Add server-paginated invoice list with period, status, subscriber, service, due date, and amount filters.
-- Add invoice detail with immutable line items and ledger links.
-- Add overdue-state processing.
-- Add controlled debit/credit adjustment and invoice void workflows with reason, permission, and audit.
-- Support subscription, installation, reconnection, discount, penalty, and adjustment line types.
-- Add subscriber ledger with date range, reproducible running balance, and Statement of Account print/export.
+- [x] Add billing-cycle list, preview, generation progress/result, duplicate-run explanation, and cycle detail.
+- [x] Add server-paginated invoice list with period, status, subscriber, service, due date, and amount filters.
+- [x] Add invoice detail with immutable line items and ledger links.
+- [x] Add overdue-state processing.
+- [x] Add controlled debit/credit adjustment and invoice void workflows with reason, permission, and audit.
+- [x] Support subscription, installation, reconnection, discount, penalty, and adjustment line types.
+- [x] Add subscriber ledger with date range, reproducible running balance, and Statement of Account print/export.
 
-**Gate:** Invoice creation, due dates, immutable values, ledger balance, rollback, and duplicate billing pass; AT-11 remains green; Admin and Owner can generate while Cashier cannot.
+Delivered: preview reads the same eligibility/period rules as generation and writes nothing. Cycle generation remains atomic, sequence-numbered, immutable, and duplicate-safe. Invoice browsing is server-paginated with search and date/amount filters; detail includes original line items, adjustment history, current balance, ledger reference, and finalization metadata. Overdue processing is date-driven and audited per invoice. Adjustments write signed ledger entries and preserve original invoice items; voids are allowed only before any payment/adjustment and add a compensating credit. Ledger date filters retain opening/running/closing balances. Existing Statement of Account printing and PDF/XLSX exports now carry the correct opening balance. Integration tests cover Cashier denial, adjustment/reversal balance restoration, void constraints, overdue audits, query filters, immutable values, rollback, and real PostgreSQL migrations; the built Electron test exercises the desktop screens and mutations.
+
+**Gate:** PASS. Invoice creation, due dates, immutable values, ledger balance, rollback, and duplicate billing pass; AT-11 remains green; Admin and Owner can generate while Cashier cannot.
 
 ## Increment 4 - Cashier payments, receipts, and customer credit
 

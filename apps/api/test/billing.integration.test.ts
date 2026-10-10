@@ -10,7 +10,7 @@ import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
 import { AuthService } from '../src/auth/service.js';
 import { createDatabase } from '../src/db/client.js';
 import { seedOperationalDemoData } from '../src/db/seed-operational.js';
-import { auditLogs, billingCycles, invoiceItems, invoices, ledgerEntries, serviceAccounts, servicePlans } from '../src/db/schema.js';
+import { adjustments, auditLogs, billingCycles, invoiceItems, invoices, ledgerEntries, serviceAccounts, servicePlans } from '../src/db/schema.js';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
 const url = process.env.TEST_DATABASE_URL;
@@ -120,7 +120,7 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     expect(cyclesResponse.statusCode).toBe(200);
     expect(cyclesResponse.json<BillingCycleList>().items[0]).toMatchObject({ id: cycleId, period: '2026-08', invoiceCount: expectedActiveServices, totalInvoicedCentavos: expectedTotal.toString() });
 
-    const listResponse = await app.inject({ method: 'GET', url: '/invoices?period=2026-08&status=UNPAID&page=1&pageSize=10&query=SVC-00001-1', headers: { authorization: `Bearer ${cashierToken}` } });
+    const listResponse = await app.inject({ method: 'GET', url: '/invoices?period=2026-08&status=UNPAID&page=1&pageSize=10&query=SVC-00001-1&dueFrom=2026-08-11&dueTo=2026-08-11&minAmountCentavos=99900&maxAmountCentavos=99900', headers: { authorization: `Bearer ${cashierToken}` } });
     expect(listResponse.statusCode).toBe(200);
     const list = listResponse.json<InvoiceListResponse>();
     expect(list.total).toBe(1);
@@ -152,6 +152,66 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     expect(detail.invoices.find((candidate) => candidate.id === invoice.id)).toMatchObject({ totalCentavos: '99900', balanceCentavos: '99900' });
   });
 
+  it('posts signed adjustments atomically and denies Cashier adjustment access', async () => {
+    const target = (await app.inject({ method: 'GET', url: '/invoices?query=SVC-00002-1&page=1&pageSize=10', headers: { authorization: `Bearer ${adminToken}` } })).json<InvoiceListResponse>().items[0];
+    if (!target) throw new Error('Adjustment target missing');
+    const denied = await app.inject({ method: 'POST', url: `/invoices/${target.id}/adjustments`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { amountCentavos: '25000', lineType: 'INSTALLATION', reason: 'Synthetic installation charge' } });
+    expect(denied.statusCode).toBe(403);
+    const debit = await app.inject({ method: 'POST', url: `/invoices/${target.id}/adjustments`, headers: { authorization: `Bearer ${adminToken}` }, payload: { amountCentavos: '25000', lineType: 'INSTALLATION', reason: 'Synthetic installation charge' } });
+    expect(debit.statusCode).toBe(200);
+    expect(debit.json()).toMatchObject({ invoiceId: target.id, balanceCentavos: (BigInt(target.balanceCentavos) + 25_000n).toString() });
+    const credit = await app.inject({ method: 'POST', url: `/invoices/${target.id}/adjustments`, headers: { authorization: `Bearer ${adminToken}` }, payload: { amountCentavos: '-5000', lineType: 'DISCOUNT', reason: 'Synthetic loyalty discount' } });
+    expect(credit.statusCode).toBe(200);
+    const detail = (await app.inject({ method: 'GET', url: `/invoices/${target.id}`, headers: { authorization: `Bearer ${adminToken}` } })).json<InvoiceDetail>();
+    expect(detail.balanceCentavos).toBe((BigInt(target.balanceCentavos) + 20_000n).toString());
+    expect(detail.adjustments.map((item) => item.amountCentavos)).toEqual(['25000', '-5000']);
+    const paymentResponse = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${adminToken}` }, payload: {
+      subscriberId: target.subscriberId, amountCentavos: '10000', paymentDate: '2026-08-20T08:00:00.000Z', idempotencyKey: '00000000-0000-4000-8000-000000000101', method: 'CASH',
+    } });
+    expect(paymentResponse.statusCode).toBe(200);
+    const paymentId = paymentResponse.json<{ paymentId: string; allocations: { invoiceId: string }[] }>().paymentId;
+    expect(paymentResponse.json<{ allocations: { invoiceId: string }[] }>().allocations[0]?.invoiceId).toBe(target.id);
+    const reversed = await app.inject({ method: 'POST', url: `/payments/${paymentId}/reverse`, headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Synthetic adjustment reversal test' } });
+    expect(reversed.statusCode, JSON.stringify(reversed.json())).toBe(200);
+    const restored = (await app.inject({ method: 'GET', url: `/invoices/${target.id}`, headers: { authorization: `Bearer ${adminToken}` } })).json<InvoiceDetail>();
+    expect(restored).toMatchObject({
+      balanceCentavos: detail.balanceCentavos,
+      status: target.dueDate < new Date().toISOString().slice(0, 10) ? 'OVERDUE' : 'UNPAID',
+    });
+    const [posted] = await database.db.select().from(adjustments).where(eq(adjustments.invoiceId, target.id)).limit(1);
+    if (!posted) throw new Error('Posted adjustment missing');
+    await expect(database.db.delete(adjustments).where(eq(adjustments.id, posted.id))).rejects.toMatchObject({ cause: { code: '55000' } });
+    const adjustmentAudit = await database.db.select().from(auditLogs).where(and(eq(auditLogs.action, 'invoice.adjustment.posted'), eq(auditLogs.entityId, target.id)));
+    expect(adjustmentAudit).toHaveLength(2);
+  });
+
+  it('voids only untouched invoices with a compensating ledger entry', async () => {
+    const target = (await app.inject({ method: 'GET', url: '/invoices?query=SVC-00003-1&page=1&pageSize=10', headers: { authorization: `Bearer ${adminToken}` } })).json<InvoiceListResponse>().items[0];
+    if (!target) throw new Error('Void target missing');
+    const response = await app.inject({ method: 'POST', url: `/invoices/${target.id}/void`, headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Synthetic duplicate service validation' } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ invoiceId: target.id, status: 'VOID', balanceCentavos: '0' });
+    const detail = (await app.inject({ method: 'GET', url: `/invoices/${target.id}`, headers: { authorization: `Bearer ${adminToken}` } })).json<InvoiceDetail>();
+    expect(detail).toMatchObject({ status: 'VOID', balanceCentavos: '0', voidReason: 'Synthetic duplicate service validation' });
+    const [credit] = await database.db.select().from(ledgerEntries).where(and(eq(ledgerEntries.referenceType, 'INVOICE_VOID'), eq(ledgerEntries.referenceId, target.id))).limit(1);
+    expect(credit?.creditCentavos).toBe(BigInt(target.totalCentavos));
+    const repeat = await app.inject({ method: 'POST', url: `/invoices/${target.id}/void`, headers: { authorization: `Bearer ${adminToken}` }, payload: { reason: 'Synthetic repeated void attempt' } });
+    expect(repeat.statusCode).toBe(409);
+  });
+
+  it('processes overdue invoice states with authorized, audited bulk posting', async () => {
+    const denied = await app.inject({ method: 'POST', url: '/billing/overdue/process', headers: { authorization: `Bearer ${cashierToken}` }, payload: { asOf: '2026-09-01' } });
+    expect(denied.statusCode).toBe(403);
+    const response = await app.inject({ method: 'POST', url: '/billing/overdue/process', headers: { authorization: `Bearer ${adminToken}` }, payload: { asOf: '2026-09-01' } });
+    expect(response.statusCode).toBe(200);
+    const { invoicesMarkedOverdue } = response.json<{ invoicesMarkedOverdue: number }>();
+    expect(invoicesMarkedOverdue).toBeGreaterThan(0);
+    const overdue = await database.db.select().from(invoices).where(eq(invoices.status, 'OVERDUE'));
+    expect(overdue.length).toBeGreaterThan(0);
+    const overdueAudits = await database.db.select().from(auditLogs).where(eq(auditLogs.action, 'invoice.marked_overdue'));
+    expect(overdueAudits).toHaveLength(invoicesMarkedOverdue);
+  });
+
   it('returns a chronological ledger with a reproducible running balance', async () => {
     const [service] = await database.db.select({ subscriberId: serviceAccounts.subscriberId }).from(serviceAccounts)
       .where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00001-1')).limit(1);
@@ -165,6 +225,11 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     expect(ledger.entries.map((entry) => entry.runningBalanceCentavos)).toEqual(['99900', '154800']);
     expect(ledger.closingBalanceCentavos).toBe('154800');
     expect(second.json()).toEqual(ledger);
+    const ranged = await app.inject({ method: 'GET', url: `/subscribers/${service.subscriberId}/ledger?from=2026-08-02&to=2026-08-31`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(ranged.statusCode).toBe(200);
+    expect(ranged.json<SubscriberLedger>()).toMatchObject({ from: '2026-08-02', to: '2026-08-31', openingBalanceCentavos: '154800', entries: [], closingBalanceCentavos: '154800' });
+    const invalidRange = await app.inject({ method: 'GET', url: `/subscribers/${service.subscriberId}/ledger?from=2026-08-31&to=2026-08-01`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(invalidRange.statusCode).toBe(400);
   });
 
   it('rolls back the entire cycle when any financial posting step fails', async () => {

@@ -37,11 +37,11 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 ## Milestone 4 — Billing and ledger (PDF §§3.4–3.5, 5)
 
 - [x] Calendar-month billing cycles and subscription invoices generated for active service accounts.
-- [ ] DRAFT, UNPAID, PARTIALLY_PAID, PAID, OVERDUE, VOID, CREDITED states exist; payment/overdue/void transition workflows remain pending.
-- [ ] Exact subscription line items are implemented; installation/reconnection, discounts, penalties, and adjustment workflows remain pending.
+- [x] DRAFT, UNPAID, PARTIALLY_PAID, PAID, OVERDUE, VOID, CREDITED states and payment/overdue/void transition workflows.
+- [x] Exact subscription line items plus installation/reconnection, discount, penalty, and signed adjustment postings.
 - [x] Database-sequenced unique invoice numbers and concurrent service/period duplicate protection (AT-11).
-- [ ] Finalized invoice values and items are database-immutable; audited adjustment/void commands remain pending.
-- [ ] Chronological debit/credit ledger and reproducible running balances are implemented; printable date-range SOA remains pending.
+- [x] Finalized invoice values and items are database-immutable; reasoned adjustments and untouched-invoice voids are audited.
+- [x] Chronological debit/credit ledger has reproducible running balances and date filters; SOA supports date-range print/PDF/XLSX.
 - [x] Atomic invoice/item/ledger/audit posting with real PostgreSQL rollback evidence.
 
 ## Milestone 5 — Payments and receipts (PDF §§3.6–3.7, 3.11, 4.4)

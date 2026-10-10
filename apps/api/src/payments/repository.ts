@@ -118,10 +118,10 @@ export class PaymentRepository {
         const [invoice] = await transaction.select().from(invoices).where(eq(invoices.id, allocation.invoiceId)).limit(1).for('update');
         if (!invoice) throw new Error('ALLOCATED_INVOICE_NOT_FOUND');
         const restoredBalance = invoice.balanceCentavos + allocation.amountCentavos;
-        if (restoredBalance > invoice.totalCentavos) throw new Error('PAYMENT_REVERSAL_BALANCE_OVERFLOW');
+        const isPastDue = invoice.dueDate < new Date().toISOString().slice(0, 10);
         await transaction.update(invoices).set({
           balanceCentavos: restoredBalance,
-          status: restoredBalance === invoice.totalCentavos ? 'UNPAID' : 'PARTIALLY_PAID',
+          status: restoredBalance === 0n ? 'PAID' : restoredBalance >= invoice.totalCentavos ? (isPastDue ? 'OVERDUE' : 'UNPAID') : 'PARTIALLY_PAID',
         }).where(eq(invoices.id, invoice.id));
       }
 

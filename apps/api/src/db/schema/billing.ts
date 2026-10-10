@@ -46,7 +46,8 @@ export const invoices = pgTable('invoices', {
   uniqueIndex('invoices_service_cycle_uq').on(table.serviceAccountId, table.billingCycleId),
   index('invoices_subscriber_status_idx').on(table.subscriberId, table.status),
   index('invoices_due_status_idx').on(table.dueDate, table.status),
-  check('invoices_amounts_valid', sql`${table.totalCentavos} >= 0 AND ${table.balanceCentavos} >= 0 AND ${table.balanceCentavos} <= ${table.totalCentavos}`),
+  // Posted debit adjustments can raise the collectible balance above the immutable original invoice total.
+  check('invoices_amounts_valid', sql`${table.totalCentavos} >= 0 AND ${table.balanceCentavos} >= 0`),
   check('invoices_finalization_consistent', sql`(${table.status} = 'DRAFT' AND ${table.finalizedAt} IS NULL AND ${table.finalizedByUserId} IS NULL) OR (${table.status} <> 'DRAFT' AND ${table.finalizedAt} IS NOT NULL AND ${table.finalizedByUserId} IS NOT NULL)`),
 ]);
 
@@ -65,6 +66,7 @@ export const adjustments = pgTable('adjustments', {
   id: uuid('id').primaryKey().defaultRandom(),
   invoiceId: uuid('invoice_id').notNull().references(() => invoices.id, { onDelete: 'restrict' }),
   amountCentavos: bigint('amount_centavos', { mode: 'bigint' }).notNull(),
+  lineType: invoiceItemType('line_type').notNull().default('ADJUSTMENT'),
   reason: varchar('reason', { length: 255 }).notNull(),
   status: adjustmentStatus('status').notNull().default('PENDING'),
   requestedByUserId: uuid('requested_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),

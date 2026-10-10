@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 export const HEALTH_CHANNEL = 'bcis:connection:get';
 
 export const apiUrlSchema = z.url().pipe(z.string().refine((value) => {

@@ -1,0 +1,1 @@
+ALTER TABLE "adjustments" ADD COLUMN "line_type" "invoice_item_type" DEFAULT 'ADJUSTMENT' NOT NULL;

@@ -1,12 +1,14 @@
-import { and, asc, eq, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lt, lte, sql } from 'drizzle-orm';
 import type { InvoiceListQuery } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
   auditLogs,
+  adjustments,
   billingCycles,
   invoiceItems,
   invoices,
   ledgerEntries,
+  paymentAllocations,
   serviceAccounts,
   servicePlans,
   subscribers,
@@ -184,15 +186,96 @@ export class BillingRepository {
   }
 
   async findInvoice(id: string) {
-    const invoice = await this.database.pool.query<{ id: string; invoice_number: string; period: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string; service_account_id: string; service_account_number: string; invoice_date: string; due_date: string; status: 'DRAFT' | 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' | 'CREDITED'; total: string; balance: string; finalized_at: Date }>(
-      `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance,i.finalized_at
+    const invoice = await this.database.pool.query<{ id: string; invoice_number: string; period: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string; service_account_id: string; service_account_number: string; invoice_date: string; due_date: string; status: 'DRAFT' | 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' | 'CREDITED'; total: string; balance: string; finalized_at: Date; voided_at: Date | null; void_reason: string | null }>(
+      `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance,i.finalized_at,i.voided_at,i.void_reason
        from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id join subscribers s on s.id=i.subscriber_id join service_accounts sa on sa.id=i.service_account_id where i.id=$1`, [id]);
     if (!invoice.rows[0]) return null;
-    const [items, ledger] = await Promise.all([
+    const [items, ledger, adjustmentRows] = await Promise.all([
       this.database.pool.query<{ id: string; type: 'SUBSCRIPTION' | 'INSTALLATION' | 'RECONNECTION' | 'DISCOUNT' | 'PENALTY' | 'ADJUSTMENT'; description: string; amount: string }>(`select id,type::text,description,amount_centavos::text amount from invoice_items where invoice_id=$1 order by created_at,id`, [id]),
       this.database.pool.query<{ id: string; reference_number: string }>(`select id,reference_number from ledger_entries where reference_type='INVOICE' and reference_id=$1 limit 1`, [id]),
+      this.database.pool.query<{ id: string; amount: string; reason: string; status: 'PENDING' | 'APPROVED' | 'POSTED' | 'REJECTED' | 'REVERSED'; created_at: Date }>(`select id,amount_centavos::text amount,reason,status::text,created_at from adjustments where invoice_id=$1 order by created_at,id`, [id]),
     ]);
-    return { invoice: invoice.rows[0], items: items.rows, ledger: ledger.rows[0] ?? null };
+    return { invoice: invoice.rows[0], items: items.rows, ledger: ledger.rows[0] ?? null, adjustments: adjustmentRows.rows };
+  }
+
+  async postAdjustment(invoiceId: string, amountCentavos: bigint, lineType: 'INSTALLATION' | 'RECONNECTION' | 'DISCOUNT' | 'PENALTY' | 'ADJUSTMENT', reason: string, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [initial] = await transaction.select({ subscriberId: invoices.subscriberId }).from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!initial) return null;
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`subscriber:${initial.subscriberId}`}))`);
+      const [invoice] = await transaction.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1).for('update');
+      if (!invoice) return null;
+      if (!['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'CREDITED'].includes(invoice.status)) throw new Error('INVOICE_NOT_ADJUSTABLE');
+      const newBalance = invoice.balanceCentavos + amountCentavos;
+      if (newBalance < 0n) throw new Error('ADJUSTMENT_EXCEEDS_BALANCE');
+      const now = new Date();
+      const [adjustment] = await transaction.insert(adjustments).values({
+        invoiceId, amountCentavos, lineType, reason, status: 'POSTED', requestedByUserId: actorUserId,
+        approvedByUserId: actorUserId, approvedAt: now,
+      }).returning({ id: adjustments.id });
+      if (!adjustment) throw new Error('ADJUSTMENT_INSERT_FAILED');
+      const isPastDue = invoice.dueDate < now.toISOString().slice(0, 10);
+      const status: 'CREDITED' | 'PARTIALLY_PAID' | 'UNPAID' | 'OVERDUE' = newBalance === 0n ? 'CREDITED'
+        : isPastDue ? 'OVERDUE'
+        : newBalance < invoice.totalCentavos ? 'PARTIALLY_PAID' : 'UNPAID';
+      await transaction.update(invoices).set({ balanceCentavos: newBalance, status }).where(eq(invoices.id, invoiceId));
+      const referenceNumber = `${invoice.invoiceNumber}-ADJ-${adjustment.id.slice(0, 8).toUpperCase()}`;
+      await transaction.insert(ledgerEntries).values({
+        subscriberId: invoice.subscriberId, occurredAt: now, referenceType: 'INVOICE_ADJUSTMENT', referenceId: adjustment.id,
+        referenceNumber, description: `${lineType.replaceAll('_', ' ')} - ${reason}`,
+        debitCentavos: amountCentavos > 0n ? amountCentavos : 0n,
+        creditCentavos: amountCentavos < 0n ? -amountCentavos : 0n,
+        metadata: { invoiceId, lineType },
+      });
+      await transaction.insert(auditLogs).values({
+        actorUserId, action: 'invoice.adjustment.posted', entityType: 'invoice', entityId: invoiceId, reason,
+        oldValues: { status: invoice.status, balanceCentavos: invoice.balanceCentavos.toString() },
+        newValues: { status, balanceCentavos: newBalance.toString(), amountCentavos: amountCentavos.toString(), lineType, adjustmentId: adjustment.id }, requestId,
+      });
+      return { invoiceId, status, balanceCentavos: newBalance };
+    });
+  }
+
+  async voidInvoice(invoiceId: string, reason: string, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [initial] = await transaction.select({ subscriberId: invoices.subscriberId }).from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!initial) return null;
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`subscriber:${initial.subscriberId}`}))`);
+      const [invoice] = await transaction.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1).for('update');
+      if (!invoice) return null;
+      if (invoice.status === 'VOID') throw new Error('INVOICE_ALREADY_VOID');
+      const [allocation, adjustment] = await Promise.all([
+        transaction.select({ paymentId: paymentAllocations.paymentId }).from(paymentAllocations).where(eq(paymentAllocations.invoiceId, invoiceId)).limit(1),
+        transaction.select({ id: adjustments.id }).from(adjustments).where(eq(adjustments.invoiceId, invoiceId)).limit(1),
+      ]);
+      if (allocation.length > 0 || adjustment.length > 0 || invoice.balanceCentavos !== invoice.totalCentavos) throw new Error('INVOICE_HAS_FINANCIAL_ACTIVITY');
+      const now = new Date();
+      await transaction.update(invoices).set({ status: 'VOID', balanceCentavos: 0n, voidedAt: now, voidedByUserId: actorUserId, voidReason: reason }).where(eq(invoices.id, invoiceId));
+      if (invoice.totalCentavos > 0n) await transaction.insert(ledgerEntries).values({
+        subscriberId: invoice.subscriberId, occurredAt: now, referenceType: 'INVOICE_VOID', referenceId: invoiceId,
+        referenceNumber: invoice.invoiceNumber, description: `Invoice void - ${reason}`,
+        debitCentavos: 0n, creditCentavos: invoice.totalCentavos, metadata: { invoiceId },
+      });
+      await transaction.insert(auditLogs).values({
+        actorUserId, action: 'invoice.voided', entityType: 'invoice', entityId: invoiceId, reason,
+        oldValues: { status: invoice.status, balanceCentavos: invoice.balanceCentavos.toString() },
+        newValues: { status: 'VOID', balanceCentavos: '0' }, requestId,
+      });
+      return { invoiceId, status: 'VOID' as const, balanceCentavos: 0n };
+    });
+  }
+
+  async processOverdue(asOf: string, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const changed = await transaction.update(invoices).set({ status: 'OVERDUE' })
+        .where(and(inArray(invoices.status, ['UNPAID', 'PARTIALLY_PAID']), lt(invoices.dueDate, asOf), sql`${invoices.balanceCentavos} > 0`))
+        .returning({ id: invoices.id, oldStatus: invoices.status });
+      for (const row of changed) await transaction.insert(auditLogs).values({
+        actorUserId, action: 'invoice.marked_overdue', entityType: 'invoice', entityId: row.id, reason: `AS_OF_${asOf}`,
+        newValues: { status: 'OVERDUE', asOf }, requestId,
+      });
+      return changed.length;
+    });
   }
 
   async findCycle(id: string) {
@@ -220,10 +303,13 @@ export class BillingRepository {
     return { cycle, invoices: invoiceRows, items: itemRows };
   }
 
-  async ledger(subscriberId: string) {
+  async ledger(subscriberId: string, to?: string) {
     const [subscriber] = await this.database.db.select({ id: subscribers.id }).from(subscribers).where(eq(subscribers.id, subscriberId)).limit(1);
     if (!subscriber) return null;
-    return this.database.db.select().from(ledgerEntries).where(eq(ledgerEntries.subscriberId, subscriberId))
-      .orderBy(asc(ledgerEntries.occurredAt), asc(ledgerEntries.referenceType), asc(ledgerEntries.referenceNumber), asc(ledgerEntries.id));
+    const entries = await this.database.db.select().from(ledgerEntries).where(and(
+      eq(ledgerEntries.subscriberId, subscriberId),
+      ...(to ? [sql`${ledgerEntries.occurredAt} < (${to}::date + interval '1 day')`] : []),
+    )).orderBy(asc(ledgerEntries.occurredAt), asc(ledgerEntries.referenceType), asc(ledgerEntries.referenceNumber), asc(ledgerEntries.id));
+    return entries;
   }
 }

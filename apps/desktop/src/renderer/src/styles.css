@@ -359,6 +359,10 @@
   .profile-data-table > div { @apply grid grid-cols-[1fr_1fr_1.2fr_1fr_1fr] items-center gap-4 border-b border-border py-3 text-xs last:border-0; }
   .profile-data-table > div:first-child { @apply text-[10px] font-semibold uppercase tracking-wide text-secondary; }
   .profile-data-table > div > *:last-child { @apply text-right tabular-nums; }
+  .ledger-heading { @apply items-end; }
+  .ledger-filters { @apply flex gap-3; }
+  .ledger-filters label { @apply grid gap-1 text-[10px] font-semibold uppercase tracking-wide text-secondary; }
+  .ledger-filters input { @apply h-9 rounded-md border border-border bg-surface px-2 text-xs font-normal text-foreground; }
   .collection-table > div { @apply grid-cols-4; }
   .collection-table > div > *:last-child { @apply text-left; }
   .document-list { @apply divide-y divide-border px-5; }
@@ -411,8 +415,9 @@
   .duplicate-callout, .success-callout { @apply m-5 rounded-lg border border-warning bg-warning-muted p-4; }
   .success-callout { @apply border-success bg-success-muted; }
   .generate-button { @apply mx-5 mb-5 w-[calc(100%_-_2.5rem)]; }
-  .billing-toolbar { @apply grid grid-cols-[minmax(280px,1fr)_180px_180px]; }
-  .billing-toolbar .filter-field input { @apply h-10 min-w-0 rounded-md border border-border bg-surface px-3 text-sm; }
+  .invoice-filter-toolbar { @apply grid grid-cols-4 items-end; }
+  .invoice-filter-toolbar .search-field { @apply col-span-2; }
+  .invoice-filter-toolbar .filter-field input { @apply h-10 min-w-0 rounded-md border border-border bg-surface px-3 text-sm; }
   .invoice-table tbody tr { @apply cursor-pointer; }
   .invoice-table tbody tr:focus { @apply outline-2 outline-offset-[-2px] outline-ring; }
   .invoice-table td div { @apply flex flex-col; }
@@ -437,6 +442,13 @@
   .ledger-link { @apply mx-6 mb-6 flex flex-col rounded-lg border border-border bg-muted p-4; }
   .ledger-link span, .ledger-link small { @apply text-xs text-secondary; }
   .ledger-link strong { @apply my-1 text-sm; }
+  .invoice-actions { @apply border-t border-border p-6; }
+  .invoice-actions h3 { @apply mb-4 text-sm; }
+  .invoice-actions form { @apply grid gap-3; }
+  .invoice-actions .form-field { @apply grid gap-1.5; }
+  .invoice-actions input, .invoice-actions select, .invoice-actions textarea { @apply min-h-10 rounded-md border border-border bg-surface px-3 py-2 text-sm; }
+  .invoice-actions textarea { @apply min-h-20; }
+  .invoice-actions .void-form { @apply mt-5 border-t border-border pt-5; }
   .spin { animation: spin 1s linear infinite; }
 
   @keyframes content-arrive { from { opacity: .01; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -452,6 +464,8 @@
     .plan-grid { @apply grid-cols-2; }
     .billing-split { @apply grid-cols-1; }
     .generate-layout { @apply grid-cols-1; }
+    .invoice-filter-toolbar { @apply grid-cols-2; }
+    .invoice-filter-toolbar .search-field { @apply col-span-2; }
     .module-ready ul { @apply grid-cols-1; }
   }
   @media (prefers-reduced-transparency: reduce) { .topbar { @apply bg-surface; backdrop-filter: none; } }

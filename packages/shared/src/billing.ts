@@ -77,8 +77,28 @@ export type InvoiceListResponse = z.infer<typeof invoiceListResponseSchema>;
 export const invoiceDetailSchema = invoiceListItemSchema.extend({
   finalizedAt: z.iso.datetime(), items: z.array(invoiceItemSchema),
   ledgerEntry: z.object({ id: z.uuid(), referenceNumber: z.string() }).nullable(),
+  adjustments: z.array(z.object({ id: z.uuid(), amountCentavos: signedCentavosSchema, reason: z.string(), status: z.enum(['PENDING', 'APPROVED', 'POSTED', 'REJECTED', 'REVERSED']), createdAt: z.iso.datetime() })),
+  voidedAt: z.iso.datetime().nullable(), voidReason: z.string().nullable(),
 });
 export type InvoiceDetail = z.infer<typeof invoiceDetailSchema>;
+
+export const postInvoiceAdjustmentSchema = z.object({
+  amountCentavos: signedCentavosSchema.refine((value) => value !== '0', 'Adjustment must be nonzero'),
+  lineType: z.enum(['INSTALLATION', 'RECONNECTION', 'DISCOUNT', 'PENALTY', 'ADJUSTMENT']),
+  reason: z.string().trim().min(8).max(255),
+}).superRefine((value, context) => {
+  if (value.lineType === 'DISCOUNT' && !value.amountCentavos.startsWith('-')) context.addIssue({ code: 'custom', message: 'A discount must be a credit', path: ['amountCentavos'] });
+  if (['INSTALLATION', 'RECONNECTION', 'PENALTY'].includes(value.lineType) && value.amountCentavos.startsWith('-')) context.addIssue({ code: 'custom', message: 'This charge must be a debit', path: ['amountCentavos'] });
+});
+export type PostInvoiceAdjustment = z.infer<typeof postInvoiceAdjustmentSchema>;
+export const voidInvoiceSchema = z.object({ reason: z.string().trim().min(8).max(255) }).strict();
+export type VoidInvoice = z.infer<typeof voidInvoiceSchema>;
+export const processOverdueSchema = z.object({ asOf: z.iso.date() }).strict();
+export type ProcessOverdue = z.infer<typeof processOverdueSchema>;
+export const invoiceMutationResultSchema = z.object({ invoiceId: z.uuid(), status: invoiceStatusSchema, balanceCentavos: centavosSchema });
+export type InvoiceMutationResult = z.infer<typeof invoiceMutationResultSchema>;
+export const overdueResultSchema = z.object({ asOf: z.iso.date(), invoicesMarkedOverdue: z.number().int().nonnegative() });
+export type OverdueResult = z.infer<typeof overdueResultSchema>;
 
 export const billingCycleDetailSchema = z.object({
   id: z.uuid(), period: billingPeriodSchema, periodStart: z.iso.date(), periodEnd: z.iso.date(),
@@ -92,5 +112,12 @@ export const ledgerEntrySchema = z.object({
   description: z.string(), debitCentavos: centavosSchema, creditCentavos: centavosSchema,
   runningBalanceCentavos: signedCentavosSchema,
 });
-export const subscriberLedgerSchema = z.object({ subscriberId: z.uuid(), entries: z.array(ledgerEntrySchema), closingBalanceCentavos: signedCentavosSchema });
+export const subscriberLedgerQuerySchema = z.object({ from: z.iso.date().optional(), to: z.iso.date().optional() }).strict().superRefine((value, context) => {
+  if (value.from && value.to && value.from > value.to) context.addIssue({ code: 'custom', message: 'Ledger date range is invalid', path: ['to'] });
+});
+export type SubscriberLedgerQuery = z.infer<typeof subscriberLedgerQuerySchema>;
+export const subscriberLedgerSchema = z.object({
+  subscriberId: z.uuid(), from: z.iso.date().nullable(), to: z.iso.date().nullable(),
+  openingBalanceCentavos: signedCentavosSchema, entries: z.array(ledgerEntrySchema), closingBalanceCentavos: signedCentavosSchema,
+});
 export type SubscriberLedger = z.infer<typeof subscriberLedgerSchema>;

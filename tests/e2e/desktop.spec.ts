@@ -80,6 +80,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
 
     await page.getByRole('button', { name: 'Billing', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
+    await page.getByRole('button', { name: 'Ledger', exact: true }).click();
+    await expect(page.getByText('Opening balance', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('From', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await page.screenshot({ path: 'test-results/subscriber-profile.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
@@ -108,6 +111,17 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.locator('.invoice-table tbody tr').first().click();
     await expect(page.getByRole('complementary', { name: 'Invoice detail' })).toBeVisible();
     await expect(page.getByText('Line items')).toBeVisible();
+    await page.getByLabel('Adjustment type').selectOption('INSTALLATION');
+    await page.getByLabel('Amount (PHP)').fill('10.25');
+    await page.getByLabel('Reason', { exact: true }).fill('Synthetic E2E setup charge');
+    await page.getByRole('button', { name: 'Post adjustment' }).click();
+    await expect(page.getByText('Synthetic E2E setup charge')).toBeVisible();
+    await page.getByRole('button', { name: 'Close invoice detail' }).click();
+    await page.locator('.invoice-table tbody tr').nth(1).click();
+    await expect(page.getByRole('button', { name: 'Void untouched invoice' })).toBeVisible();
+    await page.getByLabel('Void reason').fill('Synthetic E2E duplicate test invoice');
+    await page.getByRole('button', { name: 'Void untouched invoice' }).click();
+    await expect(page.locator('.invoice-total').getByText('VOID')).toBeVisible();
     await page.getByRole('button', { name: 'Close invoice detail' }).click();
 
     await page.getByRole('link', { name: 'Services', exact: true }).click();
@@ -126,7 +140,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'listBillingCycles', 'listInvoices', 'listSubscribers', 'login', 'logout', 'previewBilling', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listInvoices', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'previewBilling', 'processOverdueInvoices', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });

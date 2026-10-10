@@ -1,4 +1,4 @@
-import type { BillingCycleDetail, BillingCycleList, BillingGenerationResult, BillingPreview, InvoiceDetail, InvoiceListQuery, InvoiceListResponse, SubscriberLedger } from '@bcis/shared';
+import type { BillingCycleDetail, BillingCycleList, BillingGenerationResult, BillingPreview, InvoiceDetail, InvoiceListQuery, InvoiceListResponse, InvoiceMutationResult, OverdueResult, PostInvoiceAdjustment, SubscriberLedger, SubscriberLedgerQuery } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
 import { BillingRepository } from './repository.js';
@@ -63,7 +63,39 @@ export class BillingService {
       totalCentavos: row.total, balanceCentavos: row.balance, finalizedAt: row.finalized_at.toISOString(),
       items: result.items.map((item) => ({ id: item.id, type: item.type, description: item.description, amountCentavos: item.amount })),
       ledgerEntry: result.ledger ? { id: result.ledger.id, referenceNumber: result.ledger.reference_number } : null,
+      adjustments: result.adjustments.map((adjustment) => ({ id: adjustment.id, amountCentavos: adjustment.amount, reason: adjustment.reason, status: adjustment.status, createdAt: adjustment.created_at.toISOString() })),
+      voidedAt: row.voided_at?.toISOString() ?? null, voidReason: row.void_reason,
     };
+  }
+
+  async adjust(invoiceId: string, input: PostInvoiceAdjustment, actorUserId: string, requestId: string): Promise<InvoiceMutationResult> {
+    try {
+      const result = await this.repository.postAdjustment(invoiceId, BigInt(input.amountCentavos), input.lineType, input.reason, actorUserId, requestId);
+      if (!result) throw new AppError(404, 'INVOICE_NOT_FOUND', 'Invoice not found');
+      return { invoiceId: result.invoiceId, status: result.status, balanceCentavos: result.balanceCentavos.toString() };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error instanceof Error && error.message === 'INVOICE_NOT_ADJUSTABLE') throw new AppError(409, 'INVOICE_NOT_ADJUSTABLE', 'Invoice cannot be adjusted in its current state');
+      if (error instanceof Error && error.message === 'ADJUSTMENT_EXCEEDS_BALANCE') throw new AppError(409, 'ADJUSTMENT_EXCEEDS_BALANCE', 'Credit adjustment exceeds the invoice balance');
+      throw error;
+    }
+  }
+
+  async void(invoiceId: string, reason: string, actorUserId: string, requestId: string): Promise<InvoiceMutationResult> {
+    try {
+      const result = await this.repository.voidInvoice(invoiceId, reason, actorUserId, requestId);
+      if (!result) throw new AppError(404, 'INVOICE_NOT_FOUND', 'Invoice not found');
+      return { invoiceId: result.invoiceId, status: result.status, balanceCentavos: result.balanceCentavos.toString() };
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error instanceof Error && error.message === 'INVOICE_ALREADY_VOID') throw new AppError(409, 'INVOICE_ALREADY_VOID', 'Invoice is already void');
+      if (error instanceof Error && error.message === 'INVOICE_HAS_FINANCIAL_ACTIVITY') throw new AppError(409, 'INVOICE_HAS_FINANCIAL_ACTIVITY', 'Reverse payments and adjustments before voiding this invoice');
+      throw error;
+    }
+  }
+
+  async processOverdue(asOf: string, actorUserId: string, requestId: string): Promise<OverdueResult> {
+    return { asOf, invoicesMarkedOverdue: await this.repository.processOverdue(asOf, actorUserId, requestId) };
   }
 
   async cycle(id: string): Promise<BillingCycleDetail> {
@@ -97,11 +129,12 @@ export class BillingService {
     };
   }
 
-  async ledger(subscriberId: string): Promise<SubscriberLedger> {
-    const rows = await this.repository.ledger(subscriberId);
+  async ledger(subscriberId: string, query: SubscriberLedgerQuery = {}): Promise<SubscriberLedger> {
+    const rows = await this.repository.ledger(subscriberId, query.to);
     if (!rows) throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
     let balance = 0n;
-    const entries = rows.map((entry) => {
+    let openingBalance = 0n;
+    const allEntries = rows.map((entry) => {
       balance += entry.debitCentavos - entry.creditCentavos;
       return {
         id: entry.id,
@@ -115,6 +148,14 @@ export class BillingService {
         runningBalanceCentavos: balance.toString(),
       };
     });
-    return { subscriberId, entries, closingBalanceCentavos: balance.toString() };
+    const fromDate = query.from;
+    const entries = fromDate ? allEntries.filter((entry) => entry.occurredAt.slice(0, 10) >= fromDate) : allEntries;
+    const beforeRange = fromDate ? allEntries.filter((entry) => entry.occurredAt.slice(0, 10) < fromDate) : [];
+    const priorBalance = beforeRange.at(-1)?.runningBalanceCentavos;
+    openingBalance = priorBalance ? BigInt(priorBalance) : 0n;
+    return {
+      subscriberId, from: query.from ?? null, to: query.to ?? null, openingBalanceCentavos: openingBalance.toString(),
+      entries, closingBalanceCentavos: balance.toString(),
+    };
   }
 }
