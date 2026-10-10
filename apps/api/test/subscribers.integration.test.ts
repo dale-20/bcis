@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { ReferenceData, ServiceAccountMaintenance, ServicePlanCatalog, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
+import type { CollectionReferenceCatalog, ReferenceData, ServiceAccountMaintenance, ServicePlanCatalog, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -22,6 +22,7 @@ const accounts: readonly DemoAccount[] = [
   { username: 'admin.demo', displayName: 'Demo Administrator', role: 'ADMIN' },
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
   { username: 'technician.demo', displayName: 'Demo Technician', role: 'TECHNICIAN' },
+  { username: 'collections.demo', displayName: 'Demo Collection Supervisor', role: 'COLLECTION_SUPERVISOR' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, testHasher);
@@ -55,6 +56,7 @@ describe.sequential('subscriber operations', () => {
   let adminToken = '';
   let cashierToken = '';
   let technicianToken = '';
+  let supervisorToken = '';
   let createdSubscriberId = '';
   let references: ReferenceData;
 
@@ -62,6 +64,7 @@ describe.sequential('subscriber operations', () => {
     adminToken = await activatedToken('admin.demo', 'Synthetic-admin-password-2');
     cashierToken = await activatedToken('cashier.demo', 'Synthetic-cashier-password-2');
     technicianToken = await activatedToken('technician.demo', 'Synthetic-technician-password-2');
+    supervisorToken = await activatedToken('collections.demo', 'Synthetic-collections-password-2');
   });
 
   it('serves deterministic server-side pages and global search', async () => {
@@ -293,6 +296,25 @@ describe.sequential('subscriber operations', () => {
     const area = await app.inject({ method: 'POST', url: '/collection-areas', headers: { authorization: `Bearer ${adminToken}` }, payload: { code: 'TEST-AREA', name: 'Test Area' } });
     const collector = await app.inject({ method: 'POST', url: '/collectors', headers: { authorization: `Bearer ${adminToken}` }, payload: { collectorNumber: 'COL-TEST', name: 'Test Collector' } });
     expect([plan.statusCode, area.statusCode, collector.statusCode]).toEqual([201, 201, 201]);
+  });
+
+  it('lets Collection Supervisor maintain areas and collectors while Cashier is denied', async () => {
+    const catalogResponse = await app.inject({ method: 'GET', url: '/collection-reference-data', headers: { authorization: `Bearer ${supervisorToken}` } });
+    expect(catalogResponse.statusCode).toBe(200);
+    const catalog = catalogResponse.json<CollectionReferenceCatalog>();
+    const area = catalog.areas.find((item) => item.code === 'TEST-AREA');
+    const collector = catalog.collectors.find((item) => item.collectorNumber === 'COL-TEST');
+    if (!area || !collector) throw new Error('Created collection references missing');
+    const updatedArea = await app.inject({ method: 'PATCH', url: `/collection-areas/${area.id}`, headers: { authorization: `Bearer ${supervisorToken}` }, payload: { code: area.code, name: 'Updated Test Area', description: 'Synthetic maintained route' } });
+    expect(updatedArea.statusCode).toBe(200);
+    expect(updatedArea.json<CollectionReferenceCatalog>().areas.find((item) => item.id === area.id)?.name).toBe('Updated Test Area');
+    const updatedCollector = await app.inject({ method: 'PATCH', url: `/collectors/${collector.id}`, headers: { authorization: `Bearer ${supervisorToken}` }, payload: { collectorNumber: collector.collectorNumber, name: 'Updated Test Collector' } });
+    expect(updatedCollector.statusCode).toBe(200);
+    expect(updatedCollector.json<CollectionReferenceCatalog>().collectors.find((item) => item.id === collector.id)?.name).toBe('Updated Test Collector');
+    const inactive = await app.inject({ method: 'POST', url: `/collectors/${collector.id}/status`, headers: { authorization: `Bearer ${supervisorToken}` }, payload: { status: 'INACTIVE', reason: 'Synthetic leave period' } });
+    expect(inactive.statusCode).toBe(200);
+    expect(inactive.json<CollectionReferenceCatalog>().collectors.find((item) => item.id === collector.id)?.status).toBe('INACTIVE');
+    expect((await app.inject({ method: 'PATCH', url: `/collection-areas/${area.id}`, headers: { authorization: `Bearer ${cashierToken}` }, payload: {} })).statusCode).toBe(403);
   });
 });
 

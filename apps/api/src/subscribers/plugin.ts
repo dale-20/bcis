@@ -1,7 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   collectionAreaCreateSchema,
+  collectionAreaUpdateSchema,
+  collectionReferenceCatalogSchema,
   collectorCreateSchema,
+  collectorUpdateSchema,
+  referenceStatusChangeSchema,
   serviceAccountMaintenanceSchema,
   serviceAccountStatusChangeSchema,
   servicePlanCatalogSchema,
@@ -71,6 +75,10 @@ const referenceDataResponse = { type: 'object', required: ['servicePlans', 'coll
 const serviceTypeResponse = { type: 'object', required: ['id', 'code', 'name', 'category', 'isActive'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, code: { type: 'string' }, name: { type: 'string' }, category: { type: 'string' }, isActive: { type: 'boolean' } } } as const;
 const servicePlanResponse = referenceDataResponse.properties.servicePlans.items;
 const servicePlanCatalogResponse = { type: 'object', required: ['serviceTypes', 'plans'], additionalProperties: false, properties: { serviceTypes: { type: 'array', items: serviceTypeResponse }, plans: { type: 'array', items: servicePlanResponse } } } as const;
+const collectionReferenceCatalogResponse = { type: 'object', required: ['areas', 'collectors'], additionalProperties: false, properties: {
+  areas: { type: 'array', items: { type: 'object', required: ['id', 'code', 'name', 'description', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, code: { type: 'string' }, name: { type: 'string' }, description: { anyOf: [{ type: 'string' }, { type: 'null' }] }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } },
+  collectors: { type: 'array', items: { type: 'object', required: ['id', 'collectorNumber', 'name', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, collectorNumber: { type: 'string' }, name: { type: 'string' }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } },
+} } as const;
 
 export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = async (app, options) => {
   const service = new SubscriberService(options.database);
@@ -215,6 +223,43 @@ export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = asy
     const context = request.authContext;
     if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
     return reply.code(201).send(await service.createCollector(collectorCreateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.get('/collection-reference-data', {
+    preHandler: [authenticate, requirePermission(options.authService, 'collection.view')],
+    schema: { response: { 200: collectionReferenceCatalogResponse, 401: errorResponse, 403: errorResponse } },
+  }, async () => collectionReferenceCatalogSchema.parse(await service.collectionReferenceCatalog()));
+
+  app.patch('/collection-areas/:id', {
+    preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: collectionReferenceCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext; if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return collectionReferenceCatalogSchema.parse(await service.updateCollectionArea((request.params as { id: string }).id, collectionAreaUpdateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/collection-areas/:id/status', {
+    preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: collectionReferenceCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext; if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return collectionReferenceCatalogSchema.parse(await service.changeCollectionAreaStatus((request.params as { id: string }).id, referenceStatusChangeSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.patch('/collectors/:id', {
+    preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: collectionReferenceCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext; if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return collectionReferenceCatalogSchema.parse(await service.updateCollector((request.params as { id: string }).id, collectorUpdateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/collectors/:id/status', {
+    preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: collectionReferenceCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext; if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return collectionReferenceCatalogSchema.parse(await service.changeCollectorStatus((request.params as { id: string }).id, referenceStatusChangeSchema.parse(request.body), context.userId, request.id));
   });
 };
 

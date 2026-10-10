@@ -92,8 +92,16 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Edit service plan' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
 
+    await page.getByRole('link', { name: 'Collections', exact: true }).click();
+    await page.getByRole('link', { name: 'Collectors', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Collectors' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New collector' })).toBeVisible();
+    await page.getByRole('link', { name: 'Areas & Routes', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Areas & routes' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
+
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
       node: false,
       process: false,
     });

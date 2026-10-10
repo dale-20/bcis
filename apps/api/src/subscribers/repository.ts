@@ -12,7 +12,7 @@ import {
   subscriberContacts,
   subscribers,
 } from '../db/schema.js';
-import type { ServiceAccountMaintenance, ServiceAccountStatusChange, ServicePlanStatusChange, ServicePlanUpdate, SubscriberCreate, SubscriberListQuery, SubscriberStatusChange, SubscriberUpdate } from '@bcis/shared';
+import type { CollectionAreaUpdate, CollectorUpdate, ReferenceStatusChange, ServiceAccountMaintenance, ServiceAccountStatusChange, ServicePlanStatusChange, ServicePlanUpdate, SubscriberCreate, SubscriberListQuery, SubscriberStatusChange, SubscriberUpdate } from '@bcis/shared';
 
 function normalizedContact(type: SubscriberUpdate['contacts'][number]['type'], value: string): string {
   return type === 'EMAIL' ? value.toLowerCase() : value.replace(/[^0-9+]/g, '');
@@ -145,6 +145,52 @@ export class SubscriberRepository {
     }).from(servicePlans).innerJoin(serviceTypes, eq(servicePlans.serviceTypeId, serviceTypes.id))
       .orderBy(asc(serviceTypes.category), asc(servicePlans.code));
     return { types, plans };
+  }
+
+  async collectionReferenceCatalog() {
+    const [areas, collectorRows] = await Promise.all([
+      this.database.db.select().from(collectionAreas).orderBy(asc(collectionAreas.name)),
+      this.database.db.select({ id: collectors.id, collectorNumber: collectors.collectorNumber, name: collectors.name, status: collectors.status, createdAt: collectors.createdAt }).from(collectors).orderBy(asc(collectors.name)),
+    ]);
+    return { areas, collectors: collectorRows };
+  }
+
+  async updateCollectionArea(id: string, input: CollectionAreaUpdate, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select().from(collectionAreas).where(eq(collectionAreas.id, id)).limit(1).for('update');
+      if (!current) throw new Error('AREA_NOT_FOUND');
+      await transaction.update(collectionAreas).set(input).where(eq(collectionAreas.id, id));
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'collection_area.updated', entityType: 'collection_area', entityId: id, oldValues: { code: current.code, name: current.name, description: current.description }, newValues: input, requestId });
+    });
+  }
+
+  async updateCollector(id: string, input: CollectorUpdate, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select().from(collectors).where(eq(collectors.id, id)).limit(1).for('update');
+      if (!current) throw new Error('COLLECTOR_NOT_FOUND');
+      await transaction.update(collectors).set(input).where(eq(collectors.id, id));
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'collector.updated', entityType: 'collector', entityId: id, oldValues: { collectorNumber: current.collectorNumber, name: current.name }, newValues: input, requestId });
+    });
+  }
+
+  async changeCollectionAreaStatus(id: string, input: ReferenceStatusChange, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ status: collectionAreas.status }).from(collectionAreas).where(eq(collectionAreas.id, id)).limit(1).for('update');
+      if (!current) throw new Error('AREA_NOT_FOUND');
+      if (current.status === input.status) throw new Error('REFERENCE_STATUS_UNCHANGED');
+      await transaction.update(collectionAreas).set({ status: input.status }).where(eq(collectionAreas.id, id));
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'collection_area.status_changed', entityType: 'collection_area', entityId: id, reason: input.reason, oldValues: { status: current.status }, newValues: { status: input.status }, requestId });
+    });
+  }
+
+  async changeCollectorStatus(id: string, input: ReferenceStatusChange, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ status: collectors.status }).from(collectors).where(eq(collectors.id, id)).limit(1).for('update');
+      if (!current) throw new Error('COLLECTOR_NOT_FOUND');
+      if (current.status === input.status) throw new Error('REFERENCE_STATUS_UNCHANGED');
+      await transaction.update(collectors).set({ status: input.status }).where(eq(collectors.id, id));
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'collector.status_changed', entityType: 'collector', entityId: id, reason: input.reason, oldValues: { status: current.status }, newValues: { status: input.status }, requestId });
+    });
   }
 
   async createService(subscriberId: string, input: ServiceAccountMaintenance, actorUserId: string, requestId: string) {

@@ -329,6 +329,24 @@
   .plan-card dd { @apply m-0 mt-1 text-xs font-medium tabular-nums; }
   .plan-description { @apply flex-1 text-xs leading-5 text-secondary; }
   .plan-card footer { @apply mt-5 flex gap-2; }
+  .reference-dialog { @apply max-w-lg; }
+  .reference-dialog form { @apply mt-5; }
+  .reference-summary { @apply flex items-center gap-8 border-b border-border p-5; }
+  .reference-summary > span { @apply flex size-11 items-center justify-center rounded-xl bg-info-muted text-primary; }
+  .reference-summary > span svg { @apply size-5; }
+  .reference-summary > div { @apply border-l border-border pl-8; }
+  .reference-summary strong { @apply text-xl tabular-nums; }
+  .reference-summary p { @apply mt-0.5 text-xs text-secondary; }
+  .reference-table { @apply px-5 pb-5; }
+  .reference-table-head, .reference-table-row { @apply grid grid-cols-[minmax(180px,1.5fr)_minmax(120px,.8fr)_110px_130px_minmax(180px,1fr)] items-center gap-4; }
+  .reference-table-head { @apply border-b border-border py-3 text-[10px] font-semibold uppercase tracking-wide text-secondary; }
+  .reference-table-row { @apply min-h-16 border-b border-border py-3 text-sm last:border-0; }
+  .reference-table-row > div:first-child { @apply flex min-w-0 flex-col; }
+  .reference-table-row small { @apply mt-1 truncate text-xs text-secondary; }
+  .reference-table-row time { @apply text-xs text-secondary; }
+  .reference-table-row > div:last-child { @apply flex gap-3; }
+  .reference-table-row button { @apply inline-flex items-center gap-1 border-0 bg-transparent p-0 text-xs font-medium text-primary hover:text-primary-hover; }
+  .reference-table-row button svg { @apply size-3.5; }
 
   @keyframes content-arrive { from { opacity: .01; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes skeleton-shift { from { transform: translateX(-100%); } to { transform: translateX(100%); } }

@@ -1,7 +1,14 @@
 import {
   authResultSchema,
+  collectionAreaCreateSchema,
+  collectionAreaUpdateSchema,
+  collectionReferenceCatalogResultSchema,
   changePasswordInputSchema,
   loginInputSchema,
+  collectorCreateSchema,
+  collectorUpdateSchema,
+  referenceCreatedResultSchema,
+  referenceStatusChangeSchema,
   referenceDataResultSchema,
   serviceAccountMaintenanceSchema,
   serviceAccountStatusChangeSchema,
@@ -18,7 +25,13 @@ import {
   subscriberListQuerySchema,
   subscriberListResultSchema,
   type AuthenticatedUser,
+  type CollectionAreaCreate,
+  type CollectionAreaUpdate,
+  type CollectionReferenceCatalog,
+  type CollectorCreate,
+  type CollectorUpdate,
   type ReferenceData,
+  type ReferenceStatusChange,
   type ServiceAccountMaintenance,
   type ServiceAccountStatusChange,
   type ServicePlanCatalog,
@@ -129,6 +142,34 @@ export async function updateServicePlan(id: string, input: ServicePlanUpdate): P
 export async function changeServicePlanStatus(id: string, input: ServicePlanStatusChange): Promise<ServicePlanCatalog> {
   const command = servicePlanStatusChangeSchema.parse(input);
   return unwrap(servicePlanCatalogResultSchema.parse(await bridge().changeServicePlanStatus(id, command)));
+}
+
+export async function getCollectionReferences(): Promise<CollectionReferenceCatalog> {
+  return unwrap(collectionReferenceCatalogResultSchema.parse(await bridge().getCollectionReferences()));
+}
+
+export async function createCollectionArea(input: CollectionAreaCreate): Promise<{ id: string }> {
+  return unwrap(referenceCreatedResultSchema.parse(await bridge().createCollectionArea(collectionAreaCreateSchema.parse(input))));
+}
+
+export async function updateCollectionArea(id: string, input: CollectionAreaUpdate): Promise<CollectionReferenceCatalog> {
+  return unwrap(collectionReferenceCatalogResultSchema.parse(await bridge().updateCollectionArea(id, collectionAreaUpdateSchema.parse(input))));
+}
+
+export async function changeCollectionAreaStatus(id: string, input: ReferenceStatusChange): Promise<CollectionReferenceCatalog> {
+  return unwrap(collectionReferenceCatalogResultSchema.parse(await bridge().changeCollectionAreaStatus(id, referenceStatusChangeSchema.parse(input))));
+}
+
+export async function createCollector(input: CollectorCreate): Promise<{ id: string }> {
+  return unwrap(referenceCreatedResultSchema.parse(await bridge().createCollector(collectorCreateSchema.parse(input))));
+}
+
+export async function updateCollector(id: string, input: CollectorUpdate): Promise<CollectionReferenceCatalog> {
+  return unwrap(collectionReferenceCatalogResultSchema.parse(await bridge().updateCollector(id, collectorUpdateSchema.parse(input))));
+}
+
+export async function changeCollectorStatus(id: string, input: ReferenceStatusChange): Promise<CollectionReferenceCatalog> {
+  return unwrap(collectionReferenceCatalogResultSchema.parse(await bridge().changeCollectorStatus(id, referenceStatusChangeSchema.parse(input))));
 }
 
 export async function getReferenceData(): Promise<ReferenceData> {

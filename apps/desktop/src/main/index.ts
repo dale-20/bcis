@@ -4,10 +4,17 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   apiUrlSchema,
+  AREAS_CREATE_CHANNEL,
+  AREAS_STATUS_CHANNEL,
+  AREAS_UPDATE_CHANNEL,
   AUTH_CHANGE_PASSWORD_CHANNEL,
   AUTH_LOGIN_CHANNEL,
   AUTH_LOGOUT_CHANNEL,
   AUTH_SESSION_CHANNEL,
+  COLLECTION_REFERENCES_LIST_CHANNEL,
+  COLLECTORS_CREATE_CHANNEL,
+  COLLECTORS_STATUS_CHANNEL,
+  COLLECTORS_UPDATE_CHANNEL,
   desktopRequestSchemas,
   HEALTH_CHANNEL,
   REFERENCE_DATA_CHANNEL,
@@ -82,6 +89,13 @@ void app.whenReady().then(() => {
   ipcMain.handle(PLANS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createServicePlan(desktopRequestSchemas.planCreate.parse(input)); });
   ipcMain.handle(PLANS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.planUpdate.parse(input); return api.updateServicePlan(command.id, command.input); });
   ipcMain.handle(PLANS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.planStatus.parse(input); return api.changeServicePlanStatus(command.id, command.input); });
+  ipcMain.handle(COLLECTION_REFERENCES_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.getCollectionReferences(); });
+  ipcMain.handle(AREAS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createCollectionArea(desktopRequestSchemas.areaCreate.parse(input)); });
+  ipcMain.handle(AREAS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.areaUpdate.parse(input); return api.updateCollectionArea(command.id, command.input); });
+  ipcMain.handle(AREAS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.areaStatus.parse(input); return api.changeCollectionAreaStatus(command.id, command.input); });
+  ipcMain.handle(COLLECTORS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createCollector(desktopRequestSchemas.collectorCreate.parse(input)); });
+  ipcMain.handle(COLLECTORS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectorUpdate.parse(input); return api.updateCollector(command.id, command.input); });
+  ipcMain.handle(COLLECTORS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectorStatus.parse(input); return api.changeCollectorStatus(command.id, command.input); });
   ipcMain.handle(REFERENCE_DATA_CHANNEL, (event) => { assertTrustedSender(event); return api.getReferenceData(); });
   ipcMain.handle(DASHBOARD_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getDashboard(desktopRequestSchemas.dashboard.parse(input)); });
   ipcMain.handle(REPORT_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReport(desktopRequestSchemas.report.parse(input)); });

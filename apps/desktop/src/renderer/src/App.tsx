@@ -31,6 +31,7 @@ import type { AuthenticatedUser } from '@bcis/shared';
 import logo from './assets/bcis-mark.png';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { AuthScreen } from './features/auth/AuthScreen';
+import { CollectionSetupPage } from './features/collections/CollectionSetupPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { PlansPage } from './features/services/PlansPage';
@@ -99,8 +100,8 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/payments/receive" element={<Allowed user={user} permissions={['payment.create']}><ModulePage {...modulePages.receivePayment} /></Allowed>} />
     <Route path="/payments/history" element={<Allowed user={user} permissions={['payment.create', 'payment.reverse']}><ModulePage {...modulePages.paymentHistory} /></Allowed>} />
     <Route path="/payments/gcash" element={<Allowed user={user} permissions={['payment.verify_gcash']}><ModulePage {...modulePages.gcash} /></Allowed>} />
-    <Route path="/collections/collectors" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.collectors} /></Allowed>} />
-    <Route path="/collections/routes" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.routes} /></Allowed>} />
+    <Route path="/collections/collectors" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="collectors" /></Allowed>} />
+    <Route path="/collections/routes" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="areas" /></Allowed>} />
     <Route path="/collections/batches" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.batches} /></Allowed>} />
     <Route path="/collections/remittance" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.remittance} /></Allowed>} />
     <Route path="/receivables/outstanding" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.outstanding} /></Allowed>} />

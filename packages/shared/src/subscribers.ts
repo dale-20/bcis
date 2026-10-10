@@ -226,8 +226,23 @@ export type ServicePlanCatalog = z.infer<typeof servicePlanCatalogSchema>;
 export const collectionAreaCreateSchema = z.object({
   code: identifierSchema, name: z.string().trim().min(2).max(120), description: optionalText(255),
 });
+export type CollectionAreaCreate = z.infer<typeof collectionAreaCreateSchema>;
+export const collectionAreaUpdateSchema = collectionAreaCreateSchema;
+export type CollectionAreaUpdate = z.infer<typeof collectionAreaUpdateSchema>;
 
 export const collectorCreateSchema = z.object({
   collectorNumber: identifierSchema, name: z.string().trim().min(2).max(120),
 });
+export type CollectorCreate = z.infer<typeof collectorCreateSchema>;
+export const collectorUpdateSchema = collectorCreateSchema;
+export type CollectorUpdate = z.infer<typeof collectorUpdateSchema>;
+
+export const referenceStatusChangeSchema = z.object({ status: z.enum(['ACTIVE', 'INACTIVE']), reason: z.string().trim().min(3).max(255) });
+export type ReferenceStatusChange = z.infer<typeof referenceStatusChangeSchema>;
+
+export const collectionReferenceCatalogSchema = z.object({
+  areas: z.array(z.object({ id: z.uuid(), code: z.string(), name: z.string(), description: z.string().nullable(), status: z.enum(['ACTIVE', 'INACTIVE']), createdAt: z.iso.datetime() })),
+  collectors: z.array(z.object({ id: z.uuid(), collectorNumber: z.string(), name: z.string(), status: z.enum(['ACTIVE', 'INACTIVE']), createdAt: z.iso.datetime() })),
+});
+export type CollectionReferenceCatalog = z.infer<typeof collectionReferenceCatalogSchema>;
 

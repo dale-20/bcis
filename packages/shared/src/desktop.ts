@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import {
   referenceDataSchema,
+  collectionAreaCreateSchema,
+  collectionAreaUpdateSchema,
+  collectionReferenceCatalogSchema,
+  collectorCreateSchema,
+  collectorUpdateSchema,
+  referenceStatusChangeSchema,
   serviceAccountMaintenanceSchema,
   serviceAccountStatusChangeSchema,
   servicePlanCatalogSchema,
@@ -14,6 +20,12 @@ import {
   servicePlanStatusChangeSchema,
   servicePlanUpdateSchema,
   type ReferenceData,
+  type CollectionAreaCreate,
+  type CollectionAreaUpdate,
+  type CollectionReferenceCatalog,
+  type CollectorCreate,
+  type CollectorUpdate,
+  type ReferenceStatusChange,
   type ServiceAccountMaintenance,
   type ServiceAccountStatusChange,
   type ServicePlanCatalog,
@@ -45,6 +57,13 @@ export const PLANS_LIST_CHANNEL = 'bcis:plans:list';
 export const PLANS_CREATE_CHANNEL = 'bcis:plans:create';
 export const PLANS_UPDATE_CHANNEL = 'bcis:plans:update';
 export const PLANS_STATUS_CHANNEL = 'bcis:plans:status';
+export const COLLECTION_REFERENCES_LIST_CHANNEL = 'bcis:collection-references:list';
+export const AREAS_CREATE_CHANNEL = 'bcis:areas:create';
+export const AREAS_UPDATE_CHANNEL = 'bcis:areas:update';
+export const AREAS_STATUS_CHANNEL = 'bcis:areas:status';
+export const COLLECTORS_CREATE_CHANNEL = 'bcis:collectors:create';
+export const COLLECTORS_UPDATE_CHANNEL = 'bcis:collectors:update';
+export const COLLECTORS_STATUS_CHANNEL = 'bcis:collectors:status';
 export const REFERENCE_DATA_CHANNEL = 'bcis:reference-data:get';
 export const DASHBOARD_GET_CHANNEL = 'bcis:dashboard:get';
 export const REPORT_GET_CHANNEL = 'bcis:report:get';
@@ -92,6 +111,14 @@ export const servicePlanCreatedResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: servicePlanCreatedSchema }),
   z.object({ ok: z.literal(false), error: apiFailureSchema }),
 ]);
+export const collectionReferenceCatalogResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: collectionReferenceCatalogSchema }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
+export const referenceCreatedResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: z.object({ id: z.uuid() }) }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -111,6 +138,13 @@ export interface DesktopBridge {
   createServicePlan: (input: ServicePlanCreate) => Promise<DesktopResult<z.infer<typeof servicePlanCreatedSchema>>>;
   updateServicePlan: (id: string, input: ServicePlanUpdate) => Promise<DesktopResult<ServicePlanCatalog>>;
   changeServicePlanStatus: (id: string, input: ServicePlanStatusChange) => Promise<DesktopResult<ServicePlanCatalog>>;
+  getCollectionReferences: () => Promise<DesktopResult<CollectionReferenceCatalog>>;
+  createCollectionArea: (input: CollectionAreaCreate) => Promise<DesktopResult<{ id: string }>>;
+  updateCollectionArea: (id: string, input: CollectionAreaUpdate) => Promise<DesktopResult<CollectionReferenceCatalog>>;
+  changeCollectionAreaStatus: (id: string, input: ReferenceStatusChange) => Promise<DesktopResult<CollectionReferenceCatalog>>;
+  createCollector: (input: CollectorCreate) => Promise<DesktopResult<{ id: string }>>;
+  updateCollector: (id: string, input: CollectorUpdate) => Promise<DesktopResult<CollectionReferenceCatalog>>;
+  changeCollectorStatus: (id: string, input: ReferenceStatusChange) => Promise<DesktopResult<CollectionReferenceCatalog>>;
   getReferenceData: () => Promise<DesktopResult<ReferenceData>>;
   getDashboard: (query: DashboardQuery) => Promise<DesktopResult<Dashboard>>;
   getReport: (query: ReportRequest) => Promise<DesktopResult<ReportData>>;
@@ -132,6 +166,12 @@ export const desktopRequestSchemas = {
   planCreate: servicePlanCreateSchema,
   planUpdate: z.object({ id: z.uuid(), input: servicePlanUpdateSchema }),
   planStatus: z.object({ id: z.uuid(), input: servicePlanStatusChangeSchema }),
+  areaCreate: collectionAreaCreateSchema,
+  areaUpdate: z.object({ id: z.uuid(), input: collectionAreaUpdateSchema }),
+  areaStatus: z.object({ id: z.uuid(), input: referenceStatusChangeSchema }),
+  collectorCreate: collectorCreateSchema,
+  collectorUpdate: z.object({ id: z.uuid(), input: collectorUpdateSchema }),
+  collectorStatus: z.object({ id: z.uuid(), input: referenceStatusChangeSchema }),
   dashboard: dashboardQuerySchema,
   report: reportRequestSchema,
   reportExport: reportRequestSchema.extend({ format: z.enum(['PDF', 'XLSX']) }),

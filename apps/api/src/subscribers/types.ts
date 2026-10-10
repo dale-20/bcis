@@ -1,7 +1,10 @@
 import type { z } from 'zod';
 import {
   collectionAreaCreateSchema,
+  collectionAreaUpdateSchema,
   collectorCreateSchema,
+  collectorUpdateSchema,
+  referenceStatusChangeSchema,
   serviceAccountMaintenanceSchema,
   serviceAccountStatusChangeSchema,
   servicePlanCreateSchema,
@@ -28,4 +31,7 @@ export type ServiceAccountMaintenance = z.infer<typeof serviceAccountMaintenance
 export type ServiceAccountStatusChange = z.infer<typeof serviceAccountStatusChangeSchema>;
 export type CollectionAreaCreate = z.infer<typeof collectionAreaCreateSchema>;
 export type CollectorCreate = z.infer<typeof collectorCreateSchema>;
+export type CollectionAreaUpdate = z.infer<typeof collectionAreaUpdateSchema>;
+export type CollectorUpdate = z.infer<typeof collectorUpdateSchema>;
+export type ReferenceStatusChange = z.infer<typeof referenceStatusChangeSchema>;
 

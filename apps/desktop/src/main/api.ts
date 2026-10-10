@@ -1,13 +1,20 @@
 import {
   authenticatedUserSchema,
+  collectionReferenceCatalogSchema,
   referenceDataSchema,
   servicePlanCatalogSchema,
   servicePlanCreatedSchema,
   subscriberDetailSchema,
   subscriberListResponseSchema,
   type AuthenticatedUser,
+  type CollectionAreaCreate,
+  type CollectionAreaUpdate,
+  type CollectionReferenceCatalog,
+  type CollectorCreate,
+  type CollectorUpdate,
   type DesktopResult,
   type ReferenceData,
+  type ReferenceStatusChange,
   type ServiceAccountMaintenance,
   type ServiceAccountStatusChange,
   type ServicePlanCatalog,
@@ -116,6 +123,34 @@ export class DesktopApiClient {
 
   changeServicePlanStatus(id: string, input: ServicePlanStatusChange): Promise<DesktopResult<ServicePlanCatalog>> {
     return this.call(`/service-plans/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, servicePlanCatalogSchema);
+  }
+
+  getCollectionReferences(): Promise<DesktopResult<CollectionReferenceCatalog>> {
+    return this.call('/collection-reference-data', { method: 'GET' }, collectionReferenceCatalogSchema);
+  }
+
+  createCollectionArea(input: CollectionAreaCreate): Promise<DesktopResult<{ id: string }>> {
+    return this.call('/collection-areas', { method: 'POST', body: JSON.stringify(input) }, z.object({ id: z.uuid() }));
+  }
+
+  updateCollectionArea(id: string, input: CollectionAreaUpdate): Promise<DesktopResult<CollectionReferenceCatalog>> {
+    return this.call(`/collection-areas/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }, collectionReferenceCatalogSchema);
+  }
+
+  changeCollectionAreaStatus(id: string, input: ReferenceStatusChange): Promise<DesktopResult<CollectionReferenceCatalog>> {
+    return this.call(`/collection-areas/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, collectionReferenceCatalogSchema);
+  }
+
+  createCollector(input: CollectorCreate): Promise<DesktopResult<{ id: string }>> {
+    return this.call('/collectors', { method: 'POST', body: JSON.stringify(input) }, z.object({ id: z.uuid() }));
+  }
+
+  updateCollector(id: string, input: CollectorUpdate): Promise<DesktopResult<CollectionReferenceCatalog>> {
+    return this.call(`/collectors/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }, collectionReferenceCatalogSchema);
+  }
+
+  changeCollectorStatus(id: string, input: ReferenceStatusChange): Promise<DesktopResult<CollectionReferenceCatalog>> {
+    return this.call(`/collectors/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, collectionReferenceCatalogSchema);
   }
 
   getReferenceData(): Promise<DesktopResult<ReferenceData>> {

@@ -1,6 +1,9 @@
 import type {
   CollectionAreaCreate,
+  CollectionAreaUpdate,
   CollectorCreate,
+  CollectorUpdate,
+  ReferenceStatusChange,
   ServiceAccountMaintenance,
   ServiceAccountStatusChange,
   ServicePlanCreate,
@@ -225,6 +228,50 @@ export class SubscriberService {
 
   async createCollector(input: CollectorCreate, actorUserId: string, requestId: string) {
     return this.createSimpleReference(collectors, input, actorUserId, requestId, 'collector.created');
+  }
+
+  async collectionReferenceCatalog() {
+    const catalog = await this.repository.collectionReferenceCatalog();
+    return {
+      areas: catalog.areas.map((area) => ({ id: area.id, code: area.code, name: area.name, description: area.description, status: area.status, createdAt: area.createdAt.toISOString() })),
+      collectors: catalog.collectors.map((collector) => ({ ...collector, createdAt: collector.createdAt.toISOString() })),
+    };
+  }
+
+  async updateCollectionArea(id: string, input: CollectionAreaUpdate, actorUserId: string, requestId: string) {
+    try { await this.repository.updateCollectionArea(id, input, actorUserId, requestId); return await this.collectionReferenceCatalog(); }
+    catch (error) {
+      if (error instanceof Error && error.message === 'AREA_NOT_FOUND') throw new AppError(404, 'AREA_NOT_FOUND', 'Collection area not found');
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_REFERENCE', 'Area code is already in use');
+      throw error;
+    }
+  }
+
+  async updateCollector(id: string, input: CollectorUpdate, actorUserId: string, requestId: string) {
+    try { await this.repository.updateCollector(id, input, actorUserId, requestId); return await this.collectionReferenceCatalog(); }
+    catch (error) {
+      if (error instanceof Error && error.message === 'COLLECTOR_NOT_FOUND') throw new AppError(404, 'COLLECTOR_NOT_FOUND', 'Collector not found');
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_REFERENCE', 'Collector number is already in use');
+      throw error;
+    }
+  }
+
+  async changeCollectionAreaStatus(id: string, input: ReferenceStatusChange, actorUserId: string, requestId: string) {
+    try { await this.repository.changeCollectionAreaStatus(id, input, actorUserId, requestId); return await this.collectionReferenceCatalog(); }
+    catch (error) {
+      if (error instanceof Error && error.message === 'AREA_NOT_FOUND') throw new AppError(404, 'AREA_NOT_FOUND', 'Collection area not found');
+      if (error instanceof Error && error.message === 'REFERENCE_STATUS_UNCHANGED') throw new AppError(409, 'REFERENCE_STATUS_UNCHANGED', 'The area already has this status');
+      throw error;
+    }
+  }
+
+  async changeCollectorStatus(id: string, input: ReferenceStatusChange, actorUserId: string, requestId: string) {
+    try { await this.repository.changeCollectorStatus(id, input, actorUserId, requestId); return await this.collectionReferenceCatalog(); }
+    catch (error) {
+      if (error instanceof Error && error.message === 'COLLECTOR_NOT_FOUND') throw new AppError(404, 'COLLECTOR_NOT_FOUND', 'Collector not found');
+      if (error instanceof Error && error.message === 'REFERENCE_STATUS_UNCHANGED') throw new AppError(409, 'REFERENCE_STATUS_UNCHANGED', 'The collector already has this status');
+      throw error;
+    }
   }
 
   private async createSimpleReference(table: typeof collectionAreas | typeof collectors, input: CollectionAreaCreate | CollectorCreate, actorUserId: string, requestId: string, action: string) {
