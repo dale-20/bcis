@@ -9,6 +9,8 @@ import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
 import { AuthService } from '../src/auth/service.js';
 import { createDatabase } from '../src/db/client.js';
 import { seedOperationalDemoData } from '../src/db/seed-operational.js';
+import { collectorAssignments } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
 const url = process.env.TEST_DATABASE_URL;
@@ -198,16 +200,24 @@ describe.sequential('subscriber operations', () => {
     const area = references.collectionAreas[0];
     const collector = references.collectors[0];
     if (!address || !plan || !area || !collector) throw new Error('Synthetic service references missing');
-    const input: ServiceAccountMaintenance = { serviceAccountNumber: 'SVC-90001-3', planId: plan.id, installationAddressId: address.id, collectionAreaId: area.id, assignedCollectorId: collector.id, billingStartDate: '2026-10-01', billingDay: 9, dueDay: 19 };
+    const input: ServiceAccountMaintenance = { serviceAccountNumber: 'SVC-90001-3', planId: plan.id, installationAddressId: address.id, collectionAreaId: area.id, assignedCollectorId: collector.id, assignmentEffectiveFrom: '2026-10-01', billingStartDate: '2026-10-01', billingDay: 9, dueDay: 19 };
     const created = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services`, headers: { authorization: `Bearer ${adminToken}` }, payload: input });
     expect(created.statusCode).toBe(201);
     const service = created.json<SubscriberDetail>().services.find((item) => item.serviceAccountNumber === input.serviceAccountNumber);
     expect(service).toMatchObject({ status: 'PENDING', currentRateCentavos: plan.priceCentavos });
     if (!service) throw new Error('Created service missing');
+    const [initialAssignment] = await database.db.select().from(collectorAssignments).where(eq(collectorAssignments.serviceAccountId, service.id));
+    expect(initialAssignment).toMatchObject({ collectorId: collector.id, effectiveFrom: '2026-10-01', effectiveTo: null });
 
-    const edited = await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}/services/${service.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { ...input, activationDate: '2026-10-02', billingDay: 10 } });
+    const replacementCollector = references.collectors.find((item) => item.id !== collector.id);
+    if (!replacementCollector) throw new Error('Second synthetic collector missing');
+    const edited = await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}/services/${service.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { ...input, assignedCollectorId: replacementCollector.id, assignmentEffectiveFrom: '2026-10-03', activationDate: '2026-10-02', billingDay: 10 } });
     expect(edited.statusCode).toBe(200);
     expect(edited.json<SubscriberDetail>().services.find((item) => item.id === service.id)).toMatchObject({ activationDate: '2026-10-02', billingDay: 10 });
+    const assignments = await database.db.select().from(collectorAssignments).where(eq(collectorAssignments.serviceAccountId, service.id)).orderBy(collectorAssignments.effectiveFrom);
+    expect(assignments).toHaveLength(2);
+    expect(assignments[0]).toMatchObject({ collectorId: collector.id, effectiveFrom: '2026-10-01', effectiveTo: '2026-10-02' });
+    expect(assignments[1]).toMatchObject({ collectorId: replacementCollector.id, effectiveFrom: '2026-10-03', effectiveTo: null });
     expect((await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}/services/${service.id}`, headers: { authorization: `Bearer ${technicianToken}` }, payload: input })).statusCode).toBe(403);
     expect((await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services/${service.id}/status`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { status: 'ACTIVE', reason: 'Cashier denied transition' } })).statusCode).toBe(403);
     const activated = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services/${service.id}/status`, headers: { authorization: `Bearer ${technicianToken}` }, payload: { status: 'ACTIVE', reason: 'Installation completed' } });

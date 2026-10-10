@@ -25,7 +25,6 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 - Most operational server workflows have no desktop screen or typed preload method.
 - Subscriber, plan, service, collector, and area maintenance lacks complete edit/archive/status workflows.
 - Verified backup/restore does not yet include the configured GCash proof attachment directory (Increment 8).
-- Collections lack batch lists, route-sheet printing, recording, remittance, reconciliation, and closing UI.
 - Suspension/reconnection, user administration, audit viewer, settings, and guided backup/restore are incomplete.
 - Physical three-PC, maximum-volume, and full desktop acceptance evidence remains incomplete.
 
@@ -113,6 +112,8 @@ Delivered: the preview serializes against posting for the selected subscriber an
 **Status:** COMPLETE for capture, secure storage/retrieval, pending review, verification/rejection, and AT-05. Inclusion of the configured proof directory in verified backup/restore artifacts remains assigned to Increment 8, where the backup format is implemented.
 
 ## Increment 6 - Collector routes, batches, and remittance
+
+**Status:** Completed and verified on 2026-10-11. `npm run check` passed (97 tests), PostgreSQL integration passed (61 tests), and built Electron E2E passed (1 test, including accessibility and secure bridge checks). Existing effective assignment history was not backfilled because original assignment dates and actors cannot be reconstructed safely.
 
 **Goal:** Complete the Collection Supervisor workspace.
 

@@ -62,6 +62,7 @@ import {
   type PostPaymentInput, type PaymentResult, type ReversePaymentInput,
   type GcashProofContent, type GcashProofMetadata, type GcashProofQueue, type VerifyGcashInput,
 } from './payments.js';
+import { collectionBatchListQuerySchema, collectionBatchListSchema, collectionBatchSchema, createCollectionBatchInputSchema, eligibleCollectionPaymentsSchema, recordCollectionInputSchema, remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema, type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput, type EligibleCollectionPayment, type RemittanceInput } from './collections.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -112,6 +113,15 @@ export const GCASH_PROOF_UPLOAD_CHANNEL = 'bcis:gcash-proof:select-upload';
 export const GCASH_PROOF_QUEUE_CHANNEL = 'bcis:gcash-proof:queue';
 export const GCASH_PROOF_GET_CHANNEL = 'bcis:gcash-proof:get';
 export const GCASH_VERIFY_CHANNEL = 'bcis:gcash:verify';
+export const COLLECTION_BATCHES_LIST_CHANNEL = 'bcis:collection-batches:list';
+export const COLLECTION_BATCH_CREATE_CHANNEL = 'bcis:collection-batches:create';
+export const COLLECTION_BATCH_GET_CHANNEL = 'bcis:collection-batches:get';
+export const COLLECTION_RECORD_CHANNEL = 'bcis:collection-batches:record';
+export const COLLECTION_SUBMIT_CHANNEL = 'bcis:collection-batches:submit';
+export const COLLECTION_REMIT_CHANNEL = 'bcis:collection-batches:remit';
+export const COLLECTION_RECONCILE_CHANNEL = 'bcis:collection-batches:reconcile';
+export const COLLECTION_CLOSE_CHANNEL = 'bcis:collection-batches:close';
+export const COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL = 'bcis:collection-batches:eligible-payments';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -189,6 +199,9 @@ export const paymentResultDesktopResultSchema = desktopResult(paymentResultSchem
 export const gcashProofQueueDesktopResultSchema = desktopResult(gcashProofQueueSchema);
 export const gcashProofMetadataDesktopResultSchema = desktopResult(gcashProofMetadataSchema);
 export const gcashProofContentDesktopResultSchema = desktopResult(gcashProofContentSchema);
+export const collectionBatchListDesktopResultSchema = desktopResult(collectionBatchListSchema);
+export const collectionBatchDesktopResultSchema = desktopResult(collectionBatchSchema);
+export const eligibleCollectionPaymentsDesktopResultSchema = desktopResult(eligibleCollectionPaymentsSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -241,6 +254,15 @@ export interface DesktopBridge {
   listGcashProofs: (page: number, pageSize: number) => Promise<DesktopResult<GcashProofQueue>>;
   getGcashProof: (paymentId: string) => Promise<DesktopResult<GcashProofContent>>;
   verifyGcashPayment: (paymentId: string, input: VerifyGcashInput) => Promise<DesktopResult<PaymentResult>>;
+  listCollectionBatches: (query: CollectionBatchListQuery) => Promise<DesktopResult<CollectionBatchList>>;
+  createCollectionBatch: (input: CreateCollectionBatchInput) => Promise<DesktopResult<CollectionBatch>>;
+  getCollectionBatch: (id: string) => Promise<DesktopResult<CollectionBatch>>;
+  recordCollection: (id: string, input: z.infer<typeof recordCollectionInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
+  submitCollectionBatch: (id: string) => Promise<DesktopResult<CollectionBatch>>;
+  remitCollectionBatch: (id: string, input: RemittanceInput) => Promise<DesktopResult<CollectionBatch>>;
+  reconcileCollectionBatch: (id: string, input: z.infer<typeof reconciliationInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
+  closeCollectionBatch: (id: string, input: z.infer<typeof closeBatchInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
+  getEligibleCollectionPayments: (id: string, accountId: string) => Promise<DesktopResult<EligibleCollectionPayment[]>>;
 }
 
 export const desktopRequestSchemas = {
@@ -281,6 +303,14 @@ export const desktopRequestSchemas = {
   paymentReverse: z.object({ id: z.uuid(), input: reversePaymentInputSchema }),
   gcashProofQueue: z.object({ page: z.number().int().min(1), pageSize: z.number().int().min(10).max(100) }),
   paymentVerification: z.object({ id: z.uuid(), input: verifyGcashInputSchema }),
+  collectionBatchList: collectionBatchListQuerySchema,
+  collectionBatchCreate: createCollectionBatchInputSchema,
+  collectionBatchId: z.uuid(),
+  collectionAccount: z.object({ id: z.uuid(), accountId: z.uuid() }),
+  collectionRecord: z.object({ id: z.uuid(), input: recordCollectionInputSchema }),
+  collectionRemittance: z.object({ id: z.uuid(), input: remittanceInputSchema }),
+  collectionReconciliation: z.object({ id: z.uuid(), input: reconciliationInputSchema }),
+  collectionClose: z.object({ id: z.uuid(), input: closeBatchInputSchema }),
   gcashProofUpload: gcashProofUploadInputSchema,
 };
 

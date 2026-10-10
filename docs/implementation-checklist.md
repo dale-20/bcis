@@ -61,11 +61,13 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 6 — Collections (PDF §3.8)
 
-- [ ] Areas/routes, collector assignments, batches, batch accounts, remittances; printable account/address/current-bill/arrears/total route sheet.
+- [x] Areas/routes, effective-dated collector assignments, batches, batch accounts, remittances; printable account/address/current-bill/arrears/total route sheet.
 - [x] OPEN, IN_PROGRESS, SUBMITTED, REMITTED, RECONCILED, CLOSED lifecycle.
 - [x] Expected receivable, cash/non-cash collected, uncollected totals; separate cash reconciliation.
 - [x] Visible expected cash, remitted cash, shortage/overage, non-cash, collected accounts and exceptions (AT-07–08).
 - [x] Authorized confirmation to close; never silently treat shortage/overage as balanced.
+
+**Increment 6 verification:** Collection Supervisor batch UI and report flows are exposed through typed, sender-validated IPC. New service assignments and collector changes persist effective dates; existing assignment rows are not fabricated or backfilled because their original effective dates and actors are not recoverable. Cashier posts the payment first; the supervisor selects an eligible same-day posted receipt for the route account.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 

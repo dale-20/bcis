@@ -40,6 +40,9 @@ import {
   PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
   GCASH_PROOF_UPLOAD_CHANNEL, GCASH_PROOF_QUEUE_CHANNEL, GCASH_PROOF_GET_CHANNEL, GCASH_VERIFY_CHANNEL,
   GCASH_PROOF_MAX_BYTES,
+  COLLECTION_BATCHES_LIST_CHANNEL, COLLECTION_BATCH_CREATE_CHANNEL, COLLECTION_BATCH_GET_CHANNEL, COLLECTION_RECORD_CHANNEL,
+  COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
+  COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -142,6 +145,15 @@ void app.whenReady().then(() => {
   ipcMain.handle(GCASH_PROOF_QUEUE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const query = desktopRequestSchemas.gcashProofQueue.parse(input); return api.listGcashProofs(query.page, query.pageSize); });
   ipcMain.handle(GCASH_PROOF_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getGcashProof(desktopRequestSchemas.paymentId.parse(input)); });
   ipcMain.handle(GCASH_VERIFY_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.paymentVerification.parse(input); return api.verifyGcashPayment(command.id, command.input); });
+  ipcMain.handle(COLLECTION_BATCHES_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.listCollectionBatches(desktopRequestSchemas.collectionBatchList.parse(input)); });
+  ipcMain.handle(COLLECTION_BATCH_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createCollectionBatch(desktopRequestSchemas.collectionBatchCreate.parse(input)); });
+  ipcMain.handle(COLLECTION_BATCH_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getCollectionBatch(desktopRequestSchemas.collectionBatchId.parse(input)); });
+  ipcMain.handle(COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionAccount.parse(input); return api.getEligibleCollectionPayments(command.id, command.accountId); });
+  ipcMain.handle(COLLECTION_RECORD_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionRecord.parse(input); return api.recordCollection(command.id, command.input); });
+  ipcMain.handle(COLLECTION_SUBMIT_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.submitCollectionBatch(desktopRequestSchemas.collectionBatchId.parse(input)); });
+  ipcMain.handle(COLLECTION_REMIT_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionRemittance.parse(input); return api.remitCollectionBatch(command.id, command.input); });
+  ipcMain.handle(COLLECTION_RECONCILE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionReconciliation.parse(input); return api.reconcileCollectionBatch(command.id, command.input); });
+  ipcMain.handle(COLLECTION_CLOSE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionClose.parse(input); return api.closeCollectionBatch(command.id, command.input); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

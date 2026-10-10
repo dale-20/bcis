@@ -1,7 +1,8 @@
-import { and, asc, count, countDistinct, desc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, isNull, notInArray, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import {
   auditLogs,
+  collectorAssignments,
   collectionAreas,
   collectors,
   serviceAccounts,
@@ -231,9 +232,15 @@ export class SubscriberRepository {
         if (!collector) throw new Error('REFERENCE_NOT_FOUND');
       }
       const [created] = await transaction.insert(serviceAccounts).values({
-        ...input, subscriberId, currentRateCentavos: plan.price, status: 'PENDING',
+        serviceAccountNumber: input.serviceAccountNumber, planId: input.planId, installationAddressId: input.installationAddressId,
+        collectionAreaId: input.collectionAreaId, assignedCollectorId: input.assignedCollectorId,
+        activationDate: input.activationDate, billingStartDate: input.billingStartDate, billingDay: input.billingDay, dueDay: input.dueDay,
+        subscriberId, currentRateCentavos: plan.price, status: 'PENDING',
       }).returning({ id: serviceAccounts.id });
       if (!created) throw new Error('SERVICE_INSERT_FAILED');
+      if (input.assignedCollectorId) await transaction.insert(collectorAssignments).values({
+        collectorId: input.assignedCollectorId, serviceAccountId: created.id, effectiveFrom: input.assignmentEffectiveFrom ?? input.activationDate ?? input.billingStartDate, assignedByUserId: actorUserId,
+      });
       await transaction.insert(serviceEvents).values({ serviceAccountId: created.id, eventType: 'SERVICE_ACCOUNT_CREATED', actorUserId, details: { status: 'PENDING', planId: input.planId } });
       await transaction.insert(auditLogs).values({ actorUserId, action: 'service_account.created', entityType: 'service_account', entityId: created.id, newValues: input, requestId });
       return created.id;
@@ -259,7 +266,30 @@ export class SubscriberRepository {
         const [collector] = await transaction.select({ id: collectors.id }).from(collectors).where(and(eq(collectors.id, input.assignedCollectorId), eq(collectors.status, 'ACTIVE'))).limit(1);
         if (!collector) throw new Error('REFERENCE_NOT_FOUND');
       }
-      await transaction.update(serviceAccounts).set({ ...input, currentRateCentavos: plan.price, updatedAt: new Date() }).where(eq(serviceAccounts.id, serviceId));
+      const effectiveFrom = input.assignmentEffectiveFrom ?? new Date().toISOString().slice(0, 10);
+      if (current.assignedCollectorId !== input.assignedCollectorId) {
+        const [activeAssignment] = await transaction.select().from(collectorAssignments).where(and(
+          eq(collectorAssignments.serviceAccountId, serviceId), isNull(collectorAssignments.effectiveTo),
+        )).limit(1).for('update');
+        if (activeAssignment && effectiveFrom < activeAssignment.effectiveFrom) throw new Error('ASSIGNMENT_DATE_BEFORE_CURRENT');
+        if (activeAssignment && effectiveFrom === activeAssignment.effectiveFrom) {
+          if (input.assignedCollectorId) throw new Error('ASSIGNMENT_EFFECTIVE_DATE_MUST_ADVANCE');
+          await transaction.update(collectorAssignments).set({ effectiveTo: effectiveFrom }).where(eq(collectorAssignments.id, activeAssignment.id));
+        } else {
+          if (activeAssignment) {
+            const end = new Date(`${effectiveFrom}T00:00:00Z`);
+            end.setUTCDate(end.getUTCDate() - 1);
+            await transaction.update(collectorAssignments).set({ effectiveTo: end.toISOString().slice(0, 10) }).where(eq(collectorAssignments.id, activeAssignment.id));
+          }
+          if (input.assignedCollectorId) await transaction.insert(collectorAssignments).values({ collectorId: input.assignedCollectorId, serviceAccountId: serviceId, effectiveFrom, assignedByUserId: actorUserId });
+        }
+      }
+      await transaction.update(serviceAccounts).set({
+        serviceAccountNumber: input.serviceAccountNumber, planId: input.planId, installationAddressId: input.installationAddressId,
+        collectionAreaId: input.collectionAreaId, assignedCollectorId: input.assignedCollectorId,
+        activationDate: input.activationDate, billingStartDate: input.billingStartDate, billingDay: input.billingDay, dueDay: input.dueDay,
+        currentRateCentavos: plan.price, updatedAt: new Date(),
+      }).where(eq(serviceAccounts.id, serviceId));
       const oldValues = { serviceAccountNumber: current.serviceAccountNumber, planId: current.planId, installationAddressId: current.installationAddressId, collectionAreaId: current.collectionAreaId, assignedCollectorId: current.assignedCollectorId, activationDate: current.activationDate, billingStartDate: current.billingStartDate, billingDay: current.billingDay, dueDay: current.dueDay, currentRateCentavos: current.currentRateCentavos.toString() };
       await transaction.insert(serviceEvents).values({ serviceAccountId: serviceId, eventType: 'SERVICE_ACCOUNT_UPDATED', actorUserId, details: { oldValues, newValues: input } });
       await transaction.insert(auditLogs).values({ actorUserId, action: 'service_account.updated', entityType: 'service_account', entityId: serviceId, oldValues, newValues: input, requestId });
@@ -384,6 +414,10 @@ export class SubscriberRepository {
           status: service.status,
         }).returning({ id: serviceAccounts.id });
         if (!created) throw new Error('SERVICE_INSERT_FAILED');
+        await transaction.insert(collectorAssignments).values({
+          collectorId: service.assignedCollectorId, serviceAccountId: created.id,
+          effectiveFrom: service.activationDate ?? service.billingStartDate, assignedByUserId: actorUserId,
+        });
         await transaction.insert(serviceEvents).values({
           serviceAccountId: created.id,
           eventType: 'SERVICE_ACCOUNT_CREATED',

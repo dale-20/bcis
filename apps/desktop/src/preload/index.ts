@@ -34,6 +34,9 @@ import {
   SUBSCRIBER_LEDGER_CHANNEL,
   PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
   GCASH_PROOF_UPLOAD_CHANNEL, GCASH_PROOF_QUEUE_CHANNEL, GCASH_PROOF_GET_CHANNEL, GCASH_VERIFY_CHANNEL,
+  COLLECTION_BATCHES_LIST_CHANNEL, COLLECTION_BATCH_CREATE_CHANNEL, COLLECTION_BATCH_GET_CHANNEL, COLLECTION_RECORD_CHANNEL,
+  COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
+  COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -88,5 +91,14 @@ const bridge: DesktopBridge = Object.freeze({
   listGcashProofs: (page: number, pageSize: number) => ipcRenderer.invoke(GCASH_PROOF_QUEUE_CHANNEL, { page, pageSize }),
   getGcashProof: (id: string) => ipcRenderer.invoke(GCASH_PROOF_GET_CHANNEL, id),
   verifyGcashPayment: (id: string, input: Parameters<DesktopBridge['verifyGcashPayment']>[1]) => ipcRenderer.invoke(GCASH_VERIFY_CHANNEL, { id, input }),
+  listCollectionBatches: (query: Parameters<DesktopBridge['listCollectionBatches']>[0]) => ipcRenderer.invoke(COLLECTION_BATCHES_LIST_CHANNEL, query),
+  createCollectionBatch: (input: Parameters<DesktopBridge['createCollectionBatch']>[0]) => ipcRenderer.invoke(COLLECTION_BATCH_CREATE_CHANNEL, input),
+  getCollectionBatch: (id: string) => ipcRenderer.invoke(COLLECTION_BATCH_GET_CHANNEL, id),
+  recordCollection: (id: string, input: Parameters<DesktopBridge['recordCollection']>[1]) => ipcRenderer.invoke(COLLECTION_RECORD_CHANNEL, { id, input }),
+  submitCollectionBatch: (id: string) => ipcRenderer.invoke(COLLECTION_SUBMIT_CHANNEL, id),
+  remitCollectionBatch: (id: string, input: Parameters<DesktopBridge['remitCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_REMIT_CHANNEL, { id, input }),
+  reconcileCollectionBatch: (id: string, input: Parameters<DesktopBridge['reconcileCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_RECONCILE_CHANNEL, { id, input }),
+  closeCollectionBatch: (id: string, input: Parameters<DesktopBridge['closeCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_CLOSE_CHANNEL, { id, input }),
+  getEligibleCollectionPayments: (id: string, accountId: string) => ipcRenderer.invoke(COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL, { id, accountId }),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

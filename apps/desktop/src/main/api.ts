@@ -1,6 +1,7 @@
 import {
   authenticatedUserSchema,
   collectionReferenceCatalogSchema,
+  collectionBatchListSchema, collectionBatchSchema, eligibleCollectionPaymentsSchema,
   referenceDataSchema,
   servicePlanCatalogSchema,
   servicePlanCreatedSchema,
@@ -14,6 +15,9 @@ import {
   type CollectionReferenceCatalog,
   type CollectorCreate,
   type CollectorUpdate,
+  type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput,
+  type EligibleCollectionPayment,
+  type RemittanceInput,
   type DesktopResult,
   type ReferenceData,
   type ReferenceStatusChange,
@@ -153,6 +157,42 @@ export class DesktopApiClient {
 
   getCollectionReferences(): Promise<DesktopResult<CollectionReferenceCatalog>> {
     return this.call('/collection-reference-data', { method: 'GET' }, collectionReferenceCatalogSchema);
+  }
+
+  listCollectionBatches(query: CollectionBatchListQuery): Promise<DesktopResult<CollectionBatchList>> {
+    return this.call(`/collection-batches?${new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })}`, { method: 'GET' }, collectionBatchListSchema);
+  }
+
+  createCollectionBatch(input: CreateCollectionBatchInput): Promise<DesktopResult<CollectionBatch>> {
+    return this.call('/collection-batches', { method: 'POST', body: JSON.stringify(input) }, collectionBatchSchema);
+  }
+
+  getCollectionBatch(id: string): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}`, { method: 'GET' }, collectionBatchSchema);
+  }
+
+  getEligibleCollectionPayments(id: string, accountId: string): Promise<DesktopResult<EligibleCollectionPayment[]>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/accounts/${encodeURIComponent(accountId)}/eligible-payments`, { method: 'GET' }, eligibleCollectionPaymentsSchema);
+  }
+
+  recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string | undefined }): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/collections`, { method: 'POST', body: JSON.stringify(input) }, collectionBatchSchema);
+  }
+
+  submitCollectionBatch(id: string): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/submit`, { method: 'POST' }, collectionBatchSchema);
+  }
+
+  remitCollectionBatch(id: string, input: RemittanceInput): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/remittance`, { method: 'POST', body: JSON.stringify(input) }, collectionBatchSchema);
+  }
+
+  reconcileCollectionBatch(id: string, input: { notes: string }): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/reconcile`, { method: 'POST', body: JSON.stringify(input) }, collectionBatchSchema);
+  }
+
+  closeCollectionBatch(id: string, input: { notes?: string | undefined }): Promise<DesktopResult<CollectionBatch>> {
+    return this.call(`/collection-batches/${encodeURIComponent(id)}/close`, { method: 'POST', body: JSON.stringify(input) }, collectionBatchSchema);
   }
 
   createCollectionArea(input: CollectionAreaCreate): Promise<DesktopResult<{ id: string }>> {

@@ -22,13 +22,14 @@ export function ServiceAccountForm({ subscriber, references, service, pending, s
     installationAddressId: service.installationAddressId,
     collectionAreaId: service.collectionAreaId,
     assignedCollectorId: service.assignedCollectorId,
+    assignmentEffectiveFrom: new Date().toISOString().slice(0, 10),
     activationDate: service.activationDate ?? undefined,
     billingStartDate: service.billingStartDate,
     billingDay: service.billingDay,
     dueDay: service.dueDay,
   } : {
     serviceAccountNumber: '', planId: '', installationAddressId: subscriber.addresses[0]?.id ?? '',
-    collectionAreaId: null, assignedCollectorId: null, billingStartDate: new Date().toISOString().slice(0, 10),
+    collectionAreaId: null, assignedCollectorId: null, assignmentEffectiveFrom: new Date().toISOString().slice(0, 10), billingStartDate: new Date().toISOString().slice(0, 10),
     billingDay: subscriber.billingDay, dueDay: subscriber.dueDay,
   } });
   const submit = form.handleSubmit(async (values) => {
@@ -46,6 +47,7 @@ export function ServiceAccountForm({ subscriber, references, service, pending, s
       <label className="field-label span-two"><span>Installation address *</span><select className="select-input" {...form.register('installationAddressId', { required: true })}>{subscriber.addresses.map((address) => <option key={address.id} value={address.id}>{address.line1}, {address.barangay}</option>)}</select></label>
       <label className="field-label"><span>Collection area</span><select className="select-input" {...form.register('collectionAreaId', { setValueAs: (value: string) => value || null })}><option value="">Unassigned</option>{references.collectionAreas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label>
       <label className="field-label"><span>Assigned collector</span><select className="select-input" {...form.register('assignedCollectorId', { setValueAs: (value: string) => value || null })}><option value="">Unassigned</option>{references.collectors.map((collector) => <option key={collector.id} value={collector.id}>{collector.name}</option>)}</select></label>
+      <label className="field-label"><span>Assignment effective from</span><input className="text-input" type="date" {...form.register('assignmentEffectiveFrom')} /></label>
       <label className="field-label"><span>Billing start *</span><input className="text-input" type="date" {...form.register('billingStartDate', { required: true })} /></label>
       <label className="field-label"><span>Activation date</span><input className="text-input" type="date" {...form.register('activationDate', { setValueAs: (value: string) => value || undefined })} /></label>
       <label className="field-label"><span>Billing day *</span><input className="text-input" type="number" min="1" max="28" {...form.register('billingDay', { valueAsNumber: true })} /></label>

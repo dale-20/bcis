@@ -50,6 +50,8 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /payments/:id/gcash-verification` | Valid session and `payment.verify_gcash` | Verification/rejection records verifier, time, and audit evidence |
 | `POST /payments/:id/reverse` | Valid session and both `payment.reverse` and `receipt.void` | Reversal reason, actor, restored value, receipt void, and audit are atomic |
 | `GET /collections/reference-data` | Valid session and `collection.view` | Read-only collectors and areas |
+| `GET /collection-batches` | Valid session and `collection.view` | Server-side paginated batch list with collected/uncollected counts and remittance variance |
+| `GET /collection-batches/:id/accounts/:accountId/eligible-payments` | Valid session and `collection.manage` | Lists at most 25 unlinked, posted same-day receipts for the route subscriber |
 | `POST /collection-batches` | Valid session and `collection.manage` | Route snapshot and expected receivable audited atomically |
 | `POST /collection-batches/:id/collections` | Valid session and `collection.manage` | Links one same-day posted payment to one route row |
 | `POST /collection-batches/:id/submit` | Valid session and `collection.manage` | Freezes collection recording and audits submission |

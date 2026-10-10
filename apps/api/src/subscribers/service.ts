@@ -215,6 +215,8 @@ export class SubscriberService {
     } catch (error) {
       if (error instanceof Error && error.message === 'SUBSCRIBER_NOT_FOUND') throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
       if (error instanceof Error && error.message === 'REFERENCE_NOT_FOUND') throw new AppError(400, 'REFERENCE_NOT_FOUND', 'A selected plan, address, area, or collector is unavailable');
+      if (error instanceof Error && error.message === 'ASSIGNMENT_DATE_BEFORE_CURRENT') throw new AppError(409, 'ASSIGNMENT_DATE_BEFORE_CURRENT', 'Assignment effective date cannot precede the current assignment');
+      if (error instanceof Error && error.message === 'ASSIGNMENT_EFFECTIVE_DATE_MUST_ADVANCE') throw new AppError(409, 'ASSIGNMENT_EFFECTIVE_DATE_MUST_ADVANCE', 'Choose an effective date after the current assignment start');
       if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_SERVICE_NUMBER', 'Service account number is already in use');
       throw error;
     }
@@ -228,6 +230,8 @@ export class SubscriberService {
       if (error instanceof Error && error.message === 'SERVICE_NOT_FOUND') throw new AppError(404, 'SERVICE_NOT_FOUND', 'Service account not found');
       if (error instanceof Error && error.message === 'SERVICE_TERMINATED') throw new AppError(409, 'SERVICE_TERMINATED', 'A terminated service account cannot be edited');
       if (error instanceof Error && error.message === 'REFERENCE_NOT_FOUND') throw new AppError(400, 'REFERENCE_NOT_FOUND', 'A selected plan, address, area, or collector is unavailable');
+      if (error instanceof Error && error.message === 'ASSIGNMENT_DATE_BEFORE_CURRENT') throw new AppError(409, 'ASSIGNMENT_DATE_BEFORE_CURRENT', 'Assignment effective date cannot precede the current assignment');
+      if (error instanceof Error && error.message === 'ASSIGNMENT_EFFECTIVE_DATE_MUST_ADVANCE') throw new AppError(409, 'ASSIGNMENT_EFFECTIVE_DATE_MUST_ADVANCE', 'Choose an effective date after the current assignment start');
       if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_SERVICE_NUMBER', 'Service account number is already in use');
       throw error;
     }

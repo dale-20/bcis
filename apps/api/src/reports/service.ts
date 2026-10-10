@@ -9,7 +9,12 @@ type Row = Record<string, unknown>;
 const text = (value: unknown) => value === null || value === undefined ? '' : String(value);
 const cents = (value: unknown) => BigInt(text(value) || '0').toString();
 const iso = (value: unknown) => value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
-const money = (value: string) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(BigInt(value)) / 100);
+const money = (value: string) => {
+  const cents = BigInt(value);
+  const pesos = cents / 100n;
+  const fraction = (cents < 0n ? -cents : cents) % 100n;
+  return `${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(pesos)}.${fraction.toString().padStart(2, '0')}`;
+};
 const displayNameSql = "coalesce(s.organization_name, concat_ws(' ', s.first_name, s.last_name))";
 
 export class ReportService {
@@ -77,10 +82,23 @@ export class ReportService {
       const name=text((owner.rows[0] as Row|undefined)?.subscriber); const account=text((owner.rows[0] as Row|undefined)?.account_number);
       return {...this.data(request,`Subscriber statement · ${name}`,rows,[{label:'Opening balance',value:money(openingBalance.toString())},{label:'Closing balance',value:money(balance.toString())}],[{key:'date',label:'Date'},{key:'reference',label:'Reference'},{key:'description',label:'Description'},{key:'debit',label:'Debit',align:'right'},{key:'credit',label:'Credit',align:'right'},{key:'balance',label:'Running balance',align:'right'}],generatedAt),subtitle:`${account} · ${request.from} to ${request.to}`};
     }
+    if (request.report === 'COLLECTOR_ASSIGNMENTS') {
+      const values: unknown[] = [request.from, request.to];
+      let collectorFilter = '';
+      if (request.collectorId) { values.push(request.collectorId); collectorFilter = ` and ca.collector_id=$${values.length}`; }
+      const result = await this.database.pool.query(`select c.collector_number, c.name collector, s.account_number, ${displayNameSql} subscriber, sa.service_account_number, area.name area, ca.effective_from::text effective_from, ca.effective_to::text effective_to from collector_assignments ca join collectors c on c.id=ca.collector_id join service_accounts sa on sa.id=ca.service_account_id join subscribers s on s.id=sa.subscriber_id left join collection_areas area on area.id=sa.collection_area_id where ca.effective_from <= $2::date and (ca.effective_to is null or ca.effective_to >= $1::date)${collectorFilter} order by c.collector_number, s.account_number, ca.effective_from`, values);
+      const rows = result.rows.map((r: Row) => ({ collectorNumber: text(r.collector_number), collector: text(r.collector), subscriberAccount: text(r.account_number), subscriber: text(r.subscriber), serviceAccount: text(r.service_account_number), area: text(r.area), effectiveFrom: text(r.effective_from), effectiveTo: text(r.effective_to) || 'Current' }));
+      return this.data(request, 'Collector assignment history', rows, [{ label: 'Assignments', value: String(rows.length) }], [
+        { key: 'collectorNumber', label: 'Collector ID' }, { key: 'collector', label: 'Collector' }, { key: 'subscriberAccount', label: 'Subscriber account' },
+        { key: 'subscriber', label: 'Subscriber' }, { key: 'serviceAccount', label: 'Service account' }, { key: 'area', label: 'Area' },
+        { key: 'effectiveFrom', label: 'Effective from' }, { key: 'effectiveTo', label: 'Effective to' },
+      ], generatedAt);
+    }
     const values: unknown[]=[request.from,request.to]; let collectorFilter=''; if(request.collectorId){values.push(request.collectorId);collectorFilter=` and cb.collector_id=$${values.length}`;}
-    const result=await this.database.pool.query(`select cb.batch_number,cb.collection_date::text,c.name collector,ca.name area,cb.status,cr.expected_cash_centavos::bigint expected,cr.remitted_cash_centavos::bigint remitted,cr.difference_centavos::bigint difference,cr.non_cash_centavos::bigint noncash from collection_batches cb join collectors c on c.id=cb.collector_id join collection_areas ca on ca.id=cb.collection_area_id left join collector_remittances cr on cr.batch_id=cb.id where cb.collection_date between $1::date and $2::date${collectorFilter} order by cb.collection_date desc,cb.batch_number`,values);
-    const rows=result.rows.map((r:Row)=>({batch:text(r.batch_number),date:text(r.collection_date),collector:text(r.collector),area:text(r.area),status:text(r.status),expected:money(cents(r.expected)),remitted:money(cents(r.remitted)),difference:money(cents(r.difference)),noncash:money(cents(r.noncash))}));
-    return this.data(request,'Collector remittance reconciliation',rows,[],[{key:'batch',label:'Batch'},{key:'date',label:'Date'},{key:'collector',label:'Collector'},{key:'area',label:'Area'},{key:'status',label:'Status'},{key:'expected',label:'Expected',align:'right'},{key:'remitted',label:'Remitted',align:'right'},{key:'difference',label:'Variance',align:'right'},{key:'noncash',label:'Non-cash',align:'right'}],generatedAt);
+    const result=await this.database.pool.query(`select cb.batch_number,cb.collection_date::text,c.name collector,ca.name area,cb.status,cr.expected_cash_centavos::bigint expected,cr.remitted_cash_centavos::bigint remitted,cr.difference_centavos::bigint difference,cr.non_cash_centavos::bigint noncash,coalesce(rollup.assigned,0)::int assigned,coalesce(rollup.collected,0)::int collected,coalesce(rollup.uncollected,0)::int uncollected,coalesce(rollup.amount,0)::bigint collected_amount from collection_batches cb join collectors c on c.id=cb.collector_id join collection_areas ca on ca.id=cb.collection_area_id left join collector_remittances cr on cr.batch_id=cb.id left join lateral (select count(*)::int assigned,count(*) filter (where a.payment_id is not null)::int collected,count(*) filter (where a.payment_id is null)::int uncollected,coalesce(sum(p.amount_centavos),0)::bigint amount from collection_batch_accounts a left join payments p on p.id=a.payment_id where a.batch_id=cb.id) rollup on true where cb.collection_date between $1::date and $2::date${collectorFilter} order by cb.collection_date desc,cb.batch_number`,values);
+    const rows=result.rows.map((r:Row)=>({batch:text(r.batch_number),date:text(r.collection_date),collector:text(r.collector),area:text(r.area),status:text(r.status),expected:money(cents(r.expected)),remitted:money(cents(r.remitted)),difference:money(cents(r.difference)),noncash:money(cents(r.noncash)),assignedAccounts:text(r.assigned),collectedAccounts:text(r.collected),uncollectedAccounts:text(r.uncollected),collectedAmount:money(cents(r.collected_amount))}));
+    const totals = result.rows.reduce((sum, row: Row) => ({ assigned: sum.assigned + Number(row.assigned), collected: sum.collected + Number(row.collected), uncollected: sum.uncollected + Number(row.uncollected), amount: sum.amount + BigInt(cents(row.collected_amount)) }), { assigned: 0, collected: 0, uncollected: 0, amount: 0n });
+    return this.data(request,'Collector remittance and performance',rows,[{label:'Assigned accounts',value:String(totals.assigned)},{label:'Collected accounts',value:String(totals.collected)},{label:'Uncollected accounts',value:String(totals.uncollected)},{label:'Collected amount',value:money(totals.amount.toString())}],[{key:'batch',label:'Batch'},{key:'date',label:'Date'},{key:'collector',label:'Collector'},{key:'area',label:'Area'},{key:'status',label:'Status'},{key:'assignedAccounts',label:'Assigned'},{key:'collectedAccounts',label:'Collected'},{key:'uncollectedAccounts',label:'Uncollected'},{key:'collectedAmount',label:'Collected amount',align:'right'},{key:'expected',label:'Expected Cash',align:'right'},{key:'remitted',label:'Remitted Cash',align:'right'},{key:'difference',label:'Shortage / overage',align:'right'},{key:'noncash',label:'Non-cash',align:'right'}],generatedAt);
   }
 
   async history(subscriberId: string): Promise<ServiceHistory> {

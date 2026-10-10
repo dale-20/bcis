@@ -1,9 +1,9 @@
 import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
-import type { CreateCollectionBatchInput } from '@bcis/shared';
+import type { CollectionBatchListQuery, CreateCollectionBatchInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
   auditLogs, collectionAreas, collectionBatchAccounts, collectionBatches, collectors, collectorRemittances,
-  invoices, payments, serviceAccounts, subscriberAddresses, subscribers,
+  invoices, payments, receipts, serviceAccounts, subscriberAddresses, subscribers,
 } from '../db/schema.js';
 import { AppError } from '../errors.js';
 
@@ -18,6 +18,49 @@ export class CollectionRepository {
       this.database.db.select({ id: collectionAreas.id, code: collectionAreas.code, name: collectionAreas.name, status: collectionAreas.status }).from(collectionAreas).orderBy(asc(collectionAreas.code)),
     ]);
     return { collectors: collectorRows, areas: areaRows };
+  }
+
+  async list(query: CollectionBatchListQuery) {
+    const offset = (query.page - 1) * query.pageSize;
+    const [rows, [count]] = await Promise.all([
+      this.database.db.select({
+        id: collectionBatches.id, batchNumber: collectionBatches.batchNumber, collectorId: collectionBatches.collectorId,
+        collectorName: collectors.name, collectionAreaId: collectionBatches.collectionAreaId, collectionAreaName: collectionAreas.name,
+        collectionDate: collectionBatches.collectionDate, status: collectionBatches.status,
+        expectedReceivableCentavos: collectionBatches.expectedReceivableCentavos,
+        accountCount: sql<number>`(SELECT count(*)::int FROM collection_batch_accounts WHERE batch_id = ${collectionBatches.id})`,
+        recordedAccountCount: sql<number>`(SELECT count(*)::int FROM collection_batch_accounts WHERE batch_id = ${collectionBatches.id} AND payment_id IS NOT NULL)`,
+        remittance: {
+          id: collectorRemittances.id, expectedCashCentavos: collectorRemittances.expectedCashCentavos,
+          remittedCashCentavos: collectorRemittances.remittedCashCentavos, differenceCentavos: collectorRemittances.differenceCentavos,
+          nonCashCentavos: collectorRemittances.nonCashCentavos, remittedAt: collectorRemittances.remittedAt, notes: collectorRemittances.notes,
+        },
+      }).from(collectionBatches).innerJoin(collectors, eq(collectionBatches.collectorId, collectors.id))
+        .innerJoin(collectionAreas, eq(collectionBatches.collectionAreaId, collectionAreas.id))
+        .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId))
+        .orderBy(sql`${collectionBatches.collectionDate} DESC`, sql`${collectionBatches.createdAt} DESC`).limit(query.pageSize).offset(offset),
+      this.database.db.select({ total: sql<number>`count(*)::int` }).from(collectionBatches),
+    ]);
+    const total = count?.total ?? 0;
+    return { items: rows, page: query.page, pageSize: query.pageSize, total, pageCount: Math.ceil(total / query.pageSize) };
+  }
+
+  async eligiblePayments(batchId: string, batchAccountId: string) {
+    const [batch] = await this.database.db.select({ status: collectionBatches.status, collectionDate: collectionBatches.collectionDate })
+      .from(collectionBatches).where(eq(collectionBatches.id, batchId)).limit(1);
+    if (!batch) throw new AppError(404, 'COLLECTION_BATCH_NOT_FOUND', 'Collection batch not found');
+    if (!['OPEN', 'IN_PROGRESS'].includes(batch.status)) throw new AppError(409, 'COLLECTION_BATCH_NOT_RECORDABLE', 'Collections can only be recorded before submission');
+    const [account] = await this.database.db.select({ subscriberId: collectionBatchAccounts.subscriberId })
+      .from(collectionBatchAccounts).where(and(eq(collectionBatchAccounts.id, batchAccountId), eq(collectionBatchAccounts.batchId, batchId))).limit(1);
+    if (!account) throw new AppError(404, 'BATCH_ACCOUNT_NOT_FOUND', 'Route-sheet account not found');
+    return this.database.db.select({
+      paymentId: payments.id, receiptNumber: receipts.receiptNumber, method: payments.method,
+      amountCentavos: payments.amountCentavos, paymentDate: payments.paymentDate,
+    }).from(payments).innerJoin(receipts, eq(receipts.paymentId, payments.id)).where(and(
+      eq(payments.subscriberId, account.subscriberId), eq(payments.status, 'POSTED'),
+      sql`${payments.paymentDate}::date = ${batch.collectionDate}::date`,
+      sql`NOT EXISTS (SELECT 1 FROM collection_batch_accounts linked WHERE linked.payment_id = ${payments.id})`,
+    )).orderBy(sql`${payments.paymentDate} DESC`).limit(25);
   }
 
   async create(input: CreateCollectionBatchInput, context: ActorContext) {

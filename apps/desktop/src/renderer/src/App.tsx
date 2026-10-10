@@ -26,12 +26,13 @@ import {
   WalletCards,
   Wrench,
 } from 'lucide-react';
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { AuthenticatedUser } from '@bcis/shared';
 import logo from './assets/bcis-mark.png';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { AuthScreen } from './features/auth/AuthScreen';
 import { CollectionSetupPage } from './features/collections/CollectionSetupPage';
+import { CollectionBatchesPage, CollectionRemittancePage } from './features/collections/CollectionBatchesPage';
 import { BillingPage } from './features/billing/BillingPage';
 import { PaymentsPage } from './features/payments/PaymentsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
@@ -62,6 +63,11 @@ function SystemConnection() {
 
 function Allowed({ user, permissions, children }: { user: AuthenticatedUser; permissions: readonly string[]; children: ReactNode }) {
   return hasAnyPermission(user.permissions, permissions) ? children : <Navigate to={defaultPath(user.permissions)} replace />;
+}
+
+function BatchRoute({ user }: { user: AuthenticatedUser }) {
+  const { batchId } = useParams();
+  return <CollectionBatchesPage user={user} batchId={batchId} />;
 }
 
 const modulePages = {
@@ -104,8 +110,9 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/payments/gcash" element={<Allowed user={user} permissions={['payment.verify_gcash']}><PaymentsPage user={user} mode="gcash" /></Allowed>} />
     <Route path="/collections/collectors" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="collectors" /></Allowed>} />
     <Route path="/collections/routes" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="areas" /></Allowed>} />
-    <Route path="/collections/batches" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.batches} /></Allowed>} />
-    <Route path="/collections/remittance" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.remittance} /></Allowed>} />
+    <Route path="/collections/batches" element={<Allowed user={user} permissions={['collection.view']}><CollectionBatchesPage user={user} /></Allowed>} />
+    <Route path="/collections/batches/:batchId" element={<Allowed user={user} permissions={['collection.view']}><BatchRoute user={user} /></Allowed>} />
+    <Route path="/collections/remittance" element={<Allowed user={user} permissions={['collection.view']}><CollectionRemittancePage user={user} /></Allowed>} />
     <Route path="/receivables/outstanding" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.outstanding} /></Allowed>} />
     <Route path="/receivables/overdue" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.overdue} /></Allowed>} />
     <Route path="/receivables/aging" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.aging} /></Allowed>} />

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   closeBatchInputSchema, collectionBatchSchema, collectionReferencesSchema, createCollectionBatchInputSchema,
-  recordCollectionInputSchema, reconciliationInputSchema, remittanceInputSchema,
+  collectionBatchListQuerySchema, collectionBatchListSchema, eligibleCollectionPaymentsSchema, recordCollectionInputSchema, reconciliationInputSchema, remittanceInputSchema,
 } from '@bcis/shared';
 import type { AuthService } from '../auth/service.js';
 import { authenticateWith, requirePermission } from '../auth/guards.js';
@@ -13,6 +13,7 @@ interface CollectionPluginOptions { database: Database; authService: AuthService
 const errorResponse = { type: 'object', required: ['error', 'message', 'requestId'], additionalProperties: false, properties: { error: { type: 'string' }, message: { type: 'string' }, requestId: { type: 'string' } } } as const;
 const uuidParams = { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } } as const;
 const permissiveResponse = { type: 'object', additionalProperties: true } as const;
+const permissiveArrayResponse = { type: 'array', items: { type: 'object', additionalProperties: true } } as const;
 
 export const collectionPlugin: FastifyPluginAsync<CollectionPluginOptions> = async (app, options) => {
   const service = new CollectionService(options.database);
@@ -23,11 +24,24 @@ export const collectionPlugin: FastifyPluginAsync<CollectionPluginOptions> = asy
   };
 
   app.get('/collections/reference-data', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: { response: { 200: permissiveResponse, 401: errorResponse, 403: errorResponse } } }, async () => collectionReferencesSchema.parse(await service.references()));
+  app.get('/collection-batches', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: {
+    querystring: { type: 'object', additionalProperties: false, properties: { page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 } } },
+    response: { 200: permissiveResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse },
+  } }, async (request) => collectionBatchListSchema.parse(await service.list(collectionBatchListQuerySchema.parse({
+    ...(request.query as { page?: number; pageSize?: number }),
+  }))));
   app.post('/collection-batches', {
     preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
     schema: { body: { type: 'object', required: ['collectorId', 'collectionAreaId', 'collectionDate'], additionalProperties: false, properties: { collectorId: { type: 'string', format: 'uuid' }, collectionAreaId: { type: 'string', format: 'uuid' }, collectionDate: { type: 'string', format: 'date' } } }, response: { 201: permissiveResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
   }, async (request, reply) => { const result = collectionBatchSchema.parse(await service.create(createCollectionBatchInputSchema.parse(request.body), actor(request), request.id)); reply.code(201); return result; });
   app.get('/collection-batches/:id', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: { params: uuidParams, response: { 200: permissiveResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse } } }, async (request) => collectionBatchSchema.parse(await service.detail((request.params as { id: string }).id)));
+  app.get('/collection-batches/:id/accounts/:accountId/eligible-payments', { preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')], schema: {
+    params: { type: 'object', required: ['id', 'accountId'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, accountId: { type: 'string', format: 'uuid' } } },
+    response: { 200: permissiveArrayResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+  } }, async (request) => {
+    const params = request.params as { id: string; accountId: string };
+    return eligibleCollectionPaymentsSchema.parse(await service.eligiblePayments(params.id, params.accountId));
+  });
   app.post('/collection-batches/:id/collections', {
     preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],
     schema: { params: uuidParams, body: { type: 'object', required: ['batchAccountId', 'paymentId'], additionalProperties: false, properties: { batchAccountId: { type: 'string', format: 'uuid' }, paymentId: { type: 'string', format: 'uuid' }, notes: { type: 'string', minLength: 1, maxLength: 255 } } }, response: { 200: permissiveResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },

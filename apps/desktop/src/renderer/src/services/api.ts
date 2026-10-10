@@ -1,5 +1,8 @@
 import {
   authResultSchema,
+  collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
+  collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
+  remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
   collectionAreaCreateSchema,
   collectionAreaUpdateSchema,
   collectionReferenceCatalogResultSchema,
@@ -27,6 +30,7 @@ import {
   subscriberListQuerySchema,
   subscriberListResultSchema,
   type AuthenticatedUser,
+  type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput,
   type CollectionAreaCreate,
   type CollectionAreaUpdate,
   type CollectionReferenceCatalog,
@@ -313,5 +317,47 @@ export async function getGcashProof(paymentId: string) {
 export async function verifyGcashPayment(paymentId: string, input: VerifyGcashInput): Promise<PaymentResult> {
   const command = verifyGcashInputSchema.parse(input);
   return unwrap(paymentResultDesktopResultSchema.parse(await bridge().verifyGcashPayment(paymentId, command)));
+}
+
+export async function listCollectionBatches(query: CollectionBatchListQuery): Promise<CollectionBatchList> {
+  const command = collectionBatchListQuerySchema.parse(query);
+  return unwrap(collectionBatchListDesktopResultSchema.parse(await bridge().listCollectionBatches(command)));
+}
+
+export async function createCollectionBatch(input: CreateCollectionBatchInput): Promise<CollectionBatch> {
+  const command = createCollectionBatchInputSchema.parse(input);
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().createCollectionBatch(command)));
+}
+
+export async function getCollectionBatch(id: string): Promise<CollectionBatch> {
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().getCollectionBatch(id)));
+}
+
+export async function getEligibleCollectionPayments(id: string, accountId: string) {
+  return unwrap(eligibleCollectionPaymentsDesktopResultSchema.parse(await bridge().getEligibleCollectionPayments(id, accountId)));
+}
+
+export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {
+  const command = recordCollectionInputSchema.parse(input);
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().recordCollection(id, command)));
+}
+
+export async function submitCollectionBatch(id: string): Promise<CollectionBatch> {
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().submitCollectionBatch(id)));
+}
+
+export async function remitCollectionBatch(id: string, input: { remittedCashCentavos: string; notes?: string }): Promise<CollectionBatch> {
+  const command = remittanceInputSchema.parse(input);
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().remitCollectionBatch(id, command)));
+}
+
+export async function reconcileCollectionBatch(id: string, input: { notes: string }): Promise<CollectionBatch> {
+  const command = reconciliationInputSchema.parse(input);
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().reconcileCollectionBatch(id, command)));
+}
+
+export async function closeCollectionBatch(id: string, input: { notes?: string }): Promise<CollectionBatch> {
+  const command = closeBatchInputSchema.parse(input);
+  return unwrap(collectionBatchDesktopResultSchema.parse(await bridge().closeCollectionBatch(id, command)));
 }
 

@@ -81,6 +81,7 @@ export const serviceAccountMaintenanceSchema = z.object({
   installationAddressId: z.uuid(),
   collectionAreaId: z.uuid().nullable(),
   assignedCollectorId: z.uuid().nullable(),
+  assignmentEffectiveFrom: z.iso.date().optional(),
   activationDate: z.iso.date().optional(),
   billingStartDate: z.iso.date(),
   billingDay: z.number().int().min(1).max(28),

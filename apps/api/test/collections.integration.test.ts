@@ -11,7 +11,7 @@ import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
 import { AuthService } from '../src/auth/service.js';
 import { createDatabase } from '../src/db/client.js';
 import { seedOperationalDemoData } from '../src/db/seed-operational.js';
-import { auditLogs, collectionBatches, collectorRemittances, serviceAccounts } from '../src/db/schema.js';
+import { auditLogs, collectionBatches, collectorAssignments, collectorRemittances, serviceAccounts, users } from '../src/db/schema.js';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
 const url = process.env.TEST_DATABASE_URL;
@@ -60,6 +60,10 @@ async function recordCash(batch: CollectionBatch, amount = '2000000') {
   });
   expect(payment.statusCode).toBe(200);
   const posted = payment.json<PaymentResult>();
+  const eligible = await app.inject({ method: 'GET', url: `/collection-batches/${batch.id}/accounts/${routeAccount.id}/eligible-payments`, headers: { authorization: `Bearer ${tokens.collections}` } });
+  expect(eligible.statusCode, eligible.body).toBe(200);
+  expect(eligible.json<{ paymentId: string; receiptNumber: string }[]>()).toEqual(expect.arrayContaining([expect.objectContaining({ paymentId: posted.paymentId, receiptNumber: expect.stringMatching(/^OR-/) })]));
+  expect((await app.inject({ method: 'GET', url: `/collection-batches/${batch.id}/accounts/${routeAccount.id}/eligible-payments`, headers: { authorization: `Bearer ${tokens.cashier}` } })).statusCode).toBe(403);
   const recorded = await app.inject({
     method: 'POST', url: `/collection-batches/${batch.id}/collections`, headers: { authorization: `Bearer ${tokens.collections}` },
     payload: { batchAccountId: routeAccount.id, paymentId: posted.paymentId, notes: 'Synthetic route collection' },
@@ -118,6 +122,10 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
   it('AT-07 records a balanced ₱20,000 remittance and enforces authorized closing', async () => {
     const created = await createBatch('2026-11-15');
     expect(created).toMatchObject({ status: 'OPEN', collectorId, collectionAreaId: areaId });
+    const listed = await app.inject({ method: 'GET', url: '/collection-batches?page=1&pageSize=5', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(listed.statusCode, listed.body).toBe(200);
+    expect(listed.json<{ items: { id: string; batchNumber: string; accountCount: number }[]; total: number }>()).toMatchObject({ total: expect.any(Number), items: expect.arrayContaining([expect.objectContaining({ id: created.id, batchNumber: created.batchNumber, accountCount: created.accounts.length })]) });
+    expect((await app.inject({ method: 'GET', url: '/collection-batches?page=1&pageSize=5', headers: { authorization: `Bearer ${tokens.cashier}` } })).statusCode).toBe(403);
     const recorded = await recordCash(created);
     expect(recorded.status).toBe('IN_PROGRESS');
     expect(recorded.accounts.find((account) => account.paymentId)?.paymentAmountCentavos).toBe('2000000');
@@ -174,6 +182,10 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
   });
 
   it('builds live dashboard and authorized financial reports from posted records', async () => {
+    const [assignmentActor] = await database.db.select({ id: users.id }).from(users).where(eq(users.username, 'collections.demo'));
+    const [assignmentService] = await database.db.select({ id: serviceAccounts.id }).from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00001-1'));
+    if (!assignmentActor || !assignmentService) throw new Error('Synthetic assignment report fixture missing');
+    await database.db.insert(collectorAssignments).values({ collectorId, serviceAccountId: assignmentService.id, effectiveFrom: '2026-01-01', assignedByUserId: assignmentActor.id });
     const dashboard = await app.inject({ method: 'GET', url: '/dashboard?from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.cashier}` } });
     expect(dashboard.statusCode, dashboard.body).toBe(200);
     const summary = dashboard.json<Dashboard>();
@@ -185,6 +197,12 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const monthly = await app.inject({ method: 'GET', url: '/reports/data?report=MONTHLY_COLLECTIONS&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(monthly.statusCode, monthly.body).toBe(200);
     expect(monthly.json<ReportData>()).toMatchObject({ report: 'MONTHLY_COLLECTIONS', title: 'Monthly collections', columns: expect.any(Array), rows: expect.any(Array) });
+    const remittanceReport = await app.inject({ method: 'GET', url: '/reports/data?report=COLLECTOR_REMITTANCE&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(remittanceReport.statusCode, remittanceReport.body).toBe(200);
+    expect(remittanceReport.json<ReportData>()).toMatchObject({ title: 'Collector remittance and performance', columns: expect.arrayContaining([expect.objectContaining({ key: 'uncollectedAccounts' }), expect.objectContaining({ key: 'difference' })]), totals: expect.arrayContaining([expect.objectContaining({ label: 'Collected amount' })]) });
+    const assignmentReport = await app.inject({ method: 'GET', url: `/reports/data?report=COLLECTOR_ASSIGNMENTS&from=2026-01-01&to=2026-12-31&collectorId=${collectorId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(assignmentReport.statusCode, assignmentReport.body).toBe(200);
+    expect(assignmentReport.json<ReportData>()).toMatchObject({ title: 'Collector assignment history', columns: expect.arrayContaining([expect.objectContaining({ key: 'effectiveFrom' }), expect.objectContaining({ key: 'effectiveTo' })]), rows: expect.arrayContaining([expect.objectContaining({ collector: expect.any(String), effectiveTo: 'Current' })]) });
     const statement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-01-01&to=2026-12-31&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(statement.statusCode, statement.body).toBe(200);
     expect(statement.json<ReportData>().title).toContain('Subscriber statement');
