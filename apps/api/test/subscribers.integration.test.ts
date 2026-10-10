@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { CollectionReferenceCatalog, ReferenceData, ServiceAccountMaintenance, ServicePlanCatalog, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
+import type { CollectionReferenceCatalog, ReferenceData, ServiceAccountMaintenance, ServicePlanCatalog, SubscriberAudit, SubscriberCreate, SubscriberDetail, SubscriberFinancialProfile, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -23,6 +23,7 @@ const accounts: readonly DemoAccount[] = [
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
   { username: 'technician.demo', displayName: 'Demo Technician', role: 'TECHNICIAN' },
   { username: 'collections.demo', displayName: 'Demo Collection Supervisor', role: 'COLLECTION_SUPERVISOR' },
+  { username: 'auditor.demo', displayName: 'Demo Auditor', role: 'AUDITOR' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, testHasher);
@@ -57,6 +58,7 @@ describe.sequential('subscriber operations', () => {
   let cashierToken = '';
   let technicianToken = '';
   let supervisorToken = '';
+  let auditorToken = '';
   let createdSubscriberId = '';
   let references: ReferenceData;
 
@@ -65,6 +67,7 @@ describe.sequential('subscriber operations', () => {
     cashierToken = await activatedToken('cashier.demo', 'Synthetic-cashier-password-2');
     technicianToken = await activatedToken('technician.demo', 'Synthetic-technician-password-2');
     supervisorToken = await activatedToken('collections.demo', 'Synthetic-collections-password-2');
+    auditorToken = await activatedToken('auditor.demo', 'Synthetic-auditor-password-2');
   });
 
   it('serves deterministic server-side pages and global search', async () => {
@@ -226,6 +229,9 @@ describe.sequential('subscriber operations', () => {
     const user = await database.pool.query<{ id: string }>('SELECT id FROM users WHERE username = $1', ['admin.demo']);
     const cycle = await database.pool.query<{ id: string }>("INSERT INTO billing_cycles (period_start, period_end, status, finalized_at, finalized_by_user_id) VALUES ('2026-09-01', '2026-09-30', 'FINALIZED', now(), $1) RETURNING id", [user.rows[0]?.id]);
     await database.pool.query("INSERT INTO invoices (invoice_number, subscriber_id, service_account_id, billing_cycle_id, invoice_date, due_date, status, total_centavos, balance_centavos, finalized_at, finalized_by_user_id) VALUES ('INV-PLAN-HISTORY', $1, $2, $3, '2026-09-01', '2026-09-19', 'UNPAID', $4, $4, now(), $5)", [createdSubscriberId, service.id, cycle.rows[0]?.id, plan.priceCentavos, user.rows[0]?.id]);
+    const payment = await database.pool.query<{ id: string }>("INSERT INTO payments (idempotency_key,subscriber_id,payment_date,amount_centavos,method,status,reference_number,posted_by_user_id,posted_at,created_by_user_id) VALUES ('profile-search-cash',$1,now(),10000,'CASH','POSTED',null,$2,now(),$2) RETURNING id", [createdSubscriberId, user.rows[0]?.id]);
+    await database.pool.query("INSERT INTO receipts (receipt_number,payment_id,issued_by_user_id) VALUES ('OR-PROFILE-001',$1,$2)", [payment.rows[0]?.id, user.rows[0]?.id]);
+    await database.pool.query("INSERT INTO payments (idempotency_key,subscriber_id,payment_date,amount_centavos,method,status,reference_number,created_by_user_id) VALUES ('profile-search-gcash',$1,now(),5000,'GCASH','PENDING_VERIFICATION','GCASH-PROFILE-001',$2)", [createdSubscriberId, user.rows[0]?.id]);
     const nextPrice = (BigInt(plan.priceCentavos) + 10_000n).toString();
     const updated = await app.inject({ method: 'PATCH', url: `/service-plans/${plan.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { serviceTypeId: plan.serviceTypeId, code: plan.code, name: plan.name, priceCentavos: nextPrice, installationFeeCentavos: plan.installationFeeCentavos, reconnectionFeeCentavos: plan.reconnectionFeeCentavos, speedMbps: plan.speedMbps ?? undefined, channelCount: plan.channelCount ?? undefined, description: plan.description ?? '' } });
     expect(updated.statusCode).toBe(200);
@@ -237,6 +243,23 @@ describe.sequential('subscriber operations', () => {
     const deactivated = await app.inject({ method: 'POST', url: `/service-plans/${plan.id}/status`, headers: { authorization: `Bearer ${adminToken}` }, payload: { isActive: false, reason: 'Synthetic plan retirement' } });
     expect(deactivated.statusCode).toBe(200);
     expect(deactivated.json<ServicePlanCatalog>().plans.find((item) => item.id === plan.id)?.isActive).toBe(false);
+  });
+
+  it('searches financial references and returns permission-scoped profile tabs', async () => {
+    for (const reference of ['INV-PLAN-HISTORY', 'OR-PROFILE-001', 'GCASH-PROFILE-001']) {
+      const response = await app.inject({ method: 'GET', url: `/subscribers?query=${encodeURIComponent(reference)}&page=1&pageSize=10`, headers: { authorization: `Bearer ${adminToken}` } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<SubscriberListResponse>().items.some((item) => item.id === createdSubscriberId)).toBe(true);
+    }
+    const financial = await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}/financial-profile`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(financial.statusCode).toBe(200);
+    expect(financial.json<SubscriberFinancialProfile>().invoices.some((item) => item.invoiceNumber === 'INV-PLAN-HISTORY')).toBe(true);
+    expect(financial.json<SubscriberFinancialProfile>().payments.some((item) => item.receiptNumber === 'OR-PROFILE-001')).toBe(true);
+    expect((await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}/financial-profile`, headers: { authorization: `Bearer ${technicianToken}` } })).statusCode).toBe(403);
+    const audit = await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}/audit`, headers: { authorization: `Bearer ${auditorToken}` } });
+    expect(audit.statusCode).toBe(200);
+    expect(audit.json<SubscriberAudit>().entries.some((entry) => entry.action === 'subscriber.updated')).toBe(true);
+    expect((await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}/audit`, headers: { authorization: `Bearer ${adminToken}` } })).statusCode).toBe(403);
   });
 
   it('blocks archival with live services, then archives and reactivates with immutable audit history', async () => {

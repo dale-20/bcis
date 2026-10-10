@@ -49,6 +49,8 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 
 **Goal:** Complete the master data required by billing and collections.
 
+**Status: COMPLETE (2026-10-11).** The desktop, secure preload bridge, API, PostgreSQL transactions, server RBAC, and audit records cover every item below. Verification includes Admin, Cashier, Technician, Collection Supervisor, and Auditor permission cases plus built Electron E2E.
+
 - Add subscriber edit, archive/reactivate, status, notes, contacts, and address maintenance.
 - Add service-account create/edit/status workflows, plan change for future billing, address assignment, billing/due day, current rate, area, and collector assignment.
 - Add plan list/create/edit/activate/deactivate with Internet speed, Cable channel count, Combo attributes, price, fees, and description.
@@ -57,7 +59,7 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 - Complete subscriber profile tabs: overview, services, billing, payments, ledger, collection, history, documents, and audit.
 - Preserve all history through statuses and dated assignment/service events; never delete historical subscribers or services.
 
-Progress: subscriber identity, notes, contacts, and addresses now support audited editing. Archive/reactivate is permission-protected, reason-required, and blocked while billable services remain. Service accounts support audited create/edit/status operations with separate maintenance and technician status permissions. Plans support create/edit/activate/deactivate; rate changes update future service rates without mutating finalized invoices. Collectors and collection areas support create/edit/activate/deactivate from the desktop, including Collection Supervisor access. Cashier denial, transaction rollback, status transitions, and historical invoice preservation are covered by PostgreSQL integration tests. Profile-tab and global financial search work remains in this increment.
+Delivered: subscriber identity, notes, contacts, and addresses support audited editing. Archive/reactivate is permission-protected, reason-required, and blocked while billable services remain. Service accounts support audited create/edit/status operations with separate maintenance and technician status permissions. Plans support create/edit/activate/deactivate; rate changes update future service rates without mutating finalized invoices. Collectors and collection areas support create/edit/activate/deactivate from the desktop, including Collection Supervisor access. Permission-aware subscriber tabs expose overview, services, billing, payments, ledger, collection, history, documents, and audit data. Global subscriber search resolves names, accounts, contacts, addresses, services, invoices, receipts, and GCash references. PostgreSQL integration tests cover Cashier denial, transaction rollback, status transitions, reference search, permission-scoped financial/audit data, and historical invoice preservation.
 
 **Gate:** Admin can maintain master data; Cashier can search/view but receives 403 for mutations; plan-rate changes do not alter finalized invoices.
 

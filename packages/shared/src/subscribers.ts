@@ -185,6 +185,23 @@ export const subscriberDetailSchema = z.object({
 });
 export type SubscriberDetail = z.infer<typeof subscriberDetailSchema>;
 
+export const subscriberFinancialProfileSchema = z.object({
+  subscriberId: z.uuid(),
+  outstandingCentavos: centavosSchema,
+  availableCreditCentavos: centavosSchema,
+  invoices: z.array(z.object({ id: z.uuid(), invoiceNumber: z.string(), serviceAccountNumber: z.string(), invoiceDate: z.string(), dueDate: z.string(), status: z.string(), totalCentavos: centavosSchema, balanceCentavos: centavosSchema })),
+  payments: z.array(z.object({ id: z.uuid(), receiptNumber: z.string().nullable(), paymentDate: z.iso.datetime(), method: z.string(), status: z.string(), referenceNumber: z.string().nullable(), amountCentavos: centavosSchema })),
+  ledger: z.array(z.object({ id: z.uuid(), occurredAt: z.iso.datetime(), referenceNumber: z.string(), description: z.string(), debitCentavos: centavosSchema, creditCentavos: centavosSchema, runningBalanceCentavos: z.string().regex(/^-?\d+$/) })),
+  documents: z.array(z.object({ id: z.uuid(), paymentId: z.uuid(), originalFilename: z.string(), mimeType: z.string(), sizeBytes: centavosSchema, status: z.string(), createdAt: z.iso.datetime() })),
+});
+export type SubscriberFinancialProfile = z.infer<typeof subscriberFinancialProfileSchema>;
+
+export const subscriberAuditSchema = z.object({
+  subscriberId: z.uuid(),
+  entries: z.array(z.object({ id: z.uuid(), action: z.string(), entityType: z.string(), entityId: z.string().nullable(), reason: z.string().nullable(), actorName: z.string().nullable(), oldValues: z.record(z.string(), z.unknown()).nullable(), newValues: z.record(z.string(), z.unknown()).nullable(), createdAt: z.iso.datetime() })),
+});
+export type SubscriberAudit = z.infer<typeof subscriberAuditSchema>;
+
 export const servicePlanSchema = z.object({
   id: z.uuid(), serviceTypeId: z.uuid(), serviceTypeName: z.string(), category: serviceCategorySchema,
   code: z.string(), name: z.string(), priceCentavos: centavosSchema,

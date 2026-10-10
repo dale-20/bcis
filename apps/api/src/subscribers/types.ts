@@ -12,6 +12,8 @@ import {
   servicePlanUpdateSchema,
   subscriberCreateSchema,
   subscriberDetailSchema,
+  subscriberFinancialProfileSchema,
+  subscriberAuditSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
   subscriberStatusChangeSchema,
@@ -20,6 +22,8 @@ import {
 
 export type SubscriberCreate = z.infer<typeof subscriberCreateSchema>;
 export type SubscriberDetail = z.infer<typeof subscriberDetailSchema>;
+export type SubscriberFinancialProfile = z.infer<typeof subscriberFinancialProfileSchema>;
+export type SubscriberAudit = z.infer<typeof subscriberAuditSchema>;
 export type SubscriberListQuery = z.infer<typeof subscriberListQuerySchema>;
 export type SubscriberListResponse = z.infer<typeof subscriberListResponseSchema>;
 export type SubscriberUpdate = z.infer<typeof subscriberUpdateSchema>;

@@ -21,6 +21,8 @@ import {
   subscriberCreateSchema,
   subscriberStatusChangeSchema,
   subscriberDetailResultSchema,
+  subscriberAuditResultSchema,
+  subscriberFinancialResultSchema,
   subscriberUpdateSchema,
   subscriberListQuerySchema,
   subscriberListResultSchema,
@@ -40,6 +42,8 @@ import {
   type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
+  type SubscriberAudit,
+  type SubscriberFinancialProfile,
   type SubscriberListQuery,
   type SubscriberListResponse,
   type SubscriberStatusChange,
@@ -108,6 +112,14 @@ export async function updateSubscriber(id: string, input: SubscriberUpdate): Pro
 export async function changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<SubscriberDetail> {
   const command = subscriberStatusChangeSchema.parse(input);
   return unwrap(subscriberDetailResultSchema.parse(await bridge().changeSubscriberStatus(id, command)));
+}
+
+export async function getSubscriberFinancialProfile(id: string): Promise<SubscriberFinancialProfile> {
+  return unwrap(subscriberFinancialResultSchema.parse(await bridge().getSubscriberFinancialProfile(id)));
+}
+
+export async function getSubscriberAudit(id: string): Promise<SubscriberAudit> {
+  return unwrap(subscriberAuditResultSchema.parse(await bridge().getSubscriberAudit(id)));
 }
 
 export async function createServiceAccount(subscriberId: string, input: ServiceAccountMaintenance): Promise<SubscriberDetail> {

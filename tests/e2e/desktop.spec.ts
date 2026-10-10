@@ -77,6 +77,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.locator('.service-row').first().getByRole('button', { name: 'Edit' }).click();
     await expect(page.getByRole('heading', { name: 'Edit service account' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('button', { name: 'Billing', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
+    await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await page.screenshot({ path: 'test-results/subscriber-profile.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
     await expect(page.getByRole('button', { name: 'New subscriber' })).toBeVisible();
@@ -101,7 +104,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'listSubscribers', 'login', 'logout', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
       node: false,
       process: false,
     });

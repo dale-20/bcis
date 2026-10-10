@@ -10,7 +10,9 @@ import type {
   ServicePlanStatusChange,
   ServicePlanUpdate,
   SubscriberCreate,
+  SubscriberAudit,
   SubscriberDetail,
+  SubscriberFinancialProfile,
   SubscriberListQuery,
   SubscriberListResponse,
   SubscriberStatusChange,
@@ -68,6 +70,26 @@ export class SubscriberService {
       })),
       services: services.map((service) => ({ ...service, currentRateCentavos: service.currentRateCentavos.toString() })),
     };
+  }
+
+  async financialProfile(id: string): Promise<SubscriberFinancialProfile> {
+    await this.get(id);
+    const result = await this.repository.financialProfile(id);
+    return {
+      subscriberId: id,
+      outstandingCentavos: result.summary?.outstanding ?? '0',
+      availableCreditCentavos: result.summary?.credit ?? '0',
+      invoices: result.invoices.map((row) => ({ id: row.id, invoiceNumber: row.invoice_number, serviceAccountNumber: row.service_account_number, invoiceDate: row.invoice_date, dueDate: row.due_date, status: row.status, totalCentavos: row.total, balanceCentavos: row.balance })),
+      payments: result.payments.map((row) => ({ id: row.id, receiptNumber: row.receipt_number, paymentDate: row.payment_date.toISOString(), method: row.method, status: row.status, referenceNumber: row.reference_number, amountCentavos: row.amount })),
+      ledger: result.ledger.map((row) => ({ id: row.id, occurredAt: row.occurred_at.toISOString(), referenceNumber: row.reference_number, description: row.description, debitCentavos: row.debit, creditCentavos: row.credit, runningBalanceCentavos: row.running_balance })),
+      documents: result.documents.map((row) => ({ id: row.id, paymentId: row.payment_id, originalFilename: row.original_filename, mimeType: row.mime_type, sizeBytes: row.size_bytes, status: row.status, createdAt: row.created_at.toISOString() })),
+    };
+  }
+
+  async auditHistory(id: string): Promise<SubscriberAudit> {
+    await this.get(id);
+    const result = await this.repository.auditHistory(id);
+    return { subscriberId: id, entries: result.rows.map((row) => ({ id: row.id, action: row.action, entityType: row.entity_type, entityId: row.entity_id, reason: row.reason, actorName: row.actor_name, oldValues: row.old_values, newValues: row.new_values, createdAt: row.created_at.toISOString() })) };
   }
 
   async references() {

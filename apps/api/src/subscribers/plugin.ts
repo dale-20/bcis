@@ -13,7 +13,9 @@ import {
   servicePlanStatusChangeSchema,
   servicePlanUpdateSchema,
   subscriberCreateSchema,
+  subscriberAuditSchema,
   subscriberDetailSchema,
+  subscriberFinancialProfileSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
   subscriberStatusChangeSchema,
@@ -79,6 +81,14 @@ const collectionReferenceCatalogResponse = { type: 'object', required: ['areas',
   areas: { type: 'array', items: { type: 'object', required: ['id', 'code', 'name', 'description', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, code: { type: 'string' }, name: { type: 'string' }, description: { anyOf: [{ type: 'string' }, { type: 'null' }] }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } },
   collectors: { type: 'array', items: { type: 'object', required: ['id', 'collectorNumber', 'name', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, collectorNumber: { type: 'string' }, name: { type: 'string' }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } },
 } } as const;
+const subscriberFinancialResponse = { type: 'object', required: ['subscriberId', 'outstandingCentavos', 'availableCreditCentavos', 'invoices', 'payments', 'ledger', 'documents'], additionalProperties: false, properties: {
+  subscriberId: { type: 'string', format: 'uuid' }, outstandingCentavos: { type: 'string' }, availableCreditCentavos: { type: 'string' },
+  invoices: { type: 'array', items: { type: 'object', required: ['id', 'invoiceNumber', 'serviceAccountNumber', 'invoiceDate', 'dueDate', 'status', 'totalCentavos', 'balanceCentavos'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, invoiceNumber: { type: 'string' }, serviceAccountNumber: { type: 'string' }, invoiceDate: { type: 'string' }, dueDate: { type: 'string' }, status: { type: 'string' }, totalCentavos: { type: 'string' }, balanceCentavos: { type: 'string' } } } },
+  payments: { type: 'array', items: { type: 'object', required: ['id', 'receiptNumber', 'paymentDate', 'method', 'status', 'referenceNumber', 'amountCentavos'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, receiptNumber: { anyOf: [{ type: 'string' }, { type: 'null' }] }, paymentDate: { type: 'string', format: 'date-time' }, method: { type: 'string' }, status: { type: 'string' }, referenceNumber: { anyOf: [{ type: 'string' }, { type: 'null' }] }, amountCentavos: { type: 'string' } } } },
+  ledger: { type: 'array', items: { type: 'object', required: ['id', 'occurredAt', 'referenceNumber', 'description', 'debitCentavos', 'creditCentavos', 'runningBalanceCentavos'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, occurredAt: { type: 'string', format: 'date-time' }, referenceNumber: { type: 'string' }, description: { type: 'string' }, debitCentavos: { type: 'string' }, creditCentavos: { type: 'string' }, runningBalanceCentavos: { type: 'string' } } } },
+  documents: { type: 'array', items: { type: 'object', required: ['id', 'paymentId', 'originalFilename', 'mimeType', 'sizeBytes', 'status', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, paymentId: { type: 'string', format: 'uuid' }, originalFilename: { type: 'string' }, mimeType: { type: 'string' }, sizeBytes: { type: 'string' }, status: { type: 'string' }, createdAt: { type: 'string', format: 'date-time' } } } },
+} } as const;
+const subscriberAuditResponse = { type: 'object', required: ['subscriberId', 'entries'], additionalProperties: false, properties: { subscriberId: { type: 'string', format: 'uuid' }, entries: { type: 'array', items: { type: 'object', required: ['id', 'action', 'entityType', 'entityId', 'reason', 'actorName', 'oldValues', 'newValues', 'createdAt'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, action: { type: 'string' }, entityType: { type: 'string' }, entityId: { anyOf: [{ type: 'string' }, { type: 'null' }] }, reason: { anyOf: [{ type: 'string' }, { type: 'null' }] }, actorName: { anyOf: [{ type: 'string' }, { type: 'null' }] }, oldValues: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] }, newValues: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] }, createdAt: { type: 'string', format: 'date-time' } } } } } } as const;
 
 export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = async (app, options) => {
   const service = new SubscriberService(options.database);
@@ -101,6 +111,16 @@ export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = asy
     if (typeof id !== 'string') throw new AppError(400, 'VALIDATION_ERROR', 'Subscriber identifier is required');
     return subscriberDetailSchema.parse(await service.get(id));
   });
+
+  app.get('/subscribers/:id/financial-profile', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, response: { 200: subscriberFinancialResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+  }, async (request) => subscriberFinancialProfileSchema.parse(await service.financialProfile((request.params as { id: string }).id)));
+
+  app.get('/subscribers/:id/audit', {
+    preHandler: [authenticate, requirePermission(options.authService, 'audit.view')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, response: { 200: subscriberAuditResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+  }, async (request) => subscriberAuditSchema.parse(await service.auditHistory((request.params as { id: string }).id)));
 
   app.post('/subscribers', {
     preHandler: [authenticate, canManage],

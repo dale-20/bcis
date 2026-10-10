@@ -26,6 +26,8 @@ import {
   SERVICES_STATUS_CHANNEL,
   SERVICES_UPDATE_CHANNEL,
   SUBSCRIBERS_CREATE_CHANNEL,
+  SUBSCRIBERS_AUDIT_CHANNEL,
+  SUBSCRIBERS_FINANCIAL_CHANNEL,
   SUBSCRIBERS_STATUS_CHANNEL,
   SUBSCRIBERS_UPDATE_CHANNEL,
   SUBSCRIBERS_GET_CHANNEL,
@@ -82,6 +84,8 @@ void app.whenReady().then(() => {
   ipcMain.handle(SUBSCRIBERS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createSubscriber(desktopRequestSchemas.subscriberCreate.parse(input)); });
   ipcMain.handle(SUBSCRIBERS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberUpdate.parse(input); return api.updateSubscriber(command.id, command.input); });
   ipcMain.handle(SUBSCRIBERS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberStatus.parse(input); return api.changeSubscriberStatus(command.id, command.input); });
+  ipcMain.handle(SUBSCRIBERS_FINANCIAL_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getSubscriberFinancialProfile(desktopRequestSchemas.subscriberId.parse(input)); });
+  ipcMain.handle(SUBSCRIBERS_AUDIT_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getSubscriberAudit(desktopRequestSchemas.subscriberId.parse(input)); });
   ipcMain.handle(SERVICES_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceCreate.parse(input); return api.createServiceAccount(command.subscriberId, command.input); });
   ipcMain.handle(SERVICES_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceUpdate.parse(input); return api.updateServiceAccount(command.subscriberId, command.serviceId, command.input); });
   ipcMain.handle(SERVICES_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceStatus.parse(input); return api.changeServiceAccountStatus(command.subscriberId, command.serviceId, command.input); });

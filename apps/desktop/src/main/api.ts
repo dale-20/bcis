@@ -5,6 +5,8 @@ import {
   servicePlanCatalogSchema,
   servicePlanCreatedSchema,
   subscriberDetailSchema,
+  subscriberAuditSchema,
+  subscriberFinancialProfileSchema,
   subscriberListResponseSchema,
   type AuthenticatedUser,
   type CollectionAreaCreate,
@@ -23,6 +25,8 @@ import {
   type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
+  type SubscriberAudit,
+  type SubscriberFinancialProfile,
   type SubscriberListQuery,
   type SubscriberListResponse,
   type SubscriberStatusChange,
@@ -95,6 +99,14 @@ export class DesktopApiClient {
 
   changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<DesktopResult<SubscriberDetail>> {
     return this.call(`/subscribers/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  getSubscriberFinancialProfile(id: string): Promise<DesktopResult<SubscriberFinancialProfile>> {
+    return this.call(`/subscribers/${encodeURIComponent(id)}/financial-profile`, { method: 'GET' }, subscriberFinancialProfileSchema);
+  }
+
+  getSubscriberAudit(id: string): Promise<DesktopResult<SubscriberAudit>> {
+    return this.call(`/subscribers/${encodeURIComponent(id)}/audit`, { method: 'GET' }, subscriberAuditSchema);
   }
 
   createServiceAccount(subscriberId: string, input: ServiceAccountMaintenance): Promise<DesktopResult<SubscriberDetail>> {

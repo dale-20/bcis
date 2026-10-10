@@ -33,6 +33,9 @@ function searchCondition(query: string): SQL | undefined {
     OR EXISTS (SELECT 1 FROM subscriber_contacts contact WHERE contact.subscriber_id = ${subscribers.id} AND contact.value ILIKE ${pattern} ESCAPE '\\')
     OR EXISTS (SELECT 1 FROM subscriber_addresses address WHERE address.subscriber_id = ${subscribers.id} AND concat_ws(' ', address.line1, address.line2, address.barangay, address.municipality, address.province) ILIKE ${pattern} ESCAPE '\\')
     OR EXISTS (SELECT 1 FROM service_accounts service WHERE service.subscriber_id = ${subscribers.id} AND service.service_account_number ILIKE ${pattern} ESCAPE '\\')
+    OR EXISTS (SELECT 1 FROM invoices invoice WHERE invoice.subscriber_id = ${subscribers.id} AND invoice.invoice_number ILIKE ${pattern} ESCAPE '\\')
+    OR EXISTS (SELECT 1 FROM payments payment WHERE payment.subscriber_id = ${subscribers.id} AND COALESCE(payment.reference_number, '') ILIKE ${pattern} ESCAPE '\\')
+    OR EXISTS (SELECT 1 FROM payments payment JOIN receipts receipt ON receipt.payment_id = payment.id WHERE payment.subscriber_id = ${subscribers.id} AND receipt.receipt_number ILIKE ${pattern} ESCAPE '\\')
   )`;
 }
 
@@ -114,6 +117,23 @@ export class SubscriberRepository {
         .where(eq(serviceAccounts.subscriberId, id)).orderBy(asc(serviceAccounts.serviceAccountNumber)),
     ]);
     return { subscriber, contacts, addresses, services };
+  }
+
+  async financialProfile(subscriberId: string) {
+    const [summary, invoiceRows, paymentRows, ledgerRows, documentRows] = await Promise.all([
+      this.database.pool.query<{ outstanding: string; credit: string }>(`select
+        coalesce((select sum(balance_centavos) from invoices where subscriber_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::text outstanding,
+        coalesce((select sum(remaining_amount_centavos) from subscriber_credits where subscriber_id=$1 and status in ('AVAILABLE','PARTIALLY_USED')),0)::text credit`, [subscriberId]),
+      this.database.pool.query<{ id: string; invoice_number: string; service_account_number: string; invoice_date: string; due_date: string; status: string; total: string; balance: string }>(`select i.id,i.invoice_number,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance from invoices i join service_accounts sa on sa.id=i.service_account_id where i.subscriber_id=$1 order by i.invoice_date desc,i.invoice_number desc limit 200`, [subscriberId]),
+      this.database.pool.query<{ id: string; receipt_number: string | null; payment_date: Date; method: string; status: string; reference_number: string | null; amount: string }>(`select p.id,r.receipt_number,p.payment_date,p.method::text,p.status::text,p.reference_number,p.amount_centavos::text amount from payments p left join receipts r on r.payment_id=p.id where p.subscriber_id=$1 order by p.payment_date desc,p.id desc limit 200`, [subscriberId]),
+      this.database.pool.query<{ id: string; occurred_at: Date; reference_number: string; description: string; debit: string; credit: string; running_balance: string }>(`select id,occurred_at,reference_number,description,debit_centavos::text debit,credit_centavos::text credit,sum(debit_centavos-credit_centavos) over(order by occurred_at,id)::text running_balance from ledger_entries where subscriber_id=$1 order by occurred_at,id limit 500`, [subscriberId]),
+      this.database.pool.query<{ id: string; payment_id: string; original_filename: string; mime_type: string; size_bytes: string; status: string; created_at: Date }>(`select pp.id,pp.payment_id,pp.original_filename,pp.mime_type,pp.size_bytes::text,pp.status::text,pp.created_at from payment_proofs pp join payments p on p.id=pp.payment_id where p.subscriber_id=$1 order by pp.created_at desc limit 100`, [subscriberId]),
+    ]);
+    return { summary: summary.rows[0], invoices: invoiceRows.rows, payments: paymentRows.rows, ledger: ledgerRows.rows, documents: documentRows.rows };
+  }
+
+  async auditHistory(subscriberId: string) {
+    return this.database.pool.query<{ id: string; action: string; entity_type: string; entity_id: string | null; reason: string | null; actor_name: string | null; old_values: Record<string, unknown> | null; new_values: Record<string, unknown> | null; created_at: Date }>(`select a.id,a.action,a.entity_type,a.entity_id,a.reason,u.display_name actor_name,a.old_values,a.new_values,a.created_at from audit_logs a left join users u on u.id=a.actor_user_id where (a.entity_type='subscriber' and a.entity_id=$1::text) or (a.entity_type='service_account' and a.entity_id in (select id::text from service_accounts where subscriber_id=$1::uuid)) order by a.created_at desc limit 200`, [subscriberId]);
   }
 
   async referenceData() {

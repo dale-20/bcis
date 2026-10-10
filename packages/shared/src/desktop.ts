@@ -12,6 +12,8 @@ import {
   servicePlanCatalogSchema,
   subscriberCreateSchema,
   subscriberDetailSchema,
+  subscriberAuditSchema,
+  subscriberFinancialProfileSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
   subscriberStatusChangeSchema,
@@ -34,6 +36,8 @@ import {
   type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
+  type SubscriberAudit,
+  type SubscriberFinancialProfile,
   type SubscriberListQuery,
   type SubscriberListResponse,
   type SubscriberStatusChange,
@@ -50,6 +54,8 @@ export const SUBSCRIBERS_GET_CHANNEL = 'bcis:subscribers:get';
 export const SUBSCRIBERS_CREATE_CHANNEL = 'bcis:subscribers:create';
 export const SUBSCRIBERS_UPDATE_CHANNEL = 'bcis:subscribers:update';
 export const SUBSCRIBERS_STATUS_CHANNEL = 'bcis:subscribers:status';
+export const SUBSCRIBERS_FINANCIAL_CHANNEL = 'bcis:subscribers:financial';
+export const SUBSCRIBERS_AUDIT_CHANNEL = 'bcis:subscribers:audit';
 export const SERVICES_CREATE_CHANNEL = 'bcis:services:create';
 export const SERVICES_UPDATE_CHANNEL = 'bcis:services:update';
 export const SERVICES_STATUS_CHANNEL = 'bcis:services:status';
@@ -98,6 +104,14 @@ export const subscriberDetailResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: subscriberDetailSchema }),
   z.object({ ok: z.literal(false), error: apiFailureSchema }),
 ]);
+export const subscriberFinancialResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: subscriberFinancialProfileSchema }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
+export const subscriberAuditResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: subscriberAuditSchema }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
 export const referenceDataResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: referenceDataSchema }),
   z.object({ ok: z.literal(false), error: apiFailureSchema }),
@@ -131,6 +145,8 @@ export interface DesktopBridge {
   createSubscriber: (input: SubscriberCreate) => Promise<DesktopResult<SubscriberDetail>>;
   updateSubscriber: (id: string, input: SubscriberUpdate) => Promise<DesktopResult<SubscriberDetail>>;
   changeSubscriberStatus: (id: string, input: SubscriberStatusChange) => Promise<DesktopResult<SubscriberDetail>>;
+  getSubscriberFinancialProfile: (id: string) => Promise<DesktopResult<SubscriberFinancialProfile>>;
+  getSubscriberAudit: (id: string) => Promise<DesktopResult<SubscriberAudit>>;
   createServiceAccount: (subscriberId: string, input: ServiceAccountMaintenance) => Promise<DesktopResult<SubscriberDetail>>;
   updateServiceAccount: (subscriberId: string, serviceId: string, input: ServiceAccountMaintenance) => Promise<DesktopResult<SubscriberDetail>>;
   changeServiceAccountStatus: (subscriberId: string, serviceId: string, input: ServiceAccountStatusChange) => Promise<DesktopResult<SubscriberDetail>>;
