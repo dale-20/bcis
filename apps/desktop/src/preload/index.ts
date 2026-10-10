@@ -33,6 +33,7 @@ import {
   INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
   SUBSCRIBER_LEDGER_CHANNEL,
   PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
+  GCASH_PROOF_UPLOAD_CHANNEL, GCASH_PROOF_QUEUE_CHANNEL, GCASH_PROOF_GET_CHANNEL, GCASH_VERIFY_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -83,5 +84,9 @@ const bridge: DesktopBridge = Object.freeze({
   getPayment: (id: string) => ipcRenderer.invoke(PAYMENT_DETAIL_CHANNEL, id),
   postPayment: (input: Parameters<DesktopBridge['postPayment']>[0]) => ipcRenderer.invoke(PAYMENT_POST_CHANNEL, input),
   reversePayment: (id: string, input: Parameters<DesktopBridge['reversePayment']>[1]) => ipcRenderer.invoke(PAYMENT_REVERSE_CHANNEL, { id, input }),
+  selectAndUploadGcashProof: () => ipcRenderer.invoke(GCASH_PROOF_UPLOAD_CHANNEL),
+  listGcashProofs: (page: number, pageSize: number) => ipcRenderer.invoke(GCASH_PROOF_QUEUE_CHANNEL, { page, pageSize }),
+  getGcashProof: (id: string) => ipcRenderer.invoke(GCASH_PROOF_GET_CHANNEL, id),
+  verifyGcashPayment: (id: string, input: Parameters<DesktopBridge['verifyGcashPayment']>[1]) => ipcRenderer.invoke(GCASH_VERIFY_CHANNEL, { id, input }),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

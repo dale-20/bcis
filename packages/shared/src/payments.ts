@@ -3,6 +3,7 @@ import { centavosSchema } from './money.js';
 
 const positiveCentavosSchema = centavosSchema.refine((value) => BigInt(value) > 0n, 'Amount must be positive');
 const notesSchema = z.string().trim().min(1).max(500).optional();
+export const GCASH_PROOF_MAX_BYTES = 5 * 1024 * 1024;
 export const paymentMethodSchema = z.enum(['CASH', 'GCASH', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export const paymentStatusSchema = z.enum(['PENDING_VERIFICATION', 'POSTED', 'REJECTED', 'REVERSED']);
@@ -16,6 +17,38 @@ export const paymentProofInputSchema = z.object({
   sizeBytes: positiveCentavosSchema,
   sha256: z.string().regex(/^[a-fA-F0-9]{64}$/),
 }).strict();
+export const gcashProofMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'application/pdf']);
+
+export const gcashProofUploadInputSchema = z.object({
+  originalFilename: z.string().trim().min(1).max(255),
+  mimeType: gcashProofMimeTypeSchema,
+  contentBase64: z.string().min(1).max(7_000_000),
+}).strict();
+export type GcashProofUploadInput = z.infer<typeof gcashProofUploadInputSchema>;
+
+export const gcashProofMetadataSchema = z.object({
+  storageKey: z.uuid(), originalFilename: z.string(), mimeType: gcashProofMimeTypeSchema,
+  sizeBytes: positiveCentavosSchema, sha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
+export type GcashProofMetadata = z.infer<typeof gcashProofMetadataSchema>;
+
+export const gcashProofItemSchema = z.object({
+  paymentId: z.uuid(), subscriberId: z.uuid(), subscriberAccountNumber: z.string(), subscriberName: z.string(),
+  paymentDate: z.iso.datetime(), createdAt: z.iso.datetime(), amountCentavos: positiveCentavosSchema,
+  referenceNumber: z.string(), senderDetails: z.string(), notes: z.string().nullable(),
+  originalFilename: z.string(), mimeType: gcashProofMimeTypeSchema,
+  sizeBytes: positiveCentavosSchema, sha256: z.string().regex(/^[a-f0-9]{64}$/),
+});
+export type GcashProofItem = z.infer<typeof gcashProofItemSchema>;
+export const gcashProofQueueSchema = z.object({
+  items: z.array(gcashProofItemSchema), page: z.number().int().positive(), pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(), pageCount: z.number().int().nonnegative(),
+});
+export type GcashProofQueue = z.infer<typeof gcashProofQueueSchema>;
+export const gcashProofContentSchema = z.object({
+  mimeType: gcashProofMimeTypeSchema, contentBase64: z.string().min(1),
+});
+export type GcashProofContent = z.infer<typeof gcashProofContentSchema>;
 
 const paymentBase = {
   subscriberId: z.uuid(),

@@ -1,7 +1,8 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { config } from 'dotenv';
 import pg from 'pg';
@@ -25,6 +26,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   }
   const endpoint = 'http://127.0.0.1:3101';
   const seedPassword = 'Synthetic-e2e-password-1';
+  const proofDirectory = await mkdtemp(path.join(tmpdir(), 'bcis-desktop-gcash-'));
+  const proofFile = path.join(proofDirectory, 'synthetic-proof.png');
+  await writeFile(proofFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=', 'base64'));
   await runNode('apps/api/dist/db/seed-demo.js', { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: 'test', DEMO_ACCOUNT_PASSWORD: seedPassword });
   const server = spawn(process.execPath, ['apps/api/dist/server.js'], {
     env: { ...process.env, DATABASE_URL: databaseUrl, API_HOST: '127.0.0.1', API_PORT: '3101', LOG_LEVEL: 'silent' },
@@ -134,6 +138,28 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Confirm and post' }).click();
     await expect(page.getByRole('heading', { name: /Receipt OR-/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Print receipt' })).toBeEnabled();
+    await desktop.evaluate(({ dialog }, selectedFile) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedFile] });
+    }, proofFile);
+    await page.getByRole('link', { name: 'Payments', exact: true }).click();
+    await page.getByLabel('Find subscriber').fill('BCIS-00001');
+    await page.locator('.payment-subscriber-results button').first().click();
+    await page.getByLabel('Payment method').selectOption('GCASH');
+    await page.getByLabel('Amount received (PHP)').fill('0.05');
+    await page.getByLabel('GCash reference number').fill(`E2E-GCASH-${Date.now()}`);
+    await page.getByLabel('Sender details').fill('Synthetic E2E Sender');
+    await page.getByRole('button', { name: 'Choose proof file' }).click();
+    await expect(page.getByText('synthetic-proof.png')).toBeVisible();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Submit for verification' }).click();
+    await expect(page.getByText(/GCash submission saved as pending/)).toBeVisible();
+    await page.getByRole('link', { name: 'GCash Verification', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'GCash verification' })).toBeVisible();
+    await page.locator('.gcash-queue-list button').filter({ hasText: 'BCIS-00001' }).first().click();
+    await expect(page.locator('.gcash-proof-preview img')).toBeVisible();
+    await page.getByLabel('Review decision').selectOption('VERIFIED');
+    await page.getByRole('button', { name: 'Verify and post payment' }).click();
+    await expect(page.locator('.gcash-queue-list button').filter({ hasText: 'BCIS-00001' })).toHaveCount(0);
     await page.getByRole('link', { name: 'Payment History' }).click();
     await expect(page.getByRole('heading', { name: 'Payment history' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
@@ -157,7 +183,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getPayment', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reversePayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getGcashProof', 'getInvoice', 'getPayment', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listGcashProofs', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reversePayment', 'selectAndUploadGcashProof', 'verifyGcashPayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });
@@ -202,5 +228,6 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await database.end();
     await desktop?.close();
     server.kill();
+    await rm(proofDirectory, { recursive: true, force: true });
   }
 });

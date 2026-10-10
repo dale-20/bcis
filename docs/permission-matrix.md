@@ -43,6 +43,8 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /auth/logout` | Valid bearer session | Session revoked and logout recorded |
 | `GET /admin/users` | Valid session, changed demo password, `user.manage` | Missing permission recorded as `authorization.denied` |
 | `POST /payments` | Valid session and `payment.create` | Posting or pending GCash submission is audited atomically |
+| `POST /payments/gcash/proofs` | Valid session and `payment.create` | Type/size validation, generated key, uploader-bound staged file |
+| `GET /payments/gcash/pending`, `GET /payments/:id/proof` | Valid session and `payment.verify_gcash` | Queue and attachment retrieval remain restricted to authorized reviewers |
 | `GET /payments/preview` | Valid session and `payment.create` | Read-only oldest-first allocation estimate; no financial record is written |
 | `GET /payments`, `GET /payments/:id` | Valid session and `billing.view` | Paginated payment/receipt history and immutable detail |
 | `POST /payments/:id/gcash-verification` | Valid session and `payment.verify_gcash` | Verification/rejection records verifier, time, and audit evidence |

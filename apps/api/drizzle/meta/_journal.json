@@ -57,6 +57,13 @@
       "when": 1791656186913,
       "tag": "0007_amusing_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791659037077,
+      "tag": "0008_dear_pyro",
+      "breakpoints": true
     }
   ]
 }

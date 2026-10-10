@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
@@ -11,6 +14,7 @@ import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
 import { AuthService } from '../src/auth/service.js';
 import { createDatabase } from '../src/db/client.js';
 import { seedOperationalDemoData } from '../src/db/seed-operational.js';
+import { GcashProofStorage } from '../src/payments/proof-storage.js';
 import {
   auditLogs, billingCycles, invoices, ledgerEntries, paymentAllocations, paymentProofs,
   paymentReversals, payments, receipts, serviceAccounts, subscriberCredits,
@@ -29,7 +33,8 @@ const accounts: readonly DemoAccount[] = [
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, testHasher);
-const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: 'silent' });
+const proofDirectory = await mkdtemp(join(tmpdir(), 'bcis-gcash-proof-test-'));
+const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: 'silent', proofStorage: new GcashProofStorage(proofDirectory) });
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
 let adminToken = '';
 let cashierToken = '';
@@ -83,7 +88,7 @@ beforeAll(async () => {
   await generate('2026-08');
 });
 
-afterAll(async () => { await app.close(); await database.close(); });
+afterAll(async () => { await app.close(); await database.close(); await rm(proofDirectory, { recursive: true, force: true }); });
 
 describe.sequential('AT-01 through AT-06 payment invariants', () => {
   it('AT-01 posts an exact cash payment, clears the invoice, balances the ledger, and issues a unique receipt', async () => {
@@ -157,23 +162,72 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
   });
 
   it('AT-05 keeps GCash unposted until verification and blocks a reused canonical reference', async () => {
+    const proofUpload = await app.inject({ method: 'POST', url: '/payments/gcash/proofs', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+      originalFilename: '../proof.png', mimeType: 'image/png',
+      contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=',
+    } });
+    expect(proofUpload.statusCode).toBe(201);
+    const proofMetadata = proofUpload.json<{ storageKey: string; originalFilename: string; mimeType: string; sizeBytes: string; sha256: string }>();
+    expect(proofMetadata).toMatchObject({ originalFilename: 'proof.png', mimeType: 'image/png' });
+    expect(proofMetadata.storageKey).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(proofMetadata.sha256).toMatch(/^[a-f0-9]{64}$/);
+    const deniedUpload = await app.inject({ method: 'POST', url: '/payments/gcash/proofs', headers: { authorization: `Bearer ${viewerToken}` }, payload: {
+      originalFilename: 'denied.png', mimeType: 'image/png', contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=',
+    } });
+    expect(deniedUpload.statusCode).toBe(403);
+    const invalidProof = await app.inject({ method: 'POST', url: '/payments/gcash/proofs', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+      originalFilename: 'forged.png', mimeType: 'image/png', contentBase64: Buffer.from('not an image').toString('base64'),
+    } });
+    expect(invalidProof.statusCode).toBe(400);
+    expect((await app.inject({ method: 'GET', url: '/payments/gcash/pending?page=1&pageSize=20', headers: { authorization: `Bearer ${viewerToken}` } })).statusCode).toBe(403);
     const payload = {
       subscriberId: subscriberIds.gcash, amountCentavos: '99900', paymentDate: '2026-08-16T08:00:00.000Z', idempotencyKey: randomUUID(), method: 'GCASH',
       referenceNumber: ' gcash-ref-0001 ', senderDetails: 'Synthetic Sender',
-      proof: { storageKey: 'synthetic/gcash-proof-0001.png', originalFilename: 'proof.png', mimeType: 'image/png', sizeBytes: '1024', sha256: 'a'.repeat(64) },
+      proof: proofMetadata,
     };
     const submitted = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${cashierToken}` }, payload });
-    expect(submitted.statusCode).toBe(201);
+    expect(submitted.statusCode, submitted.body).toBe(201);
     const pending = submitted.json<PaymentResult>();
     expect(pending).toMatchObject({ status: 'PENDING_VERIFICATION', receiptNumber: null, allocatedCentavos: '0' });
     const [beforeProof] = await database.db.select().from(paymentProofs).where(eq(paymentProofs.paymentId, pending.paymentId));
     expect(beforeProof?.status).toBe('PENDING');
+    expect(beforeProof?.uploadedByUserId).toBe((await database.db.select({ id: payments.createdByUserId }).from(payments).where(eq(payments.id, pending.paymentId)))[0]?.id);
+    expect(await database.db.select().from(receipts).where(eq(receipts.paymentId, pending.paymentId))).toHaveLength(0);
+    expect(await database.db.select().from(paymentAllocations).where(eq(paymentAllocations.paymentId, pending.paymentId))).toHaveLength(0);
+    const queue = await app.inject({ method: 'GET', url: '/payments/gcash/pending?page=1&pageSize=20', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(queue.statusCode).toBe(200);
+    expect(queue.json<{ items: { paymentId: string; originalFilename: string; sha256: string }[] }>().items).toContainEqual(expect.objectContaining({ paymentId: pending.paymentId, originalFilename: 'proof.png', sha256: proofMetadata.sha256 }));
+    const downloaded = await app.inject({ method: 'GET', url: `/payments/${pending.paymentId}/proof`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.json()).toMatchObject({ mimeType: 'image/png', contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=' });
+    expect((await app.inject({ method: 'GET', url: `/payments/${pending.paymentId}/proof`, headers: { authorization: `Bearer ${viewerToken}` } })).statusCode).toBe(403);
     const verified = await app.inject({ method: 'POST', url: `/payments/${pending.paymentId}/gcash-verification`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { decision: 'VERIFIED' } });
     expect(verified.statusCode).toBe(200);
-    expect(verified.json<PaymentResult>().status).toBe('POSTED');
+    expect(verified.json<PaymentResult>()).toMatchObject({ status: 'POSTED', receiptNumber: expect.stringMatching(/^OR-/), allocatedCentavos: '99900' });
+    const [verifiedProof] = await database.db.select().from(paymentProofs).where(eq(paymentProofs.paymentId, pending.paymentId));
+    expect(verifiedProof).toMatchObject({ status: 'VERIFIED', verifiedByUserId: expect.any(String), rejectionReason: null });
+    expect(verifiedProof?.verifiedAt).toBeInstanceOf(Date);
     const duplicate = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${cashierToken}` }, payload: { ...payload, idempotencyKey: randomUUID(), referenceNumber: 'GCASH-REF-0001', proof: { ...payload.proof, storageKey: 'synthetic/gcash-proof-0002.png' } } });
     expect(duplicate.statusCode).toBe(409);
     expect(duplicate.json()).toMatchObject({ error: 'GCASH_REFERENCE_DUPLICATE' });
+
+    const rejectedSubscriber = await subscriberFor('SVC-00030-1', 99_900n);
+    const rejectedUpload = await app.inject({ method: 'POST', url: '/payments/gcash/proofs', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+      originalFilename: 'rejected-proof.png', mimeType: 'image/png', contentBase64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=',
+    } });
+    const rejectedPayment = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+      subscriberId: rejectedSubscriber, amountCentavos: '99900', paymentDate: '2026-08-16T08:00:00.000Z', idempotencyKey: randomUUID(), method: 'GCASH',
+      referenceNumber: 'GCASH-REJECT-0001', senderDetails: 'Synthetic Sender', proof: rejectedUpload.json(),
+    } });
+    const rejectedId = rejectedPayment.json<PaymentResult>().paymentId;
+    const rejected = await app.inject({ method: 'POST', url: `/payments/${rejectedId}/gcash-verification`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { decision: 'REJECTED', reason: 'Proof does not show a completed transfer' } });
+    expect(rejected.statusCode).toBe(200);
+    expect(rejected.json<PaymentResult>()).toMatchObject({ status: 'REJECTED', receiptNumber: null, allocatedCentavos: '0' });
+    const [rejectedProofRow] = await database.db.select().from(paymentProofs).where(eq(paymentProofs.paymentId, rejectedId));
+    expect(rejectedProofRow).toMatchObject({ status: 'REJECTED', rejectionReason: 'Proof does not show a completed transfer' });
+    expect(rejectedProofRow?.verifiedAt).toBeInstanceOf(Date);
+    expect(await database.db.select().from(receipts).where(eq(receipts.paymentId, rejectedId))).toHaveLength(0);
+    expect(await database.db.select().from(paymentAllocations).where(eq(paymentAllocations.paymentId, rejectedId))).toHaveLength(0);
   });
 
   it('AT-06 reverses with compensating history, restores balances, and blocks Cashier reversal', async () => {

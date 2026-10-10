@@ -57,8 +57,10 @@ import {
 import {
   paymentDetailSchema, paymentListQuerySchema, paymentListSchema, paymentPreviewQuerySchema, paymentPreviewSchema,
   postPaymentInputSchema, paymentResultSchema, reversePaymentInputSchema,
+  gcashProofContentSchema, gcashProofMetadataSchema, gcashProofQueueSchema, gcashProofUploadInputSchema, verifyGcashInputSchema,
   type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
   type PostPaymentInput, type PaymentResult, type ReversePaymentInput,
+  type GcashProofContent, type GcashProofMetadata, type GcashProofQueue, type VerifyGcashInput,
 } from './payments.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
@@ -106,6 +108,10 @@ export const PAYMENTS_LIST_CHANNEL = 'bcis:payments:list';
 export const PAYMENT_DETAIL_CHANNEL = 'bcis:payment:detail';
 export const PAYMENT_POST_CHANNEL = 'bcis:payment:post';
 export const PAYMENT_REVERSE_CHANNEL = 'bcis:payment:reverse';
+export const GCASH_PROOF_UPLOAD_CHANNEL = 'bcis:gcash-proof:select-upload';
+export const GCASH_PROOF_QUEUE_CHANNEL = 'bcis:gcash-proof:queue';
+export const GCASH_PROOF_GET_CHANNEL = 'bcis:gcash-proof:get';
+export const GCASH_VERIFY_CHANNEL = 'bcis:gcash:verify';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -180,6 +186,9 @@ export const paymentPreviewDesktopResultSchema = desktopResult(paymentPreviewSch
 export const paymentListDesktopResultSchema = desktopResult(paymentListSchema);
 export const paymentDetailDesktopResultSchema = desktopResult(paymentDetailSchema);
 export const paymentResultDesktopResultSchema = desktopResult(paymentResultSchema);
+export const gcashProofQueueDesktopResultSchema = desktopResult(gcashProofQueueSchema);
+export const gcashProofMetadataDesktopResultSchema = desktopResult(gcashProofMetadataSchema);
+export const gcashProofContentDesktopResultSchema = desktopResult(gcashProofContentSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -228,6 +237,10 @@ export interface DesktopBridge {
   getPayment: (id: string) => Promise<DesktopResult<PaymentDetail>>;
   postPayment: (input: PostPaymentInput) => Promise<DesktopResult<PaymentResult>>;
   reversePayment: (id: string, input: ReversePaymentInput) => Promise<DesktopResult<PaymentResult>>;
+  selectAndUploadGcashProof: () => Promise<DesktopResult<GcashProofMetadata>>;
+  listGcashProofs: (page: number, pageSize: number) => Promise<DesktopResult<GcashProofQueue>>;
+  getGcashProof: (paymentId: string) => Promise<DesktopResult<GcashProofContent>>;
+  verifyGcashPayment: (paymentId: string, input: VerifyGcashInput) => Promise<DesktopResult<PaymentResult>>;
 }
 
 export const desktopRequestSchemas = {
@@ -266,5 +279,8 @@ export const desktopRequestSchemas = {
   paymentId: z.uuid(),
   paymentCreate: postPaymentInputSchema,
   paymentReverse: z.object({ id: z.uuid(), input: reversePaymentInputSchema }),
+  gcashProofQueue: z.object({ page: z.number().int().min(1), pageSize: z.number().int().min(10).max(100) }),
+  paymentVerification: z.object({ id: z.uuid(), input: verifyGcashInputSchema }),
+  gcashProofUpload: gcashProofUploadInputSchema,
 };
 

@@ -24,7 +24,7 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 
 - Most operational server workflows have no desktop screen or typed preload method.
 - Subscriber, plan, service, collector, and area maintenance lacks complete edit/archive/status workflows.
-- Payments still lack GCash proof upload/review UI and restricted proof-file storage.
+- Verified backup/restore does not yet include the configured GCash proof attachment directory (Increment 8).
 - Collections lack batch lists, route-sheet printing, recording, remittance, reconciliation, and closing UI.
 - Suspension/reconnection, user administration, audit viewer, settings, and guided backup/restore are incomplete.
 - Physical three-PC, maximum-volume, and full desktop acceptance evidence remains incomplete.
@@ -96,19 +96,21 @@ Delivered: preview reads the same eligibility/period rules as generation and wri
 
 Delivered: the preview serializes against posting for the selected subscriber and exposes oldest-first allocations, current outstanding, existing available credit, and the new unapplied amount without writing financial records. Posting still revalidates under the subscriber lock. Cash, bank transfer, cheque, and other method-specific validation post through Fastify; references, notes, actor and timestamps appear in the immutable server-paginated history. Receipt numbers remain sequence-backed; issued receipts have an accessible print layout. Admin/Owner reversal requires both reversal and receipt-void permissions, restores balances, and preserves the voided receipt record. Credit policy is documented in `docs/payments.md`: existing credit is not automatically applied to later invoices; a future credit application must be explicit, confirmed, and audited.
 
-**Gate:** PASS. The real PostgreSQL suite proves AT-01, AT-02, AT-03, AT-04, and AT-06 plus methods, RBAC, preview side-effect freedom, history, receipts, and reversal. `npm run check` passes 92 tests and Electron E2E passes the live cashier workflow. GCash proof upload/review remains pending under Increment 5.
+**Gate:** PASS. The real PostgreSQL suite proves AT-01, AT-02, AT-03, AT-04, and AT-06 plus methods, RBAC, preview side-effect freedom, history, receipts, and reversal. `npm run check` passes 92 tests and Electron E2E passes the live cashier workflow. GCash proof upload/review is delivered in Increment 5.
 
 ## Increment 5 - GCash proof and verification
 
 **Goal:** Separate evidence capture from authorized posting.
 
 - Build a two-pane pending queue with transaction details and proof preview.
-- Add safe proof upload storage with MIME allow-list, size limit, generated storage key, SHA-256, restricted retrieval, and attachment backup inclusion.
+- Add safe proof upload storage with MIME allow-list, size limit, generated storage key, SHA-256, and restricted retrieval.
 - Normalize and check GCash references before submission; show a controlled duplicate conflict.
 - Add verify/reject controls with reason, verifier identity, timestamp, and audit history.
 - Post and allocate only after verification; an uploaded image never changes a balance by itself.
 
 **Gate:** AT-05 passes through API and desktop; rejected/unverified proofs create no invoice allocation or receipt.
+
+**Status:** COMPLETE for capture, secure storage/retrieval, pending review, verification/rejection, and AT-05. Inclusion of the configured proof directory in verified backup/restore artifacts remains assigned to Increment 8, where the backup format is implemented.
 
 ## Increment 6 - Collector routes, batches, and remittance
 
@@ -148,6 +150,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - Add read-only audit search by actor, action, entity, date, and request ID with before/after detail.
 - Add application settings UI for billing, due dates, grace periods, suspension, numbering display, and company/report information.
 - Add backup history, guided backup creation, verification status, checksum, and downloadable evidence.
+- Include `PAYMENT_PROOF_DIR` attachments in verified backup/restore artifacts and compare restored files with database SHA-256 values.
 - Keep restore Owner-only with explicit approval, maintenance-mode checks, test restore/integrity verification, and clear destructive-impact warning.
 - Add user activity, adjustment, reversal, and voided-receipt reports.
 

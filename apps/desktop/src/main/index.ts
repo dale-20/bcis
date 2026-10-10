@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   apiUrlSchema,
@@ -38,6 +38,8 @@ import {
   INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
   SUBSCRIBER_LEDGER_CHANNEL,
   PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
+  GCASH_PROOF_UPLOAD_CHANNEL, GCASH_PROOF_QUEUE_CHANNEL, GCASH_PROOF_GET_CHANNEL, GCASH_VERIFY_CHANNEL,
+  GCASH_PROOF_MAX_BYTES,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -124,6 +126,22 @@ void app.whenReady().then(() => {
   ipcMain.handle(PAYMENT_DETAIL_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getPayment(desktopRequestSchemas.paymentId.parse(input)); });
   ipcMain.handle(PAYMENT_POST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.postPayment(desktopRequestSchemas.paymentCreate.parse(input)); });
   ipcMain.handle(PAYMENT_REVERSE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.paymentReverse.parse(input); return api.reversePayment(command.id, command.input); });
+  ipcMain.handle(GCASH_PROOF_UPLOAD_CHANNEL, async (event) => {
+    assertTrustedSender(event);
+    const chosen = await dialog.showOpenDialog(window!, { title: 'Select GCash payment proof', properties: ['openFile'], filters: [{ name: 'Payment proof', extensions: ['jpg', 'jpeg', 'png', 'pdf'] }] });
+    if (chosen.canceled || !chosen.filePaths[0]) return { ok: false, error: { code: 'FILE_SELECTION_CANCELLED', message: 'No proof file selected' } };
+    const path = chosen.filePaths[0];
+    const extension = extname(path).toLowerCase();
+    const mimeType = extension === '.jpg' || extension === '.jpeg' ? 'image/jpeg' : extension === '.png' ? 'image/png' : extension === '.pdf' ? 'application/pdf' : null;
+    if (!mimeType) return { ok: false, error: { code: 'PROOF_TYPE_UNSUPPORTED', message: 'Select a JPEG, PNG, or PDF file' } };
+    const fileInfo = await stat(path);
+    if (fileInfo.size === 0 || fileInfo.size > GCASH_PROOF_MAX_BYTES) return { ok: false, error: { code: 'PROOF_TOO_LARGE', message: 'Proof file must be between 1 byte and 5 MB' } };
+    const bytes = await readFile(path);
+    return api.uploadGcashProof({ originalFilename: path.split(/[\\/]/).at(-1) ?? 'gcash-proof', mimeType, contentBase64: bytes.toString('base64') });
+  });
+  ipcMain.handle(GCASH_PROOF_QUEUE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const query = desktopRequestSchemas.gcashProofQueue.parse(input); return api.listGcashProofs(query.page, query.pageSize); });
+  ipcMain.handle(GCASH_PROOF_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getGcashProof(desktopRequestSchemas.paymentId.parse(input)); });
+  ipcMain.handle(GCASH_VERIFY_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.paymentVerification.parse(input); return api.verifyGcashPayment(command.id, command.input); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

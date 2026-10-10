@@ -43,8 +43,10 @@ import {
   subscriberLedgerSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
   paymentDetailSchema, paymentListSchema, paymentListQuerySchema, paymentPreviewSchema, paymentPreviewQuerySchema,
   paymentResultSchema, postPaymentInputSchema, reversePaymentInputSchema,
+  gcashProofContentSchema, gcashProofMetadataSchema, gcashProofQueueSchema, gcashProofUploadInputSchema, verifyGcashInputSchema,
   type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
   type PaymentResult, type PostPaymentInput, type ReversePaymentInput,
+  type GcashProofContent, type GcashProofMetadata, type GcashProofQueue, type GcashProofUploadInput, type VerifyGcashInput,
 } from '@bcis/shared';
 import { z } from 'zod';
 
@@ -262,6 +264,23 @@ export class DesktopApiClient {
 
   reversePayment(id: string, input: ReversePaymentInput): Promise<DesktopResult<PaymentResult>> {
     return this.call(`/payments/${encodeURIComponent(id)}/reverse`, { method: 'POST', body: JSON.stringify(reversePaymentInputSchema.parse(input)) }, paymentResultSchema);
+  }
+
+  uploadGcashProof(input: GcashProofUploadInput): Promise<DesktopResult<GcashProofMetadata>> {
+    return this.call('/payments/gcash/proofs', { method: 'POST', body: JSON.stringify(gcashProofUploadInputSchema.parse(input)) }, gcashProofMetadataSchema);
+  }
+
+  listGcashProofs(page: number, pageSize: number): Promise<DesktopResult<GcashProofQueue>> {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return this.call(`/payments/gcash/pending?${query}`, { method: 'GET' }, gcashProofQueueSchema);
+  }
+
+  getGcashProof(paymentId: string): Promise<DesktopResult<GcashProofContent>> {
+    return this.call(`/payments/${encodeURIComponent(paymentId)}/proof`, { method: 'GET' }, gcashProofContentSchema);
+  }
+
+  verifyGcashPayment(paymentId: string, input: VerifyGcashInput): Promise<DesktopResult<PaymentResult>> {
+    return this.call(`/payments/${encodeURIComponent(paymentId)}/gcash-verification`, { method: 'POST', body: JSON.stringify(verifyGcashInputSchema.parse(input)) }, paymentResultSchema);
   }
 
   async downloadReport(query: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {

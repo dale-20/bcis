@@ -9,6 +9,7 @@ export const environmentSchema = z.object({
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   DATABASE_URL: z.url().pipe(z.string().refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol))),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+  PAYMENT_PROOF_DIR: z.string().min(1).default('.local/payment-proofs'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 export type Environment = z.infer<typeof environmentSchema>;

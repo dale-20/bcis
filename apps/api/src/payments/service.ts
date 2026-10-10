@@ -1,7 +1,8 @@
-import type { PaymentListQuery, PaymentPreviewQuery, PaymentResult, PostPaymentInput, ReversePaymentInput, VerifyGcashInput } from '@bcis/shared';
+import type { GcashProofUploadInput, PaymentListQuery, PaymentPreviewQuery, PaymentResult, PostPaymentInput, ReversePaymentInput, VerifyGcashInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
 import { PaymentRepository } from './repository.js';
+import { GcashProofStorage } from './proof-storage.js';
 
 function databaseError(error: unknown): { code?: string; constraint?: string } {
   let current: unknown = error;
@@ -15,7 +16,18 @@ function databaseError(error: unknown): { code?: string; constraint?: string } {
 
 export class PaymentService {
   private readonly repository: PaymentRepository;
-  constructor(database: Database) { this.repository = new PaymentRepository(database); }
+  constructor(database: Database, proofStorage: GcashProofStorage) { this.repository = new PaymentRepository(database, proofStorage); }
+
+  async uploadProof(input: GcashProofUploadInput, actorUserId: string) {
+    return this.repository.uploadProof(input, actorUserId);
+  }
+
+  async pendingGcash(page: number, pageSize: number) {
+    const result = await this.repository.pendingGcash(page, pageSize);
+    return { items: result.rows, page, pageSize, total: result.total, pageCount: result.total === 0 ? 0 : Math.ceil(result.total / pageSize) };
+  }
+
+  async readProof(paymentId: string) { return this.repository.readProof(paymentId); }
 
   async preview(input: PaymentPreviewQuery) { return this.repository.preview(input); }
 
@@ -54,7 +66,7 @@ export class PaymentService {
   private toResult(result: Awaited<ReturnType<PaymentRepository['create']>>): PaymentResult {
     return {
       paymentId: result.payment.id, subscriberId: result.payment.subscriberId,
-      method: result.payment.method as 'CASH' | 'GCASH', status: result.payment.status,
+      method: result.payment.method, status: result.payment.status,
       amountCentavos: result.payment.amountCentavos.toString(), receiptNumber: result.receiptNumber,
       allocatedCentavos: result.allocated.toString(), unappliedCreditCentavos: result.unapplied.toString(),
       allocations: result.allocations.map((allocation) => ({ ...allocation, amountCentavos: allocation.amountCentavos.toString() })),

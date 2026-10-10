@@ -1,6 +1,6 @@
 # Payment posting and reversal
 
-The API accepts authoritative money only as canonical positive integer-centavo strings. Cash, bank transfer, cheque, and other payments post immediately. Bank transfer and cheque require a reference; Other requires an explanation in notes. GCash submission records the payment and proof as pending; it cannot allocate invoices, create a receipt, or credit the ledger until an authorized verification request succeeds. The current cashier screen exposes immediate-post methods; GCash capture/review UI remains in Increment 5 so it can include real, restricted proof-file handling.
+The API accepts authoritative money only as canonical positive integer-centavo strings. Cash, bank transfer, cheque, and other payments post immediately. Bank transfer and cheque require a reference; Other requires an explanation in notes. GCash submission records the payment and proof as pending; it cannot allocate invoices, create a receipt, or credit the ledger until an authorized verification request succeeds.
 
 Customer credit policy: any payment left after all outstanding invoices are paid remains available customer credit. Available credit does not automatically pay a future invoice and is not included in the next payment's invoice allocation. A future credit-application workflow must show the customer, source receipt, target invoice, exact centavo amount, and confirmation, then write an immutable application and audit record in one transaction. Reversing a payment is blocked after any of its credit has been consumed.
 
@@ -12,10 +12,14 @@ Customer credit policy: any payment left after all outstanding invoices are paid
 | `GET /payments` | `billing.view` | Server-paginated history search by subscriber, account, receipt, or reference, with method/status/date filters. |
 | `GET /payments/:id` | `billing.view` | Payment, receipt, actors, timestamps, allocations, credit, notes, and reversal detail. |
 | `POST /payments` | `payment.create` | Posts Cash, bank transfer, cheque, or Other; or creates pending GCash. A UUID idempotency key is required. |
+| `POST /payments/gcash/proofs` | `payment.create` | Validates and stages an allowed proof file under a generated key, bound to its uploader. |
+| `GET /payments/gcash/pending`, `GET /payments/:id/proof` | `payment.verify_gcash` | Returns the pending review queue and restricted proof bytes. |
 | `POST /payments/:id/gcash-verification` | `payment.verify_gcash` | Verifies and posts, or rejects, one pending GCash proof. |
 | `POST /payments/:id/reverse` | `payment.reverse` and `receipt.void` | Preserves the payment, adds a linked reversal, voids its receipt, restores allocations/credit, and adds a compensating ledger entry. |
 
-GCash references are trimmed and uppercased before storage. A case-insensitive partial unique index remains the final duplicate boundary. Proof metadata stores its SHA-256 digest, restricted MIME type, size, storage key, original name, status, verifier, and review time. The proof itself still requires the future restricted attachment-storage boundary.
+GCash references are trimmed and uppercased before storage. A case-insensitive partial unique index remains the final duplicate boundary. Cashiers select files through Electron's main process; the renderer never receives a filesystem path. The API allows JPEG, PNG, or PDF, verifies signature against declared MIME, limits files to 5 MB, stores bytes under a generated UUID in the server-owned `PAYMENT_PROOF_DIR`, and records SHA-256, size, uploader, reviewer, and review time in PostgreSQL. Staged uploads are uploader-bound, capped at five per user, and expire after 24 hours. Retrieval requires `payment.verify_gcash` and rechecks file type, size, and hash. Backup/restore inclusion of this configured directory remains tracked in Increment 8.
+
+The cashier enters subscriber, amount, reference, sender, and proof. Submission creates no allocation, receipt, or balance change. The two-pane review queue previews evidence; rejection requires an audit reason and creates no financial postings. Verification posts and allocates atomically, issues a receipt, and records verifier identity/time.
 
 ## Posting transaction
 

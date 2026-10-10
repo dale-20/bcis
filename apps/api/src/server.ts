@@ -1,12 +1,15 @@
 import { buildApp } from './app.js';
-import { loadEnvironment } from './config.js';
+import { dirname, resolve } from 'node:path';
+import { apiEnvPath, loadEnvironment } from './config.js';
 import { createDatabase } from './db/client.js';
+import { GcashProofStorage } from './payments/proof-storage.js';
 
 async function start() {
   const environment = loadEnvironment();
   const database = createDatabase(environment);
   const app = await buildApp({
     probeDatabase: database.probe, closeDatabase: database.close, logLevel: environment.LOG_LEVEL, database,
+    proofStorage: new GcashProofStorage(resolve(dirname(apiEnvPath), environment.PAYMENT_PROOF_DIR)),
   });
   database.pool.on('error', () => app.log.error('Idle database connection failed'));
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {

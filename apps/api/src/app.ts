@@ -13,6 +13,8 @@ import { collectionPlugin } from './collections/plugin.js';
 import { receivablePlugin } from './receivables/plugin.js';
 import { reportPlugin } from './reports/plugin.js';
 import { systemPlugin } from './system/plugin.js';
+import { resolve } from 'node:path';
+import { GcashProofStorage } from './payments/proof-storage.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -20,6 +22,7 @@ interface AppOptions {
   logLevel?: string;
   database?: Database;
   authService?: AuthService;
+  proofStorage?: GcashProofStorage;
 }
 
 export async function buildApp(options: AppOptions) {
@@ -32,7 +35,7 @@ export async function buildApp(options: AppOptions) {
       ],
     },
     bodyLimit: 1_048_576,
-    requestTimeout: 5000,
+    requestTimeout: 15_000,
   });
   await app.register(helmet);
   app.decorateRequest('authContext', null);
@@ -68,7 +71,10 @@ export async function buildApp(options: AppOptions) {
     if (options.database) {
       await app.register(subscriberPlugin, { authService, database: options.database });
       await app.register(billingPlugin, { authService, database: options.database });
-      await app.register(paymentPlugin, { authService, database: options.database });
+      await app.register(paymentPlugin, {
+        authService, database: options.database,
+        proofStorage: options.proofStorage ?? new GcashProofStorage(resolve('.local/payment-proofs')),
+      });
       await app.register(collectionPlugin, { authService, database: options.database });
       await app.register(receivablePlugin, { authService, database: options.database });
       await app.register(reportPlugin, { authService, database: options.database });

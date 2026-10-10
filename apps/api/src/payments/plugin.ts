@@ -2,14 +2,16 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   paymentDetailSchema, paymentListQuerySchema, paymentListSchema, paymentPreviewQuerySchema, paymentPreviewSchema,
   paymentResultSchema, postPaymentInputSchema, reversePaymentInputSchema, verifyGcashInputSchema,
+  gcashProofContentSchema, gcashProofMetadataSchema, gcashProofQueueSchema, gcashProofUploadInputSchema,
 } from '@bcis/shared';
 import type { AuthService } from '../auth/service.js';
 import { authenticateWith, requirePermission } from '../auth/guards.js';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
 import { PaymentService } from './service.js';
+import { GcashProofStorage } from './proof-storage.js';
 
-interface PaymentPluginOptions { database: Database; authService: AuthService }
+interface PaymentPluginOptions { database: Database; authService: AuthService; proofStorage: GcashProofStorage }
 
 const errorResponse = {
   type: 'object', required: ['error', 'message', 'requestId'], additionalProperties: false,
@@ -53,8 +55,53 @@ const paymentListResponse = { type: 'object', required: ['items','page','pageSiz
 } } as const;
 
 export const paymentPlugin: FastifyPluginAsync<PaymentPluginOptions> = async (app, options) => {
-  const service = new PaymentService(options.database);
+  const service = new PaymentService(options.database, options.proofStorage);
   const authenticate = authenticateWith(options.authService);
+
+  app.post('/payments/gcash/proofs', {
+    bodyLimit: 7_500_000,
+    preHandler: [authenticate, requirePermission(options.authService, 'payment.create')],
+    schema: {
+      body: { type: 'object', required: ['originalFilename', 'mimeType', 'contentBase64'], additionalProperties: false, properties: {
+        originalFilename: { type: 'string', minLength: 1, maxLength: 255 },
+        mimeType: { type: 'string', enum: ['image/jpeg', 'image/png', 'application/pdf'] },
+        contentBase64: { type: 'string', minLength: 1, maxLength: 7_000_000 },
+      } },
+      response: { 201: { type: 'object', required: ['storageKey', 'originalFilename', 'mimeType', 'sizeBytes', 'sha256'], additionalProperties: false, properties: {
+        storageKey: { type: 'string', format: 'uuid' }, originalFilename: { type: 'string' }, mimeType: { type: 'string' },
+        sizeBytes: { type: 'string' }, sha256: { type: 'string' },
+      } }, 400: errorResponse, 401: errorResponse, 403: errorResponse, 413: errorResponse },
+    },
+  }, async (request, reply) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const metadata = gcashProofMetadataSchema.parse(await service.uploadProof(gcashProofUploadInputSchema.parse(request.body), context.userId));
+    reply.code(201);
+    return metadata;
+  });
+
+  app.get('/payments/gcash/pending', {
+    preHandler: [authenticate, requirePermission(options.authService, 'payment.verify_gcash')],
+    schema: { querystring: { type: 'object', additionalProperties: false, properties: {
+      page: { type: 'integer', minimum: 1, default: 1 }, pageSize: { type: 'integer', minimum: 10, maximum: 100, default: 20 },
+    } }, response: { 200: { type: 'object', required: ['items', 'page', 'pageSize', 'total', 'pageCount'], additionalProperties: false, properties: {
+      items: { type: 'array', items: { type: 'object', required: ['paymentId','subscriberId','subscriberAccountNumber','subscriberName','paymentDate','createdAt','amountCentavos','referenceNumber','senderDetails','notes','originalFilename','mimeType','sizeBytes','sha256'], additionalProperties: false, properties: {
+        paymentId: { type: 'string', format: 'uuid' }, subscriberId: { type: 'string', format: 'uuid' }, subscriberAccountNumber: { type: 'string' }, subscriberName: { type: 'string' },
+        paymentDate: { type: 'string', format: 'date-time' }, createdAt: { type: 'string', format: 'date-time' }, amountCentavos: { type: 'string' }, referenceNumber: { type: 'string' }, senderDetails: { type: 'string' }, notes: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+        originalFilename: { type: 'string' }, mimeType: { type: 'string' }, sizeBytes: { type: 'string' }, sha256: { type: 'string' },
+      } } }, page: { type: 'integer' }, pageSize: { type: 'integer' }, total: { type: 'integer' }, pageCount: { type: 'integer' },
+    } }, 400: errorResponse, 401: errorResponse, 403: errorResponse } },
+  }, async (request) => {
+    const query = request.query as { page?: number; pageSize?: number };
+    return gcashProofQueueSchema.parse(await service.pendingGcash(query.page ?? 1, query.pageSize ?? 20));
+  });
+
+  app.get('/payments/:id/proof', {
+    preHandler: [authenticate, requirePermission(options.authService, 'payment.verify_gcash')],
+    schema: { params: uuidParams, response: { 200: { type: 'object', required: ['mimeType', 'contentBase64'], additionalProperties: false, properties: {
+      mimeType: { type: 'string', enum: ['image/jpeg', 'image/png', 'application/pdf'] }, contentBase64: { type: 'string' },
+    } }, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+  }, async (request) => gcashProofContentSchema.parse(await service.readProof((request.params as { id: string }).id)));
 
   app.get('/payments/preview', {
     preHandler: [authenticate, requirePermission(options.authService, 'payment.create')],

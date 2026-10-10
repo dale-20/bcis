@@ -54,6 +54,8 @@ Install and verify `/health/ready` from each of the three PCs. Test unique login
 ## Backup schedule
 
 - Daily custom-format PostgreSQL backup; more frequent if business recovery objectives require it.
+- Back up the API host's configured `PAYMENT_PROOF_DIR` with each database backup. Store both artifacts as one recovery set and preserve proof-row SHA-256 values.
+- Restore the matching proof directory before starting the API; check each restored attachment's size and SHA-256 against its database record.
 - SHA-256 verification, off-server encrypted copy, least-privilege storage, and documented retention.
 - Back up proof attachments with the database backup once binary attachment storage exists.
 - Monthly restore rehearsal into an isolated server. Run integrity checks and compare expected counts.

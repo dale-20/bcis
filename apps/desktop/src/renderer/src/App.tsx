@@ -101,7 +101,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/billing/invoices" element={<Allowed user={user} permissions={['billing.view']}><BillingPage user={user} mode="invoices" /></Allowed>} />
     <Route path="/payments/receive" element={<Allowed user={user} permissions={['payment.create']}><PaymentsPage user={user} mode="receive" /></Allowed>} />
     <Route path="/payments/history" element={<Allowed user={user} permissions={['billing.view']}><PaymentsPage user={user} mode="history" /></Allowed>} />
-    <Route path="/payments/gcash" element={<Allowed user={user} permissions={['payment.verify_gcash']}><ModulePage {...modulePages.gcash} /></Allowed>} />
+    <Route path="/payments/gcash" element={<Allowed user={user} permissions={['payment.verify_gcash']}><PaymentsPage user={user} mode="gcash" /></Allowed>} />
     <Route path="/collections/collectors" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="collectors" /></Allowed>} />
     <Route path="/collections/routes" element={<Allowed user={user} permissions={['collection.view']}><CollectionSetupPage user={user} mode="areas" /></Allowed>} />
     <Route path="/collections/batches" element={<Allowed user={user} permissions={['collection.view']}><ModulePage {...modulePages.batches} /></Allowed>} />

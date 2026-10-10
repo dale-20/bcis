@@ -1,11 +1,14 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import type { PaymentListQuery, PaymentPreviewQuery, PostPaymentInput, VerifyGcashInput } from '@bcis/shared';
+import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import type { GcashProofUploadInput, PaymentListQuery, PaymentPreviewQuery, PostPaymentInput, VerifyGcashInput } from '@bcis/shared';
+import { gcashProofMimeTypeSchema } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
   auditLogs, invoices, ledgerEntries, paymentAllocations, paymentProofs,
   paymentReversals, payments, receipts, subscriberCredits, subscribers,
 } from '../db/schema.js';
 import { AppError } from '../errors.js';
+import { createHash } from 'node:crypto';
+import { GcashProofStorage } from './proof-storage.js';
 
 type Transaction = Parameters<Parameters<Database['db']['transaction']>[0]>[0];
 
@@ -30,7 +33,79 @@ function mapPaymentHistoryRow(row: PaymentHistoryRow) {
 }
 
 export class PaymentRepository {
-  constructor(private readonly database: Database) {}
+  constructor(private readonly database: Database, private readonly proofStorage: GcashProofStorage) {}
+
+  async uploadProof(input: GcashProofUploadInput, actorUserId: string) {
+    await this.cleanupStagedProofs();
+    const [stagedCount] = await this.database.db.select({ count: sql<number>`count(*)::int` }).from(paymentProofs)
+      .where(and(eq(paymentProofs.uploadedByUserId, actorUserId), isNull(paymentProofs.paymentId)));
+    if ((stagedCount?.count ?? 0) >= 5) throw new AppError(429, 'PROOF_UPLOAD_LIMIT', 'Submit or wait for staged proof uploads to expire before adding another');
+    const saved = await this.proofStorage.save(input);
+    try {
+      await this.database.db.insert(paymentProofs).values({
+        paymentId: null, uploadedByUserId: actorUserId, storageKey: saved.metadata.storageKey,
+        originalFilename: saved.metadata.originalFilename, mimeType: saved.metadata.mimeType,
+        sizeBytes: BigInt(saved.metadata.sizeBytes), sha256: saved.metadata.sha256, status: 'PENDING',
+      });
+      return saved.metadata;
+    } catch (error) {
+      await this.proofStorage.remove(saved.metadata.storageKey, saved.metadata.mimeType);
+      throw error;
+    }
+  }
+
+  private async cleanupStagedProofs(): Promise<void> {
+    const expired = await this.database.db.transaction(async (transaction) => {
+      const rows = await transaction.select({ id: paymentProofs.id, storageKey: paymentProofs.storageKey, mimeType: paymentProofs.mimeType })
+        .from(paymentProofs).where(and(isNull(paymentProofs.paymentId), lt(paymentProofs.createdAt, sql`now() - interval '24 hours'`)))
+        .limit(100).for('update', { skipLocked: true });
+      if (rows.length > 0) await transaction.delete(paymentProofs).where(inArray(paymentProofs.id, rows.map((row) => row.id)));
+      return rows;
+    });
+    await Promise.all(expired.map((proof) => this.proofStorage.remove(proof.storageKey, gcashProofMimeTypeSchema.parse(proof.mimeType))));
+  }
+
+  async pendingGcash(page: number, pageSize: number) {
+    const [count, result] = await Promise.all([
+      this.database.pool.query<{ total: number }>(`select count(*)::int total from payment_proofs pp join payments p on p.id=pp.payment_id where pp.status='PENDING' and p.status='PENDING_VERIFICATION'`),
+      this.database.pool.query<{
+        payment_id: string; subscriber_id: string; account_number: string; subscriber_name: string; payment_date: Date; created_at: Date;
+        amount_centavos: string; reference_number: string; sender_details: string; notes: string | null;
+        original_filename: string; mime_type: string; size_bytes: string; sha256: string;
+      }>(
+        `select p.id payment_id,p.subscriber_id,s.account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,
+         p.payment_date,p.created_at,p.amount_centavos::text,p.reference_number,p.sender_details,p.notes,pp.original_filename,pp.mime_type,
+         pp.size_bytes::text,pp.sha256 from payment_proofs pp join payments p on p.id=pp.payment_id join subscribers s on s.id=p.subscriber_id
+         where pp.status='PENDING' and p.status='PENDING_VERIFICATION' order by p.created_at,p.id limit $1 offset $2`,
+        [pageSize, (page - 1) * pageSize],
+      ),
+    ]);
+    return {
+      rows: result.rows.map((row) => ({
+        paymentId: row.payment_id, subscriberId: row.subscriber_id, subscriberAccountNumber: row.account_number,
+        subscriberName: row.subscriber_name, paymentDate: row.payment_date.toISOString(), createdAt: row.created_at.toISOString(),
+        amountCentavos: row.amount_centavos, referenceNumber: row.reference_number, senderDetails: row.sender_details,
+        notes: row.notes, originalFilename: row.original_filename, mimeType: row.mime_type,
+        sizeBytes: row.size_bytes, sha256: row.sha256,
+      })),
+      total: count.rows[0]?.total ?? 0,
+    };
+  }
+
+  async readProof(paymentId: string) {
+    const result = await this.database.pool.query<{ storage_key: string; mime_type: string; sha256: string; size_bytes: string }>(
+      `select pp.storage_key,pp.mime_type,pp.sha256,pp.size_bytes::text from payment_proofs pp join payments p on p.id=pp.payment_id
+       where p.id=$1 and p.method='GCASH'`, [paymentId],
+    );
+    const proof = result.rows[0];
+    if (!proof) throw new AppError(404, 'PROOF_NOT_FOUND', 'Proof attachment is unavailable');
+    const mimeType = gcashProofMimeTypeSchema.parse(proof.mime_type);
+    const bytes = await this.proofStorage.read(proof.storage_key, mimeType);
+    if (bytes.length.toString() !== proof.size_bytes || createHash('sha256').update(bytes).digest('hex') !== proof.sha256) {
+      throw new AppError(500, 'PROOF_INTEGRITY_FAILED', 'Stored proof failed integrity validation');
+    }
+    return { mimeType, contentBase64: bytes.toString('base64') };
+  }
 
   async preview(input: PaymentPreviewQuery) {
     return this.database.db.transaction(async (transaction) => {
@@ -172,15 +247,15 @@ export class PaymentRepository {
       if (!payment) throw new Error('PAYMENT_INSERT_FAILED');
 
       if (input.method === 'GCASH') {
-        await transaction.insert(paymentProofs).values({
-          paymentId: payment.id,
-          storageKey: input.proof.storageKey,
-          originalFilename: input.proof.originalFilename,
-          mimeType: input.proof.mimeType,
-          sizeBytes: BigInt(input.proof.sizeBytes),
-          sha256: input.proof.sha256.toLowerCase(),
-          status: 'PENDING',
-        });
+        const [stagedProof] = await transaction.select().from(paymentProofs)
+          .where(and(eq(paymentProofs.storageKey, input.proof.storageKey), eq(paymentProofs.uploadedByUserId, context.actorUserId)))
+          .limit(1).for('update');
+        if (!stagedProof || stagedProof.paymentId !== null || stagedProof.status !== 'PENDING'
+          || stagedProof.originalFilename !== input.proof.originalFilename || stagedProof.mimeType !== input.proof.mimeType
+          || stagedProof.sizeBytes.toString() !== input.proof.sizeBytes || stagedProof.sha256 !== input.proof.sha256.toLowerCase()) {
+          throw new AppError(409, 'PROOF_UPLOAD_INVALID', 'Select a valid proof attachment before submitting GCash');
+        }
+        await transaction.update(paymentProofs).set({ paymentId: payment.id }).where(eq(paymentProofs.id, stagedProof.id));
         await transaction.insert(auditLogs).values({
           actorUserId: context.actorUserId, action: 'payment.gcash.submitted', entityType: 'payment', entityId: payment.id,
           reason: 'GCASH_PROOF_PENDING', newValues: { amountCentavos: input.amountCentavos, referenceNumber: normalizedReference, proofStatus: 'PENDING' },

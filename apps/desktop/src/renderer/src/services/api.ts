@@ -60,9 +60,11 @@ import {
   subscriberLedgerDesktopResultSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
   paymentDetailDesktopResultSchema, paymentListDesktopResultSchema, paymentListQuerySchema,
   paymentPreviewDesktopResultSchema, paymentPreviewQuerySchema, paymentResultDesktopResultSchema,
+  gcashProofQueueDesktopResultSchema, gcashProofContentDesktopResultSchema, verifyGcashInputSchema,
   postPaymentInputSchema, reversePaymentInputSchema,
   type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
   type PaymentResult, type PostPaymentInput, type ReversePaymentInput,
+  type VerifyGcashInput,
 } from '@bcis/shared';
 
 export class DesktopServiceError extends Error {
@@ -292,5 +294,24 @@ export async function postPayment(input: PostPaymentInput): Promise<PaymentResul
 export async function reversePayment(id: string, input: ReversePaymentInput): Promise<PaymentResult> {
   const command = reversePaymentInputSchema.parse(input);
   return unwrap(paymentResultDesktopResultSchema.parse(await bridge().reversePayment(id, command)));
+}
+
+export async function selectAndUploadGcashProof() {
+  const result = await bridge().selectAndUploadGcashProof();
+  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+  return result.data;
+}
+
+export async function listGcashProofs(page: number, pageSize: number) {
+  return unwrap(gcashProofQueueDesktopResultSchema.parse(await bridge().listGcashProofs(page, pageSize)));
+}
+
+export async function getGcashProof(paymentId: string) {
+  return unwrap(gcashProofContentDesktopResultSchema.parse(await bridge().getGcashProof(paymentId)));
+}
+
+export async function verifyGcashPayment(paymentId: string, input: VerifyGcashInput): Promise<PaymentResult> {
+  const command = verifyGcashInputSchema.parse(input);
+  return unwrap(paymentResultDesktopResultSchema.parse(await bridge().verifyGcashPayment(paymentId, command)));
 }
 

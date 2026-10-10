@@ -51,7 +51,8 @@ export const paymentAllocations = pgTable('payment_allocations', {
 
 export const paymentProofs = pgTable('payment_proofs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  paymentId: uuid('payment_id').notNull().references(() => payments.id, { onDelete: 'restrict' }),
+  paymentId: uuid('payment_id').references(() => payments.id, { onDelete: 'restrict' }),
+  uploadedByUserId: uuid('uploaded_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   storageKey: varchar('storage_key', { length: 255 }).notNull(),
   originalFilename: varchar('original_filename', { length: 255 }).notNull(),
   mimeType: varchar('mime_type', { length: 100 }).notNull(),
@@ -64,7 +65,9 @@ export const paymentProofs = pgTable('payment_proofs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('payment_proofs_storage_key_uq').on(table.storageKey),
+  uniqueIndex('payment_proofs_payment_uq').on(table.paymentId).where(sql`${table.paymentId} IS NOT NULL`),
   index('payment_proofs_payment_status_idx').on(table.paymentId, table.status),
+  index('payment_proofs_uploader_created_idx').on(table.uploadedByUserId, table.createdAt),
   check('payment_proofs_size_positive', sql`${table.sizeBytes} > 0`),
 ]);
 
