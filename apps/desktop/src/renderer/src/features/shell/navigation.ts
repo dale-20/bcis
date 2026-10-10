@@ -71,7 +71,14 @@ export const navigationItems: readonly NavigationItem[] = [
       { label: 'Suspension Candidates', path: '/receivables/suspensions', permissions: ['receivables.view'] },
     ],
   },
-  { id: 'services', label: 'Services', path: '/services', permissions: ['service.view'] },
+  {
+    id: 'services', label: 'Services', path: '/services', permissions: ['service.view', 'service.reconnection.assign', 'service.reconnection.complete'],
+    children: [
+      { label: 'Service plans', path: '/services', permissions: ['service.view'] },
+      { label: 'Reconnection requests', path: '/services/reconnections', permissions: ['service.reconnection.assign'] },
+      { label: 'My reconnection work', path: '/services/my-reconnections', permissions: ['service.reconnection.complete'] },
+    ],
+  },
   { id: 'reports', label: 'Reports', path: '/reports', permissions: ['report.view'] },
   {
     id: 'administration', label: 'Administration', path: '/administration/users',

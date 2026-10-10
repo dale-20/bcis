@@ -75,6 +75,10 @@ function ReceiveWorkspace({ user }: { user: AuthenticatedUser }) {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['payments'] }),
         client.invalidateQueries({ queryKey: ['payment-preview', subscriberId] }),
+        client.invalidateQueries({ queryKey: ['receivables'] }),
+        client.invalidateQueries({ queryKey: ['receivable-accounts'] }),
+        client.invalidateQueries({ queryKey: ['reconnections'] }),
+        client.invalidateQueries({ queryKey: ['my-reconnections'] }),
       ]);
     },
   });
@@ -165,6 +169,10 @@ function GcashReviewWorkspace({ user }: { user: AuthenticatedUser }) {
         client.invalidateQueries({ queryKey: ['gcash-proof-queue'] }),
         client.invalidateQueries({ queryKey: ['payments'] }),
         client.invalidateQueries({ queryKey: ['payment'] }),
+        client.invalidateQueries({ queryKey: ['receivables'] }),
+        client.invalidateQueries({ queryKey: ['receivable-accounts'] }),
+        client.invalidateQueries({ queryKey: ['reconnections'] }),
+        client.invalidateQueries({ queryKey: ['my-reconnections'] }),
       ]);
     },
   });

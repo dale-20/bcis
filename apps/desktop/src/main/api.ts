@@ -1,6 +1,10 @@
 import {
   authenticatedUserSchema,
   receivableAgingQuerySchema, receivableAgingResponseSchema,
+  receivableAccountResponseSchema,
+  serviceControlPolicySchema, createSuspensionInputSchema, reconnectionAssignmentSchema,
+  receivableAccountQuerySchema as serviceReceivableAccountQuerySchema,
+  reconnectionListResponseSchema, suspensionListResponseSchema, serviceTechnicianListSchema,
   collectionReferenceCatalogSchema,
   collectionBatchListSchema, collectionBatchSchema, eligibleCollectionPaymentsSchema,
   referenceDataSchema,
@@ -12,6 +16,8 @@ import {
   subscriberListResponseSchema,
   type AuthenticatedUser,
   type ReceivableAgingQuery, type ReceivableAgingResponse,
+  type ReceivableAccountQuery, type ReceivableAccountResponse, type ServiceControlPolicy,
+  type CreateSuspensionInput, type ReconnectionAssignment, type ReconnectionListResponse,
   type CollectionAreaCreate,
   type CollectionAreaUpdate,
   type CollectionReferenceCatalog,
@@ -245,6 +251,36 @@ export class DesktopApiClient {
     if (parsed.collectionAreaId) parameters.set('collectionAreaId', parsed.collectionAreaId);
     return this.call(`/receivables/aging?${parameters.toString()}`, { method: 'GET' }, receivableAgingResponseSchema);
   }
+
+  getReceivableAccounts(query: ReceivableAccountQuery): Promise<DesktopResult<ReceivableAccountResponse>> {
+    const parsed = serviceReceivableAccountQuerySchema.parse(query);
+    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), suspensionCandidates: String(parsed.suspensionCandidates), query: parsed.query, page: String(parsed.page), pageSize: String(parsed.pageSize) });
+    for (const key of ['collectorId', 'collectionAreaId', 'planId', 'serviceTypeId', 'bucket'] as const) { const value = parsed[key]; if (value) parameters.set(key, value); }
+    return this.call(`/receivables/accounts?${parameters.toString()}`, { method: 'GET' }, receivableAccountResponseSchema);
+  }
+
+  getServiceControlPolicy(): Promise<DesktopResult<ServiceControlPolicy>> { return this.call('/service-control/policy', { method: 'GET' }, serviceControlPolicySchema); }
+  updateServiceControlPolicy(policy: ServiceControlPolicy): Promise<DesktopResult<ServiceControlPolicy>> {
+    return this.call('/service-control/policy', { method: 'PUT', body: JSON.stringify(serviceControlPolicySchema.parse(policy)) }, serviceControlPolicySchema);
+  }
+  createSuspension(input: CreateSuspensionInput): Promise<DesktopResult<{ id: string }>> {
+    return this.call('/service-control/suspensions', { method: 'POST', body: JSON.stringify(createSuspensionInputSchema.parse(input)) }, z.object({ id: z.uuid() }));
+  }
+  listSuspensions(page: number, pageSize: number): Promise<DesktopResult<z.infer<typeof suspensionListResponseSchema>>> {
+    return this.call(`/service-control/suspensions?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`, { method: 'GET' }, suspensionListResponseSchema);
+  }
+  approveSuspension(id: string): Promise<DesktopResult<null>> { return this.call(`/service-control/suspensions/${encodeURIComponent(id)}/approve`, { method: 'POST' }, z.null(), true, true); }
+  listReconnections(page: number, pageSize: number): Promise<DesktopResult<ReconnectionListResponse>> {
+    return this.call(`/service-control/reconnections?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`, { method: 'GET' }, reconnectionListResponseSchema);
+  }
+  listMyReconnections(page: number, pageSize: number): Promise<DesktopResult<ReconnectionListResponse>> {
+    return this.call(`/service-control/my-reconnections?${new URLSearchParams({ page: String(page), pageSize: String(pageSize) })}`, { method: 'GET' }, reconnectionListResponseSchema);
+  }
+  listTechnicians(): Promise<DesktopResult<z.infer<typeof serviceTechnicianListSchema>>> { return this.call('/service-control/technicians', { method: 'GET' }, serviceTechnicianListSchema); }
+  assignReconnection(id: string, input: ReconnectionAssignment): Promise<DesktopResult<null>> {
+    return this.call(`/service-control/reconnections/${encodeURIComponent(id)}/assignment`, { method: 'PATCH', body: JSON.stringify(reconnectionAssignmentSchema.parse(input)) }, z.null(), true, true);
+  }
+  completeReconnection(id: string): Promise<DesktopResult<null>> { return this.call(`/service-control/reconnections/${encodeURIComponent(id)}/complete`, { method: 'POST' }, z.null(), true, true); }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {
     return this.call('/billing/cycles', { method: 'GET' }, billingCycleListSchema);

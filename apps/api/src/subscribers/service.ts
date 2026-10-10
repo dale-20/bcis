@@ -244,6 +244,7 @@ export class SubscriberService {
     } catch (error) {
       if (error instanceof Error && error.message === 'SERVICE_NOT_FOUND') throw new AppError(404, 'SERVICE_NOT_FOUND', 'Service account not found');
       if (error instanceof Error && error.message === 'SERVICE_STATUS_INVALID') throw new AppError(409, 'SERVICE_STATUS_INVALID', 'This service status change is not allowed');
+      if (error instanceof Error && error.message === 'SERVICE_CONTROL_WORKFLOW_REQUIRED') throw new AppError(409, 'SERVICE_CONTROL_WORKFLOW_REQUIRED', 'Suspension and reconnection must use their approval workflow');
       throw error;
     }
   }

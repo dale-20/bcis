@@ -44,6 +44,10 @@ import {
   COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
   COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
   RECEIVABLE_AGING_CHANNEL,
+  RECEIVABLE_ACCOUNTS_CHANNEL, SERVICE_POLICY_GET_CHANNEL, SERVICE_POLICY_UPDATE_CHANNEL,
+  SUSPENSIONS_LIST_CHANNEL, SUSPENSION_CREATE_CHANNEL, SUSPENSION_APPROVE_CHANNEL,
+  RECONNECTIONS_LIST_CHANNEL, RECONNECTIONS_MINE_CHANNEL, TECHNICIANS_LIST_CHANNEL,
+  RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -156,6 +160,17 @@ void app.whenReady().then(() => {
   ipcMain.handle(COLLECTION_RECONCILE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionReconciliation.parse(input); return api.reconcileCollectionBatch(command.id, command.input); });
   ipcMain.handle(COLLECTION_CLOSE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionClose.parse(input); return api.closeCollectionBatch(command.id, command.input); });
   ipcMain.handle(RECEIVABLE_AGING_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReceivableAging(desktopRequestSchemas.receivableAging.parse(input)); });
+  ipcMain.handle(RECEIVABLE_ACCOUNTS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReceivableAccounts(desktopRequestSchemas.receivableAccounts.parse(input)); });
+  ipcMain.handle(SERVICE_POLICY_GET_CHANNEL, (event) => { assertTrustedSender(event); return api.getServiceControlPolicy(); });
+  ipcMain.handle(SERVICE_POLICY_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.updateServiceControlPolicy(desktopRequestSchemas.servicePolicy.parse(input)); });
+  ipcMain.handle(SUSPENSIONS_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const page = desktopRequestSchemas.page.parse(input); return api.listSuspensions(page.page, page.pageSize); });
+  ipcMain.handle(SUSPENSION_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createSuspension(desktopRequestSchemas.suspensionCreate.parse(input)); });
+  ipcMain.handle(SUSPENSION_APPROVE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.approveSuspension(desktopRequestSchemas.suspensionId.parse(input)); });
+  ipcMain.handle(RECONNECTIONS_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const page = desktopRequestSchemas.page.parse(input); return api.listReconnections(page.page, page.pageSize); });
+  ipcMain.handle(RECONNECTIONS_MINE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const page = desktopRequestSchemas.page.parse(input); return api.listMyReconnections(page.page, page.pageSize); });
+  ipcMain.handle(TECHNICIANS_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.listTechnicians(); });
+  ipcMain.handle(RECONNECTION_ASSIGN_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.reconnectionAssignment.parse(input); return api.assignReconnection(command.id, command.input); });
+  ipcMain.handle(RECONNECTION_COMPLETE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.completeReconnection(desktopRequestSchemas.reconnectionId.parse(input)); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

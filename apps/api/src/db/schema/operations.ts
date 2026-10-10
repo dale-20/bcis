@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, date, index, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, date, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { serviceAccounts } from './services.js';
 import { users } from './security.js';
 
@@ -12,11 +12,16 @@ export const suspensionRecords = pgTable('suspension_records', {
   status: suspensionStatus('status').notNull().default('PENDING'),
   reason: varchar('reason', { length: 255 }).notNull(),
   effectiveDate: date('effective_date', { mode: 'string' }).notNull(),
-  approvedByUserId: uuid('approved_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  requestedByUserId: uuid('requested_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  approvedByUserId: uuid('approved_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
   notes: text('notes'),
   liftedAt: timestamp('lifted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index('suspension_records_account_status_idx').on(table.serviceAccountId, table.status)]);
+}, (table) => [
+  index('suspension_records_account_status_idx').on(table.serviceAccountId, table.status),
+  index('suspension_records_status_effective_idx').on(table.status, table.effectiveDate),
+]);
 
 export const reconnectionRecords = pgTable('reconnection_records', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -30,4 +35,8 @@ export const reconnectionRecords = pgTable('reconnection_records', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   completedByUserId: uuid('completed_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
   notes: text('notes'),
-}, (table) => [index('reconnection_records_account_status_idx').on(table.serviceAccountId, table.status)]);
+}, (table) => [
+  index('reconnection_records_account_status_idx').on(table.serviceAccountId, table.status),
+  index('reconnection_records_technician_status_idx').on(table.technicianUserId, table.status),
+  uniqueIndex('reconnection_records_one_open_account_uq').on(table.serviceAccountId).where(sql`${table.status} IN ('REQUESTED', 'SCHEDULED')`),
+]);

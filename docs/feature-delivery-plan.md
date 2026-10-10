@@ -130,7 +130,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 7 - Receivables, suspension, and reconnection
 
-**Progress:** Receivable review is connected end to end for outstanding balances, overdue invoices, and aging with server-side pagination, date/collector/area filters, and bucket totals. Remaining Increment 7 requirements are tracked in `docs/implementation-checklist.md`; do not treat this increment as complete until its gate passes.
+**Status:** COMPLETE (2026-10-11). `npm run check` passed (97 tests), `npm run test:integration` passed (63 tests on PostgreSQL), and `npm run test:e2e` passed (1 built Electron workflow). The Electron test uses real invoice/payment records and completes suspension approval, payment-triggered reconnection, assignment, and Technician completion. PostgreSQL tests cover a second independent subscriber path, receivable reconciliation, and role restrictions.
 
 **Goal:** Turn aging data into controlled service operations.
 
@@ -141,7 +141,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - Add suspension approval with reason, effective date, approver, and notes.
 - Create reconnection requests after qualifying payments, assign a technician, and record request/completion dates and fees.
 - Preserve every service-state transition in service history.
-- Give Technicians only assigned service/reconnection operations allowed by `service.status.update`.
+- Keep installation status updates under `service.status.update`; prohibit direct suspension/reconnection transitions and grant reconnection completion through `service.reconnection.complete` only for work assigned to that Technician.
 
 **Gate:** Aging boundaries and totals pass; two synthetic suspension/reconnection scenarios work end to end; financial actions remain unavailable to Technicians.
 

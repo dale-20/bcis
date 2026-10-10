@@ -19,6 +19,11 @@ function runNode(script: string, environment: NodeJS.ProcessEnv): Promise<void> 
   });
 }
 
+function pesosFromCentavos(value: string): string {
+  const cents = BigInt(value);
+  return `${cents / 100n}.${(cents % 100n).toString().padStart(2, '0')}`;
+}
+
 test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a narrow bridge', async () => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (!databaseUrl || !new URL(databaseUrl).pathname.endsWith('_test') || databaseUrl === process.env.DATABASE_URL) {
@@ -191,7 +196,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Recent route batches' })).toBeVisible();
     await expect(page.getByText(/total · showing page 1 of/)).toBeVisible();
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getPayment', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'reversePayment', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'verifyGcashPayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
+      bridge: ['approveSuspension', 'assignReconnection', 'changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'completeReconnection', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'createSuspension', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getPayment', 'getReceivableAccounts', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceControlPolicy', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listMyReconnections', 'listPayments', 'listReconnections', 'listSubscribers', 'listSuspensions', 'listTechnicians', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'reversePayment', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServiceControlPolicy', 'updateServicePlan', 'updateSubscriber', 'verifyGcashPayment', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });
@@ -220,10 +225,105 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Accounts receivable aging' })).toBeVisible();
     await expect(page.getByText(/Day 90 belongs to 61–90/)).toBeVisible();
     await page.screenshot({ path: 'test-results/receivables-aging.png' });
+    await page.getByRole('link', { name: 'Suspension Candidates', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Suspension candidates' })).toBeVisible();
+    await expect(page.locator('.service-control-table').first()).toBeVisible();
+    await page.getByRole('link', { name: 'Services', exact: true }).click();
+    await page.getByRole('link', { name: 'Reconnection requests', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Reconnection requests' })).toBeVisible();
+    await expect(page.locator('.service-control-table').first()).toBeVisible();
+    await page.getByRole('link', { name: 'Administration', exact: true }).click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Service control policy' })).toBeVisible();
+    await expect(page.getByLabel('Suspension threshold (days)')).toHaveValue('90');
 
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
     await page.screenshot({ path: 'test-results/reports.png' });
+
+    await page.getByRole('link', { name: 'Administration', exact: true }).click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await page.getByLabel('Grace period (days)').fill('0');
+    await page.getByLabel('Suspension threshold (days)').fill('1');
+    await page.getByLabel('Reconnection fee (PHP)').fill('500.00');
+    await page.getByRole('button', { name: 'Save policy' }).click();
+
+    await page.getByRole('link', { name: 'Billing', exact: true }).click();
+    await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();
+    await page.getByLabel('Period').fill('2026-07');
+    await expect(page.getByText('To create', { exact: true })).toBeVisible();
+    const overdueCycleButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
+    await expect(overdueCycleButton).toBeEnabled();
+    await overdueCycleButton.click();
+    await expect(page.getByText('Billing run completed')).toBeVisible();
+
+    const syntheticSubscriber = await database.query<{ id: string; account_number: string }>("select id, account_number from subscribers where account_number='BCIS-00001'");
+    const subscriber = syntheticSubscriber.rows[0];
+    if (!subscriber) throw new Error('Synthetic E2E subscriber missing');
+    const targetService = await database.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1' and status='ACTIVE'");
+    const serviceId = targetService.rows[0]?.id;
+    if (!serviceId) throw new Error('Synthetic E2E active service missing');
+
+    await page.getByRole('link', { name: 'Receivables', exact: true }).click();
+    await page.getByRole('link', { name: 'Suspension Candidates', exact: true }).click();
+    await page.getByLabel('Search subscriber or service').fill('SVC-00001-1');
+    const candidateRow = page.getByRole('row').filter({ hasText: 'SVC-00001-1' }).first();
+    await expect(candidateRow).toBeVisible();
+    await candidateRow.getByRole('button', { name: 'Request', exact: true }).click();
+    await page.getByLabel('Effective date').fill(new Date().toISOString().slice(0, 10));
+    await page.getByLabel('Reason').fill('Synthetic E2E overdue service');
+    await page.getByRole('button', { name: 'Submit request' }).click();
+    await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
+    const pendingSuspension = page.getByRole('row').filter({ hasText: 'SVC-00001-1' }).last();
+    await pendingSuspension.getByRole('button', { name: 'Approve', exact: true }).click();
+    await expect(pendingSuspension.getByText('ACTIVE', { exact: true })).toBeVisible();
+
+    const subscriberBalance = await database.query<{ amount: string }>(
+      "select coalesce(sum(balance_centavos),0)::text amount from invoices where subscriber_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')",
+      [subscriber.id],
+    );
+    const amountCentavos = subscriberBalance.rows[0]?.amount ?? '0';
+    if (BigInt(amountCentavos) <= 0n) throw new Error('Synthetic E2E subscriber has no invoice balance to settle');
+    await page.getByRole('link', { name: 'Payments', exact: true }).click();
+    await page.getByLabel('Find subscriber').fill(subscriber.account_number);
+    await page.locator('.payment-subscriber-results button').first().click();
+    await page.getByLabel('Amount received (PHP)').fill(pesosFromCentavos(amountCentavos));
+    await expect(page.getByRole('heading', { name: 'Allocation preview' })).toBeVisible();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Confirm and post' }).click();
+    await expect(page.getByRole('heading', { name: /Receipt OR-/ })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Services', exact: true }).click();
+    await page.getByRole('link', { name: 'Reconnection requests', exact: true }).click();
+    const reconnectionRow = page.getByRole('row').filter({ hasText: 'SVC-00001-1' });
+    await expect(reconnectionRow).toBeVisible();
+    await expect(reconnectionRow.getByText('₱500.00')).toBeVisible();
+    await reconnectionRow.getByLabel('Assign Technician for SVC-00001-1').selectOption({ label: 'Demo Technician' });
+    await reconnectionRow.getByLabel('Scheduled date for SVC-00001-1').fill(new Date().toISOString().slice(0, 10));
+    await reconnectionRow.getByRole('button', { name: 'Assign' }).click();
+
+    await page.getByRole('button', { name: 'Lock' }).click();
+    await page.getByLabel('Username').fill('technician.demo');
+    await page.getByLabel('Password', { exact: true }).fill(seedPassword);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await expect(page.getByRole('heading', { name: 'Secure your demo account' })).toBeVisible();
+    await page.getByLabel('Current password', { exact: true }).fill(seedPassword);
+    await page.getByLabel('New password', { exact: true }).fill('Synthetic-technician-e2e-2');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-technician-e2e-2');
+    await page.getByRole('button', { name: 'Update password' }).click();
+    await page.getByRole('link', { name: 'Services', exact: true }).click();
+    await page.getByRole('link', { name: 'My reconnection work', exact: true }).click();
+    const assignedWork = page.getByRole('row').filter({ hasText: 'SVC-00001-1' });
+    await expect(assignedWork).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Payments', exact: true })).toHaveCount(0);
+    await assignedWork.getByRole('button', { name: 'Complete' }).click();
+    await expect(page.getByRole('heading', { name: 'No open reconnections' })).toBeVisible();
+    const completedService = await database.query<{ status: string; reconnection_status: string }>(
+      'select service.status, reconnect.status reconnection_status from service_accounts service join reconnection_records reconnect on reconnect.service_account_id=service.id where service.id=$1 order by reconnect.requested_at desc limit 1',
+      [serviceId],
+    );
+    expect(completedService.rows[0]).toEqual({ status: 'ACTIVE', reconnection_status: 'COMPLETED' });
+
     await page.getByRole('link', { name: 'Connection', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Connected to BCIS' })).toBeVisible();
     await database.query('UPDATE application_metadata SET schema_version = 99');

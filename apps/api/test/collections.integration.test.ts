@@ -23,12 +23,13 @@ const accounts: readonly DemoAccount[] = [
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
   { username: 'collections.demo', displayName: 'Demo Collection Supervisor', role: 'COLLECTION_SUPERVISOR' },
   { username: 'auditor.demo', displayName: 'Demo Auditor', role: 'AUDITOR' },
+  { username: 'technician.demo', displayName: 'Demo Technician', role: 'TECHNICIAN' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, hasher);
-const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: 'silent' });
+const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: process.env.BCIS_TEST_LOG_LEVEL ?? 'silent' });
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
-const tokens = { admin: '', cashier: '', collections: '', auditor: '' };
+const tokens = { admin: '', cashier: '', collections: '', auditor: '', technician: '' };
 let collectorId = '';
 let areaId = '';
 let subscriberId = '';
@@ -91,6 +92,7 @@ beforeAll(async () => {
   tokens.cashier = await activate('cashier.demo');
   tokens.collections = await activate('collections.demo');
   tokens.auditor = await activate('auditor.demo');
+  tokens.technician = await activate('technician.demo');
   for (const period of ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11']) {
     const generated = await app.inject({ method: 'POST', url: '/billing/cycles/generate', headers: { authorization: `Bearer ${tokens.admin}` }, payload: { period } });
     expect(generated.statusCode).toBe(200);
@@ -167,6 +169,9 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(aging.total).toBe(aging.rows.length);
     const bucketTotal = BigInt(aging.totals.CURRENT) + BigInt(aging.totals['1_30']) + BigInt(aging.totals['31_60']) + BigInt(aging.totals['61_90']) + BigInt(aging.totals['90_PLUS']);
     expect(bucketTotal).toBe(BigInt(aging.totals.total));
+    const accounts = await app.inject({ method: 'GET', url: `/receivables/accounts?asOf=2026-11-15&collectorId=${collectorId}&collectionAreaId=${areaId}&page=1&pageSize=100`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(accounts.statusCode, accounts.body).toBe(200);
+    expect(accounts.json<{ arrearsCentavos: string }>().arrearsCentavos).toBe(aging.totals.total);
     for (const row of aging.rows) {
       if (row.daysOverdue === 0) expect(row.bucket).toBe('CURRENT');
       else if (row.daysOverdue <= 30) expect(row.bucket).toBe('1_30');
@@ -216,6 +221,121 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(denied.statusCode).toBe(403);
   });
 
+  it('runs the suspension and payment-triggered reconnection workflow with assigned Technician-only completion', async () => {
+    const [service] = await database.db.select({ id: serviceAccounts.id, subscriberId: serviceAccounts.subscriberId, planId: serviceAccounts.planId }).from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00001-1'));
+    if (!service) throw new Error('Synthetic service account missing');
+    const technician = await database.pool.query<{ id: string }>("select id from users where normalized_username='technician.demo'");
+    const technicianId = technician.rows[0]?.id;
+    if (!technicianId) throw new Error('Synthetic Technician missing');
+    const technicianList = await app.inject({ method: 'GET', url: '/service-control/technicians', headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(technicianList.statusCode, technicianList.body).toBe(200);
+    expect(technicianList.json<{ id: string; displayName: string }[]>()).toEqual(expect.arrayContaining([expect.objectContaining({ id: technicianId, displayName: 'Demo Technician' })]));
+
+    const policyResponse = await app.inject({ method: 'PUT', url: '/service-control/policy', headers: { authorization: `Bearer ${tokens.admin}` }, payload: { gracePeriodDays: 0, suspensionThresholdDays: 1, reconnectionFeeCentavos: '50000' } });
+    expect(policyResponse.statusCode, policyResponse.body).toBe(200);
+    const policyDenied = await app.inject({ method: 'PUT', url: '/service-control/policy', headers: { authorization: `Bearer ${tokens.cashier}` }, payload: { gracePeriodDays: 0, suspensionThresholdDays: 1, reconnectionFeeCentavos: '0' } });
+    expect(policyDenied.statusCode).toBe(403);
+
+    const candidates = await app.inject({ method: 'GET', url: `/receivables/accounts?asOf=${new Date().toISOString().slice(0, 10)}&suspensionCandidates=true&planId=${service.planId}&page=1&pageSize=25`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(candidates.statusCode, candidates.body).toBe(200);
+    const candidateRows = candidates.json<{ rows: { serviceAccountId: string; monthsUnpaid: number; arrearsCentavos: string }[] }>().rows;
+    expect(candidateRows.length).toBeGreaterThan(0);
+    const workflowCandidate = candidateRows[0];
+    if (!workflowCandidate) throw new Error('No synthetic service qualified for the first suspension scenario');
+    const [workflowService] = await database.db.select({ id: serviceAccounts.id, subscriberId: serviceAccounts.subscriberId, planId: serviceAccounts.planId })
+      .from(serviceAccounts).where(eq(serviceAccounts.id, workflowCandidate.serviceAccountId));
+    if (!workflowService) throw new Error('Synthetic suspension candidate missing from service records');
+
+    const effectiveDate = new Date().toISOString().slice(0, 10);
+    const requestBody = { serviceAccountId: workflowService.id, effectiveDate, reason: 'Synthetic delinquency test', notes: 'Policy-approved integration scenario' };
+    const cashierDenied = await app.inject({ method: 'POST', url: '/service-control/suspensions', headers: { authorization: `Bearer ${tokens.cashier}` }, payload: requestBody });
+    expect(cashierDenied.statusCode).toBe(403);
+    const request = await app.inject({ method: 'POST', url: '/service-control/suspensions', headers: { authorization: `Bearer ${tokens.admin}` }, payload: requestBody });
+    expect(request.statusCode, request.body).toBe(201);
+    const suspensionId = request.json<{ id: string }>().id;
+    const approved = await app.inject({ method: 'POST', url: `/service-control/suspensions/${suspensionId}/approve`, headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(approved.statusCode, approved.body).toBe(204);
+    const secondApproval = await app.inject({ method: 'POST', url: `/service-control/suspensions/${suspensionId}/approve`, headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(secondApproval.statusCode).toBe(409);
+
+    const beforePartialResult = await database.pool.query<{ total: string }>("select coalesce(sum(balance_centavos),0)::text total from invoices where subscriber_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')", [workflowService.subscriberId]);
+    const beforePartial = beforePartialResult.rows[0];
+    expect(BigInt(beforePartial?.total ?? '0')).toBeGreaterThan(1n);
+    const post = async (amountCentavos: string, key: string) => app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${tokens.cashier}` }, payload: { subscriberId: workflowService.subscriberId, amountCentavos, method: 'CASH', paymentDate: new Date().toISOString(), idempotencyKey: key } });
+    const partial = await post('100', randomUUID());
+    expect(partial.statusCode, partial.body).toBe(200);
+    const noReconnect = await app.inject({ method: 'GET', url: '/service-control/reconnections?page=1&pageSize=25', headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(noReconnect.json<{ items: { serviceAccountId: string }[] }>().items.some((item) => item.serviceAccountId === workflowService.id)).toBe(false);
+
+    const remainingResult = await database.pool.query<{ total: string }>("select coalesce(sum(balance_centavos),0)::text total from invoices where subscriber_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')", [workflowService.subscriberId]);
+    const remaining = remainingResult.rows[0];
+    const settled = await post(remaining?.total ?? '0', randomUUID());
+    expect(settled.statusCode, settled.body).toBe(200);
+    const reconnections = await app.inject({ method: 'GET', url: '/service-control/reconnections?page=1&pageSize=25', headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(reconnections.statusCode).toBe(200);
+    const reconnection = reconnections.json<{ items: { id: string; serviceAccountId: string; feeCentavos: string }[] }>().items.find((item) => item.serviceAccountId === workflowService.id);
+    expect(reconnection).toMatchObject({ serviceAccountId: workflowService.id, feeCentavos: '50000' });
+    const assigned = await app.inject({ method: 'PATCH', url: `/service-control/reconnections/${reconnection?.id}/assignment`, headers: { authorization: `Bearer ${tokens.admin}` }, payload: { technicianUserId: technicianId, scheduledDate: effectiveDate } });
+    expect(assigned.statusCode, assigned.body).toBe(204);
+    const unassignedCompletion = await app.inject({ method: 'POST', url: `/service-control/reconnections/${reconnection?.id}/complete`, headers: { authorization: `Bearer ${tokens.cashier}` } });
+    expect(unassignedCompletion.statusCode).toBe(403);
+    const technicianFinancial = await app.inject({ method: 'GET', url: '/payments?page=1&pageSize=10', headers: { authorization: `Bearer ${tokens.technician}` } });
+    expect(technicianFinancial.statusCode).toBe(403);
+    const completed = await app.inject({ method: 'POST', url: `/service-control/reconnections/${reconnection?.id}/complete`, headers: { authorization: `Bearer ${tokens.technician}` } });
+    expect(completed.statusCode, completed.body).toBe(204);
+    const directSuspension = await app.inject({ method: 'POST', url: `/subscribers/${workflowService.subscriberId}/services/${workflowService.id}/status`, headers: { authorization: `Bearer ${tokens.admin}` }, payload: { status: 'SUSPENDED', reason: 'Should require the explicit approval workflow' } });
+    expect(directSuspension.statusCode).toBe(409);
+    const history = await app.inject({ method: 'GET', url: `/subscribers/${workflowService.subscriberId}/service-history`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(history.json<ServiceHistory>().events.map((event) => event.type)).toContain('RECONNECTION');
+  });
+
+  it('completes a second synthetic suspension and reconnection for an independently settled subscriber', async () => {
+    const secondServiceResult = await database.pool.query<{ id: string; subscriber_id: string }>(
+      "select id, subscriber_id from service_accounts where service_account_number='SVC-00002-1' and status='ACTIVE'",
+    );
+    const secondService = secondServiceResult.rows[0];
+    if (!secondService) throw new Error('Second synthetic active service is missing');
+    const asOf = new Date().toISOString().slice(0, 10);
+    const arrears = await database.pool.query<{ amount: string }>(
+      "select coalesce(sum(balance_centavos),0)::text amount from invoices where service_account_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')",
+      [secondService.id],
+    );
+    expect(BigInt(arrears.rows[0]?.amount ?? '0')).toBeGreaterThan(0n);
+    const request = await app.inject({ method: 'POST', url: '/service-control/suspensions', headers: { authorization: `Bearer ${tokens.admin}` }, payload: { serviceAccountId: secondService.id, effectiveDate: asOf, reason: 'Second synthetic delinquency scenario' } });
+    expect(request.statusCode, request.body).toBe(201);
+    const suspensionId = request.json<{ id: string }>().id;
+    const approved = await app.inject({ method: 'POST', url: `/service-control/suspensions/${suspensionId}/approve`, headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(approved.statusCode, approved.body).toBe(204);
+
+    const subscriberBalance = await database.pool.query<{ amount: string }>(
+      "select coalesce(sum(balance_centavos),0)::text amount from invoices where subscriber_id=$1 and balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')",
+      [secondService.subscriber_id],
+    );
+    const amount = subscriberBalance.rows[0]?.amount ?? '0';
+    expect(BigInt(amount)).toBeGreaterThan(0n);
+    const payment = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${tokens.cashier}` }, payload: {
+      subscriberId: secondService.subscriber_id, amountCentavos: amount, method: 'CASH', paymentDate: new Date().toISOString(), idempotencyKey: randomUUID(),
+    } });
+    expect(payment.statusCode, payment.body).toBe(200);
+    const queue = await app.inject({ method: 'GET', url: '/service-control/reconnections?page=1&pageSize=25', headers: { authorization: `Bearer ${tokens.admin}` } });
+    expect(queue.statusCode, queue.body).toBe(200);
+    const item = queue.json<{ items: { id: string; serviceAccountId: string }[] }>().items.find((entry) => entry.serviceAccountId === secondService.id);
+    expect(item).toBeDefined();
+    if (!item) throw new Error('Settled second service did not receive a reconnection request');
+    const technicianResult = await database.pool.query<{ id: string }>("select id from users where normalized_username='technician.demo'");
+    const technicianId = technicianResult.rows[0]?.id;
+    if (!technicianId) throw new Error('Synthetic Technician is missing');
+    const assignment = await app.inject({ method: 'PATCH', url: `/service-control/reconnections/${item.id}/assignment`, headers: { authorization: `Bearer ${tokens.admin}` }, payload: { technicianUserId: technicianId, scheduledDate: asOf } });
+    expect(assignment.statusCode, assignment.body).toBe(204);
+    const completed = await app.inject({ method: 'POST', url: `/service-control/reconnections/${item.id}/complete`, headers: { authorization: `Bearer ${tokens.technician}` } });
+    expect(completed.statusCode, completed.body).toBe(204);
+    const state = await database.pool.query<{ status: string; reconnection_status: string }>(
+      'select service.status, reconnect.status reconnection_status from service_accounts service join reconnection_records reconnect on reconnect.service_account_id=service.id where service.id=$1 and reconnect.id=$2',
+      [secondService.id, item.id],
+    );
+    expect(state.rows[0]).toEqual({ status: 'ACTIVE', reconnection_status: 'COMPLETED' });
+  });
+
   it('exports valid PDF/XLSX files and records suspension/reconnection history', async () => {
     const pdf = await app.inject({ method: 'GET', url: '/reports/export?report=AR_AGING&from=2026-01-01&to=2026-12-31&format=PDF', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(pdf.statusCode, pdf.body).toBe(200);
@@ -229,7 +349,7 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
     const userId = actor.rows[0]?.id; const serviceId = service.rows[0]?.id;
     if (!userId || !serviceId) throw new Error('Synthetic history references missing');
-    const suspended = await database.pool.query<{ id: string }>("insert into suspension_records(service_account_id,status,reason,effective_date,approved_by_user_id,notes) values($1,'LIFTED','Synthetic overdue test','2026-10-01',$2,'Reconnected after payment') returning id", [serviceId, userId]);
+    const suspended = await database.pool.query<{ id: string }>("insert into suspension_records(service_account_id,status,reason,effective_date,requested_by_user_id,approved_by_user_id,approved_at,notes) values($1,'LIFTED','Synthetic overdue test','2026-10-01',$2,$2,'2026-10-01T08:00:00Z','Reconnected after payment') returning id", [serviceId, userId]);
     await database.pool.query("insert into reconnection_records(service_account_id,suspension_id,status,fee_centavos,requested_at,completed_at,completed_by_user_id,notes) values($1,$2,'COMPLETED',50000,'2026-10-02T08:00:00Z','2026-10-03T08:00:00Z',$3,'Synthetic completed reconnect')", [serviceId, suspended.rows[0]?.id, userId]);
     const history = await app.inject({ method: 'GET', url: `/subscribers/${subscriberId}/service-history`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(history.statusCode, history.body).toBe(200);

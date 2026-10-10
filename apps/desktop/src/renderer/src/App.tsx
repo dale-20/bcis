@@ -38,6 +38,7 @@ import { PaymentsPage } from './features/payments/PaymentsPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { PlansPage } from './features/services/PlansPage';
+import { ServiceControlPage } from './features/services/ServiceControlPage';
 import { ModulePage } from './features/shell/ModulePage';
 import { ReceivablesPage } from './features/receivables/ReceivablesPage';
 import { defaultPath, hasAnyPermission, pageLabel, visibleNavigation, type NavigationItemId } from './features/shell/navigation';
@@ -117,12 +118,14 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/receivables/outstanding" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="outstanding" /></Allowed>} />
     <Route path="/receivables/overdue" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="overdue" /></Allowed>} />
     <Route path="/receivables/aging" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="aging" /></Allowed>} />
-    <Route path="/receivables/suspensions" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.suspensions} /></Allowed>} />
+    <Route path="/receivables/suspensions" element={<Allowed user={user} permissions={['receivables.view']}><ServiceControlPage mode="candidates" user={user} /></Allowed>} />
     <Route path="/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
+    <Route path="/services/reconnections" element={<Allowed user={user} permissions={['service.reconnection.assign']}><ServiceControlPage mode="reconnections" user={user} /></Allowed>} />
+    <Route path="/services/my-reconnections" element={<Allowed user={user} permissions={['service.reconnection.complete']}><ServiceControlPage mode="my-reconnections" user={user} /></Allowed>} />
     <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage /></Allowed>} />
     <Route path="/administration/users" element={<Allowed user={user} permissions={['user.manage']}><ModulePage {...modulePages.users} /></Allowed>} />
     <Route path="/administration/audit" element={<Allowed user={user} permissions={['audit.view']}><ModulePage {...modulePages.audit} /></Allowed>} />
-    <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><ModulePage {...modulePages.settings} /></Allowed>} />
+    <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><ServiceControlPage mode="policy" user={user} /></Allowed>} />
     <Route path="/administration/backups" element={<Allowed user={user} permissions={['backup.create', 'backup.restore']}><ModulePage {...modulePages.backups} /></Allowed>} />
     <Route path="/connection" element={<SystemConnection />} />
     <Route path="*" element={<Navigate to={fallback} replace />} />

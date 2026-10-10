@@ -11,6 +11,9 @@ Authorization is evaluated by the Fastify API from database-backed role grants o
 | `service.view` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
 | `service.manage` | ✓ | ✓ | — | — | — | — | — |
 | `service.status.update` | ✓ | ✓ | — | — | — | ✓ | — |
+| `service.suspension.manage` | ✓ | ✓ | — | — | — | — | — |
+| `service.reconnection.assign` | ✓ | ✓ | — | — | — | — | — |
+| `service.reconnection.complete` | ✓ | ✓ | — | — | — | ✓ | — |
 | `billing.view` | ✓ | ✓ | ✓ | — | ✓ | — | — |
 | `billing.generate` | ✓ | ✓ | — | — | — | — | — |
 | `billing.adjust` | ✓ | ✓ | — | — | — | — | — |
@@ -59,6 +62,11 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /collection-batches/:id/reconcile` | Valid session and `collection.reconcile` | Records reconciler, time, and notes |
 | `POST /collection-batches/:id/close` | Valid session and `collection.close` | Nonzero variance requires an explicit acknowledgement note |
 | `GET /receivables/aging` | Valid session and `receivables.view` | Server-side aging, overdue filters, totals, and pagination |
+| `GET /receivables/accounts` | Valid session and `receivables.view` | Filtered service-level arrears, overdue subscriber count, oldest due date, last payment, and exact totals |
+| `GET`, `PUT /service-control/policy` | Valid session and `settings.manage` | Read/update grace days, threshold, and reconnection fee; every update is audited |
+| `POST`, `GET /service-control/suspensions`, `POST /service-control/suspensions/:id/approve` | Valid session and `service.suspension.manage` | Delinquency threshold checked on request and rechecked transactionally at approval; approval changes service status and writes event/audit together |
+| `GET /service-control/reconnections`, `GET /service-control/technicians`, `PATCH /service-control/reconnections/:id/assignment` | Valid session and `service.reconnection.assign` | Assign only an active Technician; the operation is audited |
+| `GET /service-control/my-reconnections`, `POST /service-control/reconnections/:id/complete` | Valid session and `service.reconnection.complete`; completion also requires assignment to the signed-in user | Assigned Technician completion reactivates service, lifts its suspension, and records service-history/audit evidence atomically |
 | `GET /system/backups` | Valid session and `backup.create` | Lists bounded backup history; missing permission is audited |
 
 Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hashes. Sessions expire after 30 minutes idle or eight hours absolute time, and inactive users cannot authenticate. Passwords use salted scrypt with production parameters `N=131072`, `r=8`, `p=1`; hashes and tokens are excluded from audit payloads and response objects.

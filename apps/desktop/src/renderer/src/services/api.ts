@@ -1,6 +1,9 @@
 import {
   authResultSchema,
   receivableAgingDesktopResultSchema, receivableAgingQuerySchema,
+  receivableAccountDesktopResultSchema, receivableAccountQuerySchema, servicePolicyDesktopResultSchema,
+  suspensionListDesktopResultSchema, reconnectionListDesktopResultSchema, technicianListDesktopResultSchema,
+  suspensionCreateDesktopResultSchema, serviceControlMutationDesktopResultSchema, serviceControlPolicySchema, createSuspensionInputSchema, reconnectionAssignmentSchema,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -32,6 +35,8 @@ import {
   subscriberListResultSchema,
   type AuthenticatedUser,
   type ReceivableAgingQuery, type ReceivableAgingResponse,
+  type ReceivableAccountQuery, type ReceivableAccountResponse, type ServiceControlPolicy,
+  type CreateSuspensionInput, type ReconnectionAssignment, type ReconnectionListResponse,
   type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput,
   type CollectionAreaCreate,
   type CollectionAreaUpdate,
@@ -342,6 +347,44 @@ export async function getEligibleCollectionPayments(id: string, accountId: strin
 export async function getReceivableAging(query: ReceivableAgingQuery): Promise<ReceivableAgingResponse> {
   const command = receivableAgingQuerySchema.parse(query);
   return unwrap(receivableAgingDesktopResultSchema.parse(await bridge().getReceivableAging(command)));
+}
+
+export async function getReceivableAccounts(query: ReceivableAccountQuery): Promise<ReceivableAccountResponse> {
+  const command = receivableAccountQuerySchema.parse(query);
+  return unwrap(receivableAccountDesktopResultSchema.parse(await bridge().getReceivableAccounts(command)));
+}
+export async function getServiceControlPolicy(): Promise<ServiceControlPolicy> {
+  return unwrap(servicePolicyDesktopResultSchema.parse(await bridge().getServiceControlPolicy()));
+}
+export async function updateServiceControlPolicy(input: ServiceControlPolicy): Promise<ServiceControlPolicy> {
+  const command = serviceControlPolicySchema.parse(input);
+  return unwrap(servicePolicyDesktopResultSchema.parse(await bridge().updateServiceControlPolicy(command)));
+}
+export async function listSuspensions(page = 1, pageSize = 25) {
+  return unwrap(suspensionListDesktopResultSchema.parse(await bridge().listSuspensions(page, pageSize)));
+}
+export async function createSuspension(input: CreateSuspensionInput): Promise<{ id: string }> {
+  const command = createSuspensionInputSchema.parse(input);
+  return unwrap(suspensionCreateDesktopResultSchema.parse(await bridge().createSuspension(command)));
+}
+export async function approveSuspension(id: string): Promise<null> {
+  return unwrap(serviceControlMutationDesktopResultSchema.parse(await bridge().approveSuspension(id)));
+}
+export async function listReconnections(page = 1, pageSize = 25): Promise<ReconnectionListResponse> {
+  return unwrap(reconnectionListDesktopResultSchema.parse(await bridge().listReconnections(page, pageSize)));
+}
+export async function listMyReconnections(page = 1, pageSize = 25): Promise<ReconnectionListResponse> {
+  return unwrap(reconnectionListDesktopResultSchema.parse(await bridge().listMyReconnections(page, pageSize)));
+}
+export async function listTechnicians() {
+  return unwrap(technicianListDesktopResultSchema.parse(await bridge().listTechnicians()));
+}
+export async function assignReconnection(id: string, input: ReconnectionAssignment): Promise<null> {
+  const command = reconnectionAssignmentSchema.parse(input);
+  return unwrap(serviceControlMutationDesktopResultSchema.parse(await bridge().assignReconnection(id, command)));
+}
+export async function completeReconnection(id: string): Promise<null> {
+  return unwrap(serviceControlMutationDesktopResultSchema.parse(await bridge().completeReconnection(id)));
 }
 
 export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {

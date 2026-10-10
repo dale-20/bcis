@@ -13,6 +13,7 @@ import { collectionPlugin } from './collections/plugin.js';
 import { receivablePlugin } from './receivables/plugin.js';
 import { reportPlugin } from './reports/plugin.js';
 import { systemPlugin } from './system/plugin.js';
+import { serviceControlPlugin } from './service-control/plugin.js';
 import { resolve } from 'node:path';
 import { GcashProofStorage } from './payments/proof-storage.js';
 
@@ -77,6 +78,7 @@ export async function buildApp(options: AppOptions) {
       });
       await app.register(collectionPlugin, { authService, database: options.database });
       await app.register(receivablePlugin, { authService, database: options.database });
+      await app.register(serviceControlPlugin, { authService, database: options.database });
       await app.register(reportPlugin, { authService, database: options.database });
       await app.register(systemPlugin, { authService, database: options.database });
     }

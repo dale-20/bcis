@@ -302,9 +302,11 @@ export class SubscriberRepository {
       const [current] = await transaction.select({ status: serviceAccounts.status }).from(serviceAccounts)
         .where(and(eq(serviceAccounts.id, serviceId), eq(serviceAccounts.subscriberId, subscriberId))).limit(1).for('update');
       if (!current) throw new Error('SERVICE_NOT_FOUND');
-      const transitions: Record<typeof current.status, readonly typeof current.status[]> = {
-        PENDING: ['ACTIVE', 'TERMINATED'], ACTIVE: ['SUSPENDED', 'DISCONNECTED', 'TERMINATED'],
-        SUSPENDED: ['ACTIVE', 'DISCONNECTED', 'TERMINATED'], DISCONNECTED: ['ACTIVE', 'TERMINATED'], TERMINATED: [],
+      if (current.status === 'SUSPENDED' || input.status === 'SUSPENDED') throw new Error('SERVICE_CONTROL_WORKFLOW_REQUIRED');
+      type DirectStatus = Exclude<typeof current.status, 'SUSPENDED'>;
+      const transitions: Record<DirectStatus, readonly DirectStatus[]> = {
+        PENDING: ['ACTIVE', 'TERMINATED'], ACTIVE: ['DISCONNECTED', 'TERMINATED'],
+        DISCONNECTED: ['ACTIVE', 'TERMINATED'], TERMINATED: [],
       };
       if (!transitions[current.status].includes(input.status)) throw new Error('SERVICE_STATUS_INVALID');
       await transaction.update(serviceAccounts).set({ status: input.status, updatedAt: new Date() }).where(eq(serviceAccounts.id, serviceId));

@@ -1,12 +1,13 @@
-import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { GcashProofUploadInput, PaymentListQuery, PaymentPreviewQuery, PostPaymentInput, VerifyGcashInput } from '@bcis/shared';
 import { gcashProofMimeTypeSchema } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
-  auditLogs, invoices, ledgerEntries, paymentAllocations, paymentProofs,
-  paymentReversals, payments, receipts, subscriberCredits, subscribers,
+  applicationSettings, auditLogs, invoices, ledgerEntries, paymentAllocations, paymentProofs,
+  paymentReversals, payments, receipts, reconnectionRecords, serviceAccounts, serviceEvents, subscribers, subscriberCredits, suspensionRecords,
 } from '../db/schema.js';
 import { AppError } from '../errors.js';
+import { defaultServiceControlPolicy, serviceControlPolicySchema } from '@bcis/shared';
 import { createHash } from 'node:crypto';
 import { GcashProofStorage } from './proof-storage.js';
 
@@ -358,6 +359,7 @@ export class PaymentRepository {
   }
 
   private async post(transaction: Transaction, paymentId: string, context: ActorContext) {
+    const now = new Date();
     const [payment] = await transaction.select().from(payments).where(eq(payments.id, paymentId)).limit(1).for('update');
     if (!payment || !['POSTED', 'PENDING_VERIFICATION'].includes(payment.status)) throw new Error('PAYMENT_NOT_POSTABLE');
     let remaining = payment.amountCentavos;
@@ -381,11 +383,11 @@ export class PaymentRepository {
         originalAmountCentavos: remaining, remainingAmountCentavos: remaining, status: 'AVAILABLE',
       });
     }
+    await this.requestReconnectionsForSettledServices(transaction, paymentId, payment.subscriberId, context, now);
     const sequenceResult = await transaction.execute<{ value: string }>(sql`SELECT nextval('receipt_number_seq')::text AS value`);
     const sequenceValue = sequenceResult.rows[0]?.value;
     if (!sequenceValue) throw new Error('RECEIPT_NUMBER_FAILED');
     const receiptNumber = `OR-${payment.paymentDate.getUTCFullYear()}-${sequenceValue.padStart(8, '0')}`;
-    const now = new Date();
     await transaction.update(payments).set({ status: 'POSTED', postedByUserId: context.actorUserId, postedAt: now }).where(eq(payments.id, paymentId));
     await transaction.insert(receipts).values({ receiptNumber, paymentId, issuedAt: now, issuedByUserId: context.actorUserId });
     await transaction.insert(ledgerEntries).values({
@@ -400,6 +402,38 @@ export class PaymentRepository {
       newValues: { status: 'POSTED', amountCentavos: payment.amountCentavos.toString(), receiptNumber, allocatedCentavos: (payment.amountCentavos - remaining).toString(), unappliedCreditCentavos: remaining.toString() },
       requestId: context.requestId,
     });
+  }
+
+  private async requestReconnectionsForSettledServices(transaction: Transaction, paymentId: string, subscriberId: string, context: ActorContext, now: Date) {
+    const [setting] = await transaction.select({ value: applicationSettings.value }).from(applicationSettings)
+      .where(eq(applicationSettings.key, 'service_control_policy')).limit(1);
+    const parsedPolicy = setting ? serviceControlPolicySchema.safeParse(setting.value) : null;
+    const reconnectionFeeCentavos = parsedPolicy?.success ? BigInt(parsedPolicy.data.reconnectionFeeCentavos) : BigInt(defaultServiceControlPolicy.reconnectionFeeCentavos);
+    const suspended = await transaction.select({ id: serviceAccounts.id, status: serviceAccounts.status })
+      .from(serviceAccounts).where(and(eq(serviceAccounts.subscriberId, subscriberId), eq(serviceAccounts.status, 'SUSPENDED'))).orderBy(asc(serviceAccounts.id)).for('update');
+    for (const account of suspended) {
+      const [accountAllocation] = await transaction.select({ paymentId: paymentAllocations.paymentId }).from(paymentAllocations)
+        .innerJoin(invoices, eq(paymentAllocations.invoiceId, invoices.id))
+        .where(and(eq(paymentAllocations.paymentId, paymentId), eq(invoices.serviceAccountId, account.id))).limit(1);
+      if (!accountAllocation) continue;
+      const [unpaid] = await transaction.select({ id: invoices.id }).from(invoices)
+        .where(and(eq(invoices.serviceAccountId, account.id), inArray(invoices.status, ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE']), gt(invoices.balanceCentavos, 0n))).limit(1);
+      if (unpaid) continue;
+      const [existing] = await transaction.select({ id: reconnectionRecords.id }).from(reconnectionRecords)
+        .where(and(eq(reconnectionRecords.serviceAccountId, account.id), inArray(reconnectionRecords.status, ['REQUESTED', 'SCHEDULED']))).limit(1);
+      if (existing) continue;
+      const [suspension] = await transaction.select({ id: suspensionRecords.id }).from(suspensionRecords)
+        .where(and(eq(suspensionRecords.serviceAccountId, account.id), eq(suspensionRecords.status, 'ACTIVE'))).orderBy(asc(suspensionRecords.createdAt)).limit(1).for('update');
+      const [record] = await transaction.insert(reconnectionRecords).values({
+        serviceAccountId: account.id, suspensionId: suspension?.id ?? null, feeCentavos: reconnectionFeeCentavos,
+        status: 'REQUESTED', requestedAt: now, notes: 'Created after all open invoice balances were paid.',
+      }).returning({ id: reconnectionRecords.id });
+      if (!record) continue;
+      await transaction.insert(serviceEvents).values({ serviceAccountId: account.id, eventType: 'RECONNECTION_REQUESTED', actorUserId: context.actorUserId,
+        details: { reconnectionId: record.id, trigger: 'ARREARS_SETTLED', feeCentavos: reconnectionFeeCentavos.toString() } });
+      await transaction.insert(auditLogs).values({ actorUserId: context.actorUserId, action: 'service.reconnection.auto_requested', entityType: 'reconnection', entityId: record.id,
+        reason: 'ARREARS_SETTLED', newValues: { serviceAccountId: account.id, suspensionId: suspension?.id ?? null, feeCentavos: reconnectionFeeCentavos.toString() }, requestId: context.requestId });
+    }
   }
 
   private async summary(paymentId: string) {

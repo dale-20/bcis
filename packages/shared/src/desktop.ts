@@ -64,8 +64,20 @@ import {
 } from './payments.js';
 import { collectionBatchListQuerySchema, collectionBatchListSchema, collectionBatchSchema, createCollectionBatchInputSchema, eligibleCollectionPaymentsSchema, recordCollectionInputSchema, remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema, type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput, type EligibleCollectionPayment, type RemittanceInput } from './collections.js';
 import { receivableAgingQuerySchema, receivableAgingResponseSchema, type ReceivableAgingQuery, type ReceivableAgingResponse } from './receivables.js';
+import { createSuspensionInputSchema, receivableAccountQuerySchema, receivableAccountResponseSchema, reconnectionAssignmentSchema, reconnectionListResponseSchema, serviceControlPolicySchema, serviceTechnicianListSchema, suspensionListResponseSchema, type CreateSuspensionInput, type ReceivableAccountQuery, type ReceivableAccountResponse, type ReconnectionAssignment, type ReconnectionListResponse, type ServiceControlPolicy } from './service-control.js';
 
 export const RECEIVABLE_AGING_CHANNEL = 'bcis:receivables:aging';
+export const RECEIVABLE_ACCOUNTS_CHANNEL = 'bcis:receivables:accounts';
+export const SERVICE_POLICY_GET_CHANNEL = 'bcis:service-control:policy:get';
+export const SERVICE_POLICY_UPDATE_CHANNEL = 'bcis:service-control:policy:update';
+export const SUSPENSIONS_LIST_CHANNEL = 'bcis:service-control:suspensions:list';
+export const SUSPENSION_CREATE_CHANNEL = 'bcis:service-control:suspension:create';
+export const SUSPENSION_APPROVE_CHANNEL = 'bcis:service-control:suspension:approve';
+export const RECONNECTIONS_LIST_CHANNEL = 'bcis:service-control:reconnections:list';
+export const RECONNECTIONS_MINE_CHANNEL = 'bcis:service-control:reconnections:mine';
+export const TECHNICIANS_LIST_CHANNEL = 'bcis:service-control:technicians:list';
+export const RECONNECTION_ASSIGN_CHANNEL = 'bcis:service-control:reconnection:assign';
+export const RECONNECTION_COMPLETE_CHANNEL = 'bcis:service-control:reconnection:complete';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -206,6 +218,13 @@ export const collectionBatchListDesktopResultSchema = desktopResult(collectionBa
 export const collectionBatchDesktopResultSchema = desktopResult(collectionBatchSchema);
 export const eligibleCollectionPaymentsDesktopResultSchema = desktopResult(eligibleCollectionPaymentsSchema);
 export const receivableAgingDesktopResultSchema = desktopResult(receivableAgingResponseSchema);
+export const receivableAccountDesktopResultSchema = desktopResult(receivableAccountResponseSchema);
+export const servicePolicyDesktopResultSchema = desktopResult(serviceControlPolicySchema);
+export const suspensionListDesktopResultSchema = desktopResult(suspensionListResponseSchema);
+export const reconnectionListDesktopResultSchema = desktopResult(reconnectionListResponseSchema);
+export const technicianListDesktopResultSchema = desktopResult(serviceTechnicianListSchema);
+export const suspensionCreateDesktopResultSchema = desktopResult(servicePlanCreatedSchema.pick({ id: true }));
+export const serviceControlMutationDesktopResultSchema = desktopResult(z.null());
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -268,6 +287,17 @@ export interface DesktopBridge {
   closeCollectionBatch: (id: string, input: z.infer<typeof closeBatchInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
   getEligibleCollectionPayments: (id: string, accountId: string) => Promise<DesktopResult<EligibleCollectionPayment[]>>;
   getReceivableAging: (query: ReceivableAgingQuery) => Promise<DesktopResult<ReceivableAgingResponse>>;
+  getReceivableAccounts: (query: ReceivableAccountQuery) => Promise<DesktopResult<ReceivableAccountResponse>>;
+  getServiceControlPolicy: () => Promise<DesktopResult<ServiceControlPolicy>>;
+  updateServiceControlPolicy: (policy: ServiceControlPolicy) => Promise<DesktopResult<ServiceControlPolicy>>;
+  listSuspensions: (page: number, pageSize: number) => Promise<DesktopResult<z.infer<typeof suspensionListResponseSchema>>>;
+  createSuspension: (input: CreateSuspensionInput) => Promise<DesktopResult<{ id: string }>>;
+  approveSuspension: (id: string) => Promise<DesktopResult<null>>;
+  listReconnections: (page: number, pageSize: number) => Promise<DesktopResult<ReconnectionListResponse>>;
+  listMyReconnections: (page: number, pageSize: number) => Promise<DesktopResult<ReconnectionListResponse>>;
+  listTechnicians: () => Promise<DesktopResult<z.infer<typeof serviceTechnicianListSchema>>>;
+  assignReconnection: (id: string, input: ReconnectionAssignment) => Promise<DesktopResult<null>>;
+  completeReconnection: (id: string) => Promise<DesktopResult<null>>;
 }
 
 export const desktopRequestSchemas = {
@@ -317,6 +347,13 @@ export const desktopRequestSchemas = {
   collectionReconciliation: z.object({ id: z.uuid(), input: reconciliationInputSchema }),
   collectionClose: z.object({ id: z.uuid(), input: closeBatchInputSchema }),
   receivableAging: receivableAgingQuerySchema,
+  receivableAccounts: receivableAccountQuerySchema,
+  servicePolicy: serviceControlPolicySchema,
+  page: z.object({ page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100) }),
+  suspensionCreate: createSuspensionInputSchema,
+  suspensionId: z.uuid(),
+  reconnectionAssignment: z.object({ id: z.uuid(), input: reconnectionAssignmentSchema }),
+  reconnectionId: z.uuid(),
   gcashProofUpload: gcashProofUploadInputSchema,
 };
 

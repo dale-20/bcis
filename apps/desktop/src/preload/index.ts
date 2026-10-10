@@ -38,6 +38,10 @@ import {
   COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
   COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
   RECEIVABLE_AGING_CHANNEL,
+  RECEIVABLE_ACCOUNTS_CHANNEL, SERVICE_POLICY_GET_CHANNEL, SERVICE_POLICY_UPDATE_CHANNEL,
+  SUSPENSIONS_LIST_CHANNEL, SUSPENSION_CREATE_CHANNEL, SUSPENSION_APPROVE_CHANNEL,
+  RECONNECTIONS_LIST_CHANNEL, RECONNECTIONS_MINE_CHANNEL, TECHNICIANS_LIST_CHANNEL,
+  RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -102,5 +106,16 @@ const bridge: DesktopBridge = Object.freeze({
   closeCollectionBatch: (id: string, input: Parameters<DesktopBridge['closeCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_CLOSE_CHANNEL, { id, input }),
   getEligibleCollectionPayments: (id: string, accountId: string) => ipcRenderer.invoke(COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL, { id, accountId }),
   getReceivableAging: (query: Parameters<DesktopBridge['getReceivableAging']>[0]) => ipcRenderer.invoke(RECEIVABLE_AGING_CHANNEL, query),
+  getReceivableAccounts: (query: Parameters<DesktopBridge['getReceivableAccounts']>[0]) => ipcRenderer.invoke(RECEIVABLE_ACCOUNTS_CHANNEL, query),
+  getServiceControlPolicy: () => ipcRenderer.invoke(SERVICE_POLICY_GET_CHANNEL),
+  updateServiceControlPolicy: (policy: Parameters<DesktopBridge['updateServiceControlPolicy']>[0]) => ipcRenderer.invoke(SERVICE_POLICY_UPDATE_CHANNEL, policy),
+  listSuspensions: (page: number, pageSize: number) => ipcRenderer.invoke(SUSPENSIONS_LIST_CHANNEL, { page, pageSize }),
+  createSuspension: (input: Parameters<DesktopBridge['createSuspension']>[0]) => ipcRenderer.invoke(SUSPENSION_CREATE_CHANNEL, input),
+  approveSuspension: (id: string) => ipcRenderer.invoke(SUSPENSION_APPROVE_CHANNEL, id),
+  listReconnections: (page: number, pageSize: number) => ipcRenderer.invoke(RECONNECTIONS_LIST_CHANNEL, { page, pageSize }),
+  listMyReconnections: (page: number, pageSize: number) => ipcRenderer.invoke(RECONNECTIONS_MINE_CHANNEL, { page, pageSize }),
+  listTechnicians: () => ipcRenderer.invoke(TECHNICIANS_LIST_CHANNEL),
+  assignReconnection: (id: string, input: Parameters<DesktopBridge['assignReconnection']>[1]) => ipcRenderer.invoke(RECONNECTION_ASSIGN_CHANNEL, { id, input }),
+  completeReconnection: (id: string) => ipcRenderer.invoke(RECONNECTION_COMPLETE_CHANNEL, id),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

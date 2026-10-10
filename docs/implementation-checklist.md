@@ -69,16 +69,16 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 **Increment 6 verification:** Collection Supervisor batch UI and report flows are exposed through typed, sender-validated IPC. New service assignments and collector changes persist effective dates; existing assignment rows are not fabricated or backfilled because their original effective dates and actors are not recoverable. Cashier posts the payment first; the supervisor selects an eligible same-day posted receipt for the route account.
 
-**Increment 7 progress:** Outstanding, overdue, and AR aging now use the protected paginated API through the typed Electron preload. The screens support business date, collector, and area filters and show exact outstanding/bucket totals; the aging page explains the day-90 boundary. Delinquency account summaries, overdue subscriber counts, plan/service-type/age filters, configurable policy, suspension approvals, and reconnection scheduling remain open.
+**Increment 7 verification (2026-10-11):** `npm run check` passed (97 tests), `npm run test:integration` passed (63 PostgreSQL tests), and `npm run test:e2e` passed (1 built Electron test). The desktop E2E generated overdue invoices, changed service policy, requested and approved a suspension, settled the subscriber balance through Cash posting, assigned the new reconnection to the Technician, and completed it through the Technician session. Reconnection and payment records were verified in PostgreSQL.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 
-- [ ] Current/overdue receivable, overdue subscriber count, follow-up/suspension candidates.
+- [x] Current/overdue receivable, overdue subscriber count, follow-up/suspension candidates.
 - [x] AR aging: Current, 1–30, 31–60, 61–90, 90+; clarify boundary so day 90 is never counted twice.
-- [ ] Overdue subscriber/service/area/collector, months unpaid, oldest invoice, last payment, arrears.
-- [ ] Filters: collector, area, plan, service type, delinquency age; aging must reconcile to outstanding balances.
-- [ ] Configurable grace/threshold; suspension reason/effective date/approver/notes.
-- [ ] Qualifying payment creates reconnection request, optional fee, technician, request/completion dates; preserve service history.
+- [x] Overdue subscriber/service/area/collector, months unpaid, oldest invoice, last payment, arrears.
+- [x] Filters: collector, area, plan, service type, delinquency age; aging must reconcile to outstanding balances.
+- [x] Configurable grace/threshold; suspension reason/effective date/approver/notes.
+- [x] Qualifying payment creates reconnection request, optional fee, technician, request/completion dates; preserve service history.
 
 ## Milestone 8 — Dashboard and reporting (PDF §§3.11, 4.1–4.3)
 

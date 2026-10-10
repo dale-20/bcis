@@ -5,7 +5,10 @@ export const permissionDefinitions = {
   'plan.manage': 'Create and maintain service plans',
   'service.view': 'View service account operational information',
   'service.manage': 'Create and maintain service accounts',
-  'service.status.update': 'Record suspension and reconnection operations',
+  'service.status.update': 'Activate, disconnect, or terminate services outside controlled suspension and reconnection workflows',
+  'service.suspension.manage': 'Request and approve policy-qualified service suspensions',
+  'service.reconnection.assign': 'Assign technicians and schedule reconnections',
+  'service.reconnection.complete': 'Complete reconnections assigned to the signed-in technician',
   'billing.view': 'View billing cycles and invoices',
   'billing.generate': 'Generate and finalize billing',
   'billing.adjust': 'Request or approve billing adjustments',
@@ -50,8 +53,8 @@ export const roleDefinitions = {
     permissions: ['dashboard.view', 'subscriber.view', 'service.view', 'billing.view', 'collection.view', 'receivables.view', 'report.view', 'report.export', 'audit.view'] as PermissionCode[],
   },
   TECHNICIAN: {
-    name: 'Technician', description: 'Service status and reconnection operations only',
-    permissions: ['subscriber.view', 'service.view', 'service.status.update'] as PermissionCode[],
+    name: 'Technician', description: 'Activate completed installations and complete only assigned reconnection work; no financial actions',
+    permissions: ['subscriber.view', 'service.view', 'service.status.update', 'service.reconnection.complete'] as PermissionCode[],
   },
   VIEWER: {
     name: 'Read-only Viewer', description: 'Read-only dashboards and reports',
