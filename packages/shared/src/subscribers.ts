@@ -75,6 +75,25 @@ export const serviceAccountInputSchema = z.object({
   status: serviceAccountStatusSchema.default('PENDING'),
 });
 
+export const serviceAccountMaintenanceSchema = z.object({
+  serviceAccountNumber: identifierSchema,
+  planId: z.uuid(),
+  installationAddressId: z.uuid(),
+  collectionAreaId: z.uuid().nullable(),
+  assignedCollectorId: z.uuid().nullable(),
+  activationDate: z.iso.date().optional(),
+  billingStartDate: z.iso.date(),
+  billingDay: z.number().int().min(1).max(28),
+  dueDay: z.number().int().min(1).max(31),
+});
+export type ServiceAccountMaintenance = z.infer<typeof serviceAccountMaintenanceSchema>;
+
+export const serviceAccountStatusChangeSchema = z.object({
+  status: serviceAccountStatusSchema,
+  reason: z.string().trim().min(3).max(255),
+});
+export type ServiceAccountStatusChange = z.infer<typeof serviceAccountStatusChangeSchema>;
+
 export const subscriberCreateSchema = z.object({
   accountNumber: identifierSchema,
   firstName: z.string().trim().min(1).max(80),
@@ -187,6 +206,22 @@ export const servicePlanCreateSchema = z.object({
   reconnectionFeeCentavos: centavosSchema.default('0'), speedMbps: z.number().int().positive().optional(),
   channelCount: z.number().int().positive().optional(), description: optionalText(2000),
 });
+export type ServicePlanCreate = z.infer<typeof servicePlanCreateSchema>;
+
+export const servicePlanUpdateSchema = servicePlanCreateSchema;
+export type ServicePlanUpdate = z.infer<typeof servicePlanUpdateSchema>;
+
+export const servicePlanStatusChangeSchema = z.object({
+  isActive: z.boolean(),
+  reason: z.string().trim().min(3).max(255),
+});
+export type ServicePlanStatusChange = z.infer<typeof servicePlanStatusChangeSchema>;
+
+export const servicePlanCatalogSchema = z.object({
+  serviceTypes: z.array(z.object({ id: z.uuid(), code: z.string(), name: z.string(), category: serviceCategorySchema, isActive: z.boolean() })),
+  plans: z.array(servicePlanSchema),
+});
+export type ServicePlanCatalog = z.infer<typeof servicePlanCatalogSchema>;
 
 export const collectionAreaCreateSchema = z.object({
   code: identifierSchema, name: z.string().trim().min(2).max(120), description: optionalText(255),

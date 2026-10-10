@@ -2,7 +2,12 @@ import type { FastifyPluginAsync } from 'fastify';
 import {
   collectionAreaCreateSchema,
   collectorCreateSchema,
+  serviceAccountMaintenanceSchema,
+  serviceAccountStatusChangeSchema,
+  servicePlanCatalogSchema,
   servicePlanCreateSchema,
+  servicePlanStatusChangeSchema,
+  servicePlanUpdateSchema,
   subscriberCreateSchema,
   subscriberDetailSchema,
   subscriberListQuerySchema,
@@ -63,6 +68,9 @@ const referenceDataResponse = { type: 'object', required: ['servicePlans', 'coll
   collectionAreas: { type: 'array', items: { type: 'object', required: ['id', 'code', 'name', 'description'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, code: { type: 'string' }, name: { type: 'string' }, description: { anyOf: [{ type: 'string' }, { type: 'null' }] } } } },
   collectors: { type: 'array', items: { type: 'object', required: ['id', 'collectorNumber', 'name'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, collectorNumber: { type: 'string' }, name: { type: 'string' } } } },
 } } as const;
+const serviceTypeResponse = { type: 'object', required: ['id', 'code', 'name', 'category', 'isActive'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, code: { type: 'string' }, name: { type: 'string' }, category: { type: 'string' }, isActive: { type: 'boolean' } } } as const;
+const servicePlanResponse = referenceDataResponse.properties.servicePlans.items;
+const servicePlanCatalogResponse = { type: 'object', required: ['serviceTypes', 'plans'], additionalProperties: false, properties: { serviceTypes: { type: 'array', items: serviceTypeResponse }, plans: { type: 'array', items: servicePlanResponse } } } as const;
 
 export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = async (app, options) => {
   const service = new SubscriberService(options.database);
@@ -136,6 +144,59 @@ export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = asy
     const context = request.authContext;
     if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
     return reply.code(201).send(await service.createServicePlan(servicePlanCreateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.get('/service-plans', {
+    preHandler: [authenticate, requirePermission(options.authService, 'service.view')],
+    schema: { response: { 200: servicePlanCatalogResponse, 401: errorResponse, 403: errorResponse } },
+  }, async () => servicePlanCatalogSchema.parse(await service.planCatalog()));
+
+  app.patch('/service-plans/:id', {
+    preHandler: [authenticate, requirePermission(options.authService, 'plan.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: servicePlanCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return servicePlanCatalogSchema.parse(await service.updateServicePlan((request.params as { id: string }).id, servicePlanUpdateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/service-plans/:id/status', {
+    preHandler: [authenticate, requirePermission(options.authService, 'plan.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: servicePlanCatalogResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    return servicePlanCatalogSchema.parse(await service.changeServicePlanStatus((request.params as { id: string }).id, servicePlanStatusChangeSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/subscribers/:id/services', {
+    preHandler: [authenticate, requirePermission(options.authService, 'service.manage')],
+    schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 201: subscriberDetailResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request, reply) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const result = await service.createServiceAccount((request.params as { id: string }).id, serviceAccountMaintenanceSchema.parse(request.body), context.userId, request.id);
+    return reply.code(201).send(subscriberDetailSchema.parse(result));
+  });
+
+  app.patch('/subscribers/:id/services/:serviceId', {
+    preHandler: [authenticate, requirePermission(options.authService, 'service.manage')],
+    schema: { params: { type: 'object', required: ['id', 'serviceId'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, serviceId: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: subscriberDetailResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const params = request.params as { id: string; serviceId: string };
+    return subscriberDetailSchema.parse(await service.updateServiceAccount(params.id, params.serviceId, serviceAccountMaintenanceSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/subscribers/:id/services/:serviceId/status', {
+    preHandler: [authenticate, requirePermission(options.authService, 'service.status.update')],
+    schema: { params: { type: 'object', required: ['id', 'serviceId'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, serviceId: { type: 'string', format: 'uuid' } } }, body: { type: 'object' }, response: { 200: subscriberDetailResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const params = request.params as { id: string; serviceId: string };
+    return subscriberDetailSchema.parse(await service.changeServiceAccountStatus(params.id, params.serviceId, serviceAccountStatusChangeSchema.parse(request.body), context.userId, request.id));
   });
 
   app.post('/collection-areas', {

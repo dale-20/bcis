@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { ReferenceData, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
+import type { ReferenceData, ServiceAccountMaintenance, ServicePlanCatalog, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -21,6 +21,7 @@ const testHasher = new PasswordHasher({ cost: 16_384, blockSize: 8, parallelizat
 const accounts: readonly DemoAccount[] = [
   { username: 'admin.demo', displayName: 'Demo Administrator', role: 'ADMIN' },
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
+  { username: 'technician.demo', displayName: 'Demo Technician', role: 'TECHNICIAN' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, testHasher);
@@ -53,12 +54,14 @@ afterAll(async () => {
 describe.sequential('subscriber operations', () => {
   let adminToken = '';
   let cashierToken = '';
+  let technicianToken = '';
   let createdSubscriberId = '';
   let references: ReferenceData;
 
   it('activates Admin and Cashier sessions', async () => {
     adminToken = await activatedToken('admin.demo', 'Synthetic-admin-password-2');
     cashierToken = await activatedToken('cashier.demo', 'Synthetic-cashier-password-2');
+    technicianToken = await activatedToken('technician.demo', 'Synthetic-technician-password-2');
   });
 
   it('serves deterministic server-side pages and global search', async () => {
@@ -180,6 +183,57 @@ describe.sequential('subscriber operations', () => {
     };
     expect((await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${cashierToken}` }, payload: input })).statusCode).toBe(403);
     expect((await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/status`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { status: 'ARCHIVED', reason: 'Cashier must not archive' } })).statusCode).toBe(403);
+  });
+
+  it('creates, edits, and transitions a service account with split permissions and audit history', async () => {
+    const profile = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` } })).json<SubscriberDetail>();
+    const address = profile.addresses[0];
+    const plan = references.servicePlans[0];
+    const area = references.collectionAreas[0];
+    const collector = references.collectors[0];
+    if (!address || !plan || !area || !collector) throw new Error('Synthetic service references missing');
+    const input: ServiceAccountMaintenance = { serviceAccountNumber: 'SVC-90001-3', planId: plan.id, installationAddressId: address.id, collectionAreaId: area.id, assignedCollectorId: collector.id, billingStartDate: '2026-10-01', billingDay: 9, dueDay: 19 };
+    const created = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services`, headers: { authorization: `Bearer ${adminToken}` }, payload: input });
+    expect(created.statusCode).toBe(201);
+    const service = created.json<SubscriberDetail>().services.find((item) => item.serviceAccountNumber === input.serviceAccountNumber);
+    expect(service).toMatchObject({ status: 'PENDING', currentRateCentavos: plan.priceCentavos });
+    if (!service) throw new Error('Created service missing');
+
+    const edited = await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}/services/${service.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { ...input, activationDate: '2026-10-02', billingDay: 10 } });
+    expect(edited.statusCode).toBe(200);
+    expect(edited.json<SubscriberDetail>().services.find((item) => item.id === service.id)).toMatchObject({ activationDate: '2026-10-02', billingDay: 10 });
+    expect((await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}/services/${service.id}`, headers: { authorization: `Bearer ${technicianToken}` }, payload: input })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services/${service.id}/status`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { status: 'ACTIVE', reason: 'Cashier denied transition' } })).statusCode).toBe(403);
+    const activated = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services/${service.id}/status`, headers: { authorization: `Bearer ${technicianToken}` }, payload: { status: 'ACTIVE', reason: 'Installation completed' } });
+    expect(activated.statusCode).toBe(200);
+    expect(activated.json<SubscriberDetail>().services.find((item) => item.id === service.id)?.status).toBe('ACTIVE');
+    const invalid = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/services/${service.id}/status`, headers: { authorization: `Bearer ${technicianToken}` }, payload: { status: 'PENDING', reason: 'Invalid backward transition' } });
+    expect(invalid.statusCode).toBe(409);
+    expect(invalid.json()).toMatchObject({ error: 'SERVICE_STATUS_INVALID' });
+  });
+
+  it('updates future plan rates without changing finalized invoice values', async () => {
+    const catalogResponse = await app.inject({ method: 'GET', url: '/service-plans', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(catalogResponse.statusCode).toBe(200);
+    const catalog = catalogResponse.json<ServicePlanCatalog>();
+    const plan = catalog.plans.find((item) => item.category === 'INTERNET' && item.speedMbps !== null);
+    if (!plan) throw new Error('Synthetic Internet plan missing');
+    const service = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` } })).json<SubscriberDetail>().services.find((item) => item.planId === plan.id);
+    if (!service) throw new Error('Service for plan missing');
+    const user = await database.pool.query<{ id: string }>('SELECT id FROM users WHERE username = $1', ['admin.demo']);
+    const cycle = await database.pool.query<{ id: string }>("INSERT INTO billing_cycles (period_start, period_end, status, finalized_at, finalized_by_user_id) VALUES ('2026-09-01', '2026-09-30', 'FINALIZED', now(), $1) RETURNING id", [user.rows[0]?.id]);
+    await database.pool.query("INSERT INTO invoices (invoice_number, subscriber_id, service_account_id, billing_cycle_id, invoice_date, due_date, status, total_centavos, balance_centavos, finalized_at, finalized_by_user_id) VALUES ('INV-PLAN-HISTORY', $1, $2, $3, '2026-09-01', '2026-09-19', 'UNPAID', $4, $4, now(), $5)", [createdSubscriberId, service.id, cycle.rows[0]?.id, plan.priceCentavos, user.rows[0]?.id]);
+    const nextPrice = (BigInt(plan.priceCentavos) + 10_000n).toString();
+    const updated = await app.inject({ method: 'PATCH', url: `/service-plans/${plan.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { serviceTypeId: plan.serviceTypeId, code: plan.code, name: plan.name, priceCentavos: nextPrice, installationFeeCentavos: plan.installationFeeCentavos, reconnectionFeeCentavos: plan.reconnectionFeeCentavos, speedMbps: plan.speedMbps ?? undefined, channelCount: plan.channelCount ?? undefined, description: plan.description ?? '' } });
+    expect(updated.statusCode).toBe(200);
+    const rate = await database.pool.query<{ current_rate_centavos: string }>('SELECT current_rate_centavos::text FROM service_accounts WHERE id = $1', [service.id]);
+    const invoice = await database.pool.query<{ total_centavos: string }>('SELECT total_centavos::text FROM invoices WHERE invoice_number = $1', ['INV-PLAN-HISTORY']);
+    expect(rate.rows[0]?.current_rate_centavos).toBe(nextPrice);
+    expect(invoice.rows[0]?.total_centavos).toBe(plan.priceCentavos);
+    expect((await app.inject({ method: 'PATCH', url: `/service-plans/${plan.id}`, headers: { authorization: `Bearer ${cashierToken}` }, payload: {} })).statusCode).toBe(403);
+    const deactivated = await app.inject({ method: 'POST', url: `/service-plans/${plan.id}/status`, headers: { authorization: `Bearer ${adminToken}` }, payload: { isActive: false, reason: 'Synthetic plan retirement' } });
+    expect(deactivated.statusCode).toBe(200);
+    expect(deactivated.json<ServicePlanCatalog>().plans.find((item) => item.id === plan.id)?.isActive).toBe(false);
   });
 
   it('blocks archival with live services, then archives and reactivates with immutable audit history', async () => {

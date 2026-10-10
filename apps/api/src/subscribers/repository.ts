@@ -12,7 +12,7 @@ import {
   subscriberContacts,
   subscribers,
 } from '../db/schema.js';
-import type { SubscriberCreate, SubscriberListQuery, SubscriberStatusChange, SubscriberUpdate } from '@bcis/shared';
+import type { ServiceAccountMaintenance, ServiceAccountStatusChange, ServicePlanStatusChange, ServicePlanUpdate, SubscriberCreate, SubscriberListQuery, SubscriberStatusChange, SubscriberUpdate } from '@bcis/shared';
 
 function normalizedContact(type: SubscriberUpdate['contacts'][number]['type'], value: string): string {
   return type === 'EMAIL' ? value.toLowerCase() : value.replace(/[^0-9+]/g, '');
@@ -132,6 +132,118 @@ export class SubscriberRepository {
         .from(collectors).where(eq(collectors.status, 'ACTIVE')).orderBy(asc(collectors.name)),
     ]);
     return { plans, areas, collectors: collectorRows };
+  }
+
+  async planCatalog() {
+    const types = await this.database.db.select().from(serviceTypes).orderBy(asc(serviceTypes.name));
+    const plans = await this.database.db.select({
+      id: servicePlans.id, serviceTypeId: serviceTypes.id, serviceTypeName: serviceTypes.name,
+      category: serviceTypes.category, code: servicePlans.code, name: servicePlans.name,
+      priceCentavos: servicePlans.priceCentavos, installationFeeCentavos: servicePlans.installationFeeCentavos,
+      reconnectionFeeCentavos: servicePlans.reconnectionFeeCentavos, speedMbps: servicePlans.speedMbps,
+      channelCount: servicePlans.channelCount, description: servicePlans.description, isActive: servicePlans.isActive,
+    }).from(servicePlans).innerJoin(serviceTypes, eq(servicePlans.serviceTypeId, serviceTypes.id))
+      .orderBy(asc(serviceTypes.category), asc(servicePlans.code));
+    return { types, plans };
+  }
+
+  async createService(subscriberId: string, input: ServiceAccountMaintenance, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [subscriber] = await transaction.select({ id: subscribers.id }).from(subscribers).where(eq(subscribers.id, subscriberId)).limit(1).for('update');
+      if (!subscriber) throw new Error('SUBSCRIBER_NOT_FOUND');
+      const [plan] = await transaction.select({ id: servicePlans.id, price: servicePlans.priceCentavos }).from(servicePlans)
+        .where(and(eq(servicePlans.id, input.planId), eq(servicePlans.isActive, true))).limit(1);
+      const [address] = await transaction.select({ id: subscriberAddresses.id }).from(subscriberAddresses)
+        .where(and(eq(subscriberAddresses.id, input.installationAddressId), eq(subscriberAddresses.subscriberId, subscriberId))).limit(1);
+      if (!plan || !address) throw new Error('REFERENCE_NOT_FOUND');
+      if (input.collectionAreaId) {
+        const [area] = await transaction.select({ id: collectionAreas.id }).from(collectionAreas).where(and(eq(collectionAreas.id, input.collectionAreaId), eq(collectionAreas.status, 'ACTIVE'))).limit(1);
+        if (!area) throw new Error('REFERENCE_NOT_FOUND');
+      }
+      if (input.assignedCollectorId) {
+        const [collector] = await transaction.select({ id: collectors.id }).from(collectors).where(and(eq(collectors.id, input.assignedCollectorId), eq(collectors.status, 'ACTIVE'))).limit(1);
+        if (!collector) throw new Error('REFERENCE_NOT_FOUND');
+      }
+      const [created] = await transaction.insert(serviceAccounts).values({
+        ...input, subscriberId, currentRateCentavos: plan.price, status: 'PENDING',
+      }).returning({ id: serviceAccounts.id });
+      if (!created) throw new Error('SERVICE_INSERT_FAILED');
+      await transaction.insert(serviceEvents).values({ serviceAccountId: created.id, eventType: 'SERVICE_ACCOUNT_CREATED', actorUserId, details: { status: 'PENDING', planId: input.planId } });
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'service_account.created', entityType: 'service_account', entityId: created.id, newValues: input, requestId });
+      return created.id;
+    });
+  }
+
+  async updateService(subscriberId: string, serviceId: string, input: ServiceAccountMaintenance, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select().from(serviceAccounts)
+        .where(and(eq(serviceAccounts.id, serviceId), eq(serviceAccounts.subscriberId, subscriberId))).limit(1).for('update');
+      if (!current) throw new Error('SERVICE_NOT_FOUND');
+      if (current.status === 'TERMINATED') throw new Error('SERVICE_TERMINATED');
+      const [plan] = await transaction.select({ id: servicePlans.id, price: servicePlans.priceCentavos }).from(servicePlans)
+        .where(and(eq(servicePlans.id, input.planId), eq(servicePlans.isActive, true))).limit(1);
+      const [address] = await transaction.select({ id: subscriberAddresses.id }).from(subscriberAddresses)
+        .where(and(eq(subscriberAddresses.id, input.installationAddressId), eq(subscriberAddresses.subscriberId, subscriberId))).limit(1);
+      if (!plan || !address) throw new Error('REFERENCE_NOT_FOUND');
+      if (input.collectionAreaId) {
+        const [area] = await transaction.select({ id: collectionAreas.id }).from(collectionAreas).where(and(eq(collectionAreas.id, input.collectionAreaId), eq(collectionAreas.status, 'ACTIVE'))).limit(1);
+        if (!area) throw new Error('REFERENCE_NOT_FOUND');
+      }
+      if (input.assignedCollectorId) {
+        const [collector] = await transaction.select({ id: collectors.id }).from(collectors).where(and(eq(collectors.id, input.assignedCollectorId), eq(collectors.status, 'ACTIVE'))).limit(1);
+        if (!collector) throw new Error('REFERENCE_NOT_FOUND');
+      }
+      await transaction.update(serviceAccounts).set({ ...input, currentRateCentavos: plan.price, updatedAt: new Date() }).where(eq(serviceAccounts.id, serviceId));
+      const oldValues = { serviceAccountNumber: current.serviceAccountNumber, planId: current.planId, installationAddressId: current.installationAddressId, collectionAreaId: current.collectionAreaId, assignedCollectorId: current.assignedCollectorId, activationDate: current.activationDate, billingStartDate: current.billingStartDate, billingDay: current.billingDay, dueDay: current.dueDay, currentRateCentavos: current.currentRateCentavos.toString() };
+      await transaction.insert(serviceEvents).values({ serviceAccountId: serviceId, eventType: 'SERVICE_ACCOUNT_UPDATED', actorUserId, details: { oldValues, newValues: input } });
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'service_account.updated', entityType: 'service_account', entityId: serviceId, oldValues, newValues: input, requestId });
+      return serviceId;
+    });
+  }
+
+  async changeServiceStatus(subscriberId: string, serviceId: string, input: ServiceAccountStatusChange, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ status: serviceAccounts.status }).from(serviceAccounts)
+        .where(and(eq(serviceAccounts.id, serviceId), eq(serviceAccounts.subscriberId, subscriberId))).limit(1).for('update');
+      if (!current) throw new Error('SERVICE_NOT_FOUND');
+      const transitions: Record<typeof current.status, readonly typeof current.status[]> = {
+        PENDING: ['ACTIVE', 'TERMINATED'], ACTIVE: ['SUSPENDED', 'DISCONNECTED', 'TERMINATED'],
+        SUSPENDED: ['ACTIVE', 'DISCONNECTED', 'TERMINATED'], DISCONNECTED: ['ACTIVE', 'TERMINATED'], TERMINATED: [],
+      };
+      if (!transitions[current.status].includes(input.status)) throw new Error('SERVICE_STATUS_INVALID');
+      await transaction.update(serviceAccounts).set({ status: input.status, updatedAt: new Date() }).where(eq(serviceAccounts.id, serviceId));
+      await transaction.insert(serviceEvents).values({ serviceAccountId: serviceId, eventType: 'SERVICE_STATUS_CHANGED', actorUserId, reason: input.reason, details: { from: current.status, to: input.status } });
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'service_account.status_changed', entityType: 'service_account', entityId: serviceId, reason: input.reason, oldValues: { status: current.status }, newValues: { status: input.status }, requestId });
+      return serviceId;
+    });
+  }
+
+  async updatePlan(id: string, input: ServicePlanUpdate, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select().from(servicePlans).where(eq(servicePlans.id, id)).limit(1).for('update');
+      if (!current) throw new Error('PLAN_NOT_FOUND');
+      const [type] = await transaction.select().from(serviceTypes).where(eq(serviceTypes.id, input.serviceTypeId)).limit(1);
+      if (!type) throw new Error('SERVICE_TYPE_NOT_FOUND');
+      const nextPrice = BigInt(input.priceCentavos);
+      await transaction.update(servicePlans).set({ ...input, priceCentavos: nextPrice, installationFeeCentavos: BigInt(input.installationFeeCentavos), reconnectionFeeCentavos: BigInt(input.reconnectionFeeCentavos), updatedAt: new Date() }).where(eq(servicePlans.id, id));
+      if (current.priceCentavos !== nextPrice) {
+        await transaction.update(serviceAccounts).set({ currentRateCentavos: nextPrice, updatedAt: new Date() })
+          .where(and(eq(serviceAccounts.planId, id), notInArray(serviceAccounts.status, ['TERMINATED'])));
+      }
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'service_plan.updated', entityType: 'service_plan', entityId: id, oldValues: { ...current, priceCentavos: current.priceCentavos.toString(), installationFeeCentavos: current.installationFeeCentavos.toString(), reconnectionFeeCentavos: current.reconnectionFeeCentavos.toString() }, newValues: input, requestId });
+      return id;
+    });
+  }
+
+  async changePlanStatus(id: string, input: ServicePlanStatusChange, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ isActive: servicePlans.isActive }).from(servicePlans).where(eq(servicePlans.id, id)).limit(1).for('update');
+      if (!current) throw new Error('PLAN_NOT_FOUND');
+      if (current.isActive === input.isActive) throw new Error('PLAN_STATUS_UNCHANGED');
+      await transaction.update(servicePlans).set({ isActive: input.isActive, updatedAt: new Date() }).where(eq(servicePlans.id, id));
+      await transaction.insert(auditLogs).values({ actorUserId, action: 'service_plan.status_changed', entityType: 'service_plan', entityId: id, reason: input.reason, oldValues: { isActive: current.isActive }, newValues: { isActive: input.isActive }, requestId });
+      return id;
+    });
   }
 
   async create(input: SubscriberCreate, actorUserId: string, requestId: string) {

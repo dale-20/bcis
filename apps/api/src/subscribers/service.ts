@@ -1,7 +1,11 @@
 import type {
   CollectionAreaCreate,
   CollectorCreate,
+  ServiceAccountMaintenance,
+  ServiceAccountStatusChange,
   ServicePlanCreate,
+  ServicePlanStatusChange,
+  ServicePlanUpdate,
   SubscriberCreate,
   SubscriberDetail,
   SubscriberListQuery,
@@ -18,6 +22,11 @@ import { eq } from 'drizzle-orm';
 function databaseCode(error: unknown): string | undefined {
   const cause = error instanceof Error && 'cause' in error ? error.cause : error;
   return typeof cause === 'object' && cause !== null && 'code' in cause && typeof cause.code === 'string' ? cause.code : undefined;
+}
+
+function assertPlanAttributes(category: 'INTERNET' | 'CABLE' | 'COMBO', input: ServicePlanCreate | ServicePlanUpdate): void {
+  if ((category === 'INTERNET' || category === 'COMBO') && input.speedMbps === undefined) throw new AppError(400, 'PLAN_SPEED_REQUIRED', 'Internet and Combo plans require a speed');
+  if ((category === 'CABLE' || category === 'COMBO') && input.channelCount === undefined) throw new AppError(400, 'PLAN_CHANNELS_REQUIRED', 'Cable and Combo plans require a channel count');
 }
 
 export class SubscriberService {
@@ -117,9 +126,10 @@ export class SubscriberService {
   }
 
   async createServicePlan(input: ServicePlanCreate, actorUserId: string, requestId: string) {
-    const [type] = await this.database.db.select({ id: serviceTypes.id }).from(serviceTypes)
+    const [type] = await this.database.db.select({ id: serviceTypes.id, category: serviceTypes.category }).from(serviceTypes)
       .where(eq(serviceTypes.id, input.serviceTypeId)).limit(1);
     if (!type) throw new AppError(400, 'SERVICE_TYPE_NOT_FOUND', 'Service type not found');
+    assertPlanAttributes(type.category, input);
     try {
       const [plan] = await this.database.db.transaction(async (transaction) => {
         const created = await transaction.insert(servicePlans).values({
@@ -136,6 +146,75 @@ export class SubscriberService {
       return plan;
     } catch (error) {
       if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_PLAN_CODE', 'Plan code is already in use');
+      throw error;
+    }
+  }
+
+  async planCatalog() {
+    const catalog = await this.repository.planCatalog();
+    return {
+      serviceTypes: catalog.types,
+      plans: catalog.plans.map((plan) => ({ ...plan, priceCentavos: plan.priceCentavos.toString(), installationFeeCentavos: plan.installationFeeCentavos.toString(), reconnectionFeeCentavos: plan.reconnectionFeeCentavos.toString() })),
+    };
+  }
+
+  async updateServicePlan(id: string, input: ServicePlanUpdate, actorUserId: string, requestId: string) {
+    const [type] = await this.database.db.select({ category: serviceTypes.category }).from(serviceTypes).where(eq(serviceTypes.id, input.serviceTypeId)).limit(1);
+    if (!type) throw new AppError(400, 'SERVICE_TYPE_NOT_FOUND', 'Service type not found');
+    assertPlanAttributes(type.category, input);
+    try {
+      await this.repository.updatePlan(id, input, actorUserId, requestId);
+      return await this.planCatalog();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PLAN_NOT_FOUND') throw new AppError(404, 'PLAN_NOT_FOUND', 'Service plan not found');
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_PLAN_CODE', 'Plan code is already in use');
+      throw error;
+    }
+  }
+
+  async changeServicePlanStatus(id: string, input: ServicePlanStatusChange, actorUserId: string, requestId: string) {
+    try {
+      await this.repository.changePlanStatus(id, input, actorUserId, requestId);
+      return await this.planCatalog();
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PLAN_NOT_FOUND') throw new AppError(404, 'PLAN_NOT_FOUND', 'Service plan not found');
+      if (error instanceof Error && error.message === 'PLAN_STATUS_UNCHANGED') throw new AppError(409, 'PLAN_STATUS_UNCHANGED', 'The service plan already has this status');
+      throw error;
+    }
+  }
+
+  async createServiceAccount(subscriberId: string, input: ServiceAccountMaintenance, actorUserId: string, requestId: string): Promise<SubscriberDetail> {
+    try {
+      await this.repository.createService(subscriberId, input, actorUserId, requestId);
+      return await this.get(subscriberId);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SUBSCRIBER_NOT_FOUND') throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
+      if (error instanceof Error && error.message === 'REFERENCE_NOT_FOUND') throw new AppError(400, 'REFERENCE_NOT_FOUND', 'A selected plan, address, area, or collector is unavailable');
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_SERVICE_NUMBER', 'Service account number is already in use');
+      throw error;
+    }
+  }
+
+  async updateServiceAccount(subscriberId: string, serviceId: string, input: ServiceAccountMaintenance, actorUserId: string, requestId: string): Promise<SubscriberDetail> {
+    try {
+      await this.repository.updateService(subscriberId, serviceId, input, actorUserId, requestId);
+      return await this.get(subscriberId);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SERVICE_NOT_FOUND') throw new AppError(404, 'SERVICE_NOT_FOUND', 'Service account not found');
+      if (error instanceof Error && error.message === 'SERVICE_TERMINATED') throw new AppError(409, 'SERVICE_TERMINATED', 'A terminated service account cannot be edited');
+      if (error instanceof Error && error.message === 'REFERENCE_NOT_FOUND') throw new AppError(400, 'REFERENCE_NOT_FOUND', 'A selected plan, address, area, or collector is unavailable');
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_SERVICE_NUMBER', 'Service account number is already in use');
+      throw error;
+    }
+  }
+
+  async changeServiceAccountStatus(subscriberId: string, serviceId: string, input: ServiceAccountStatusChange, actorUserId: string, requestId: string): Promise<SubscriberDetail> {
+    try {
+      await this.repository.changeServiceStatus(subscriberId, serviceId, input, actorUserId, requestId);
+      return await this.get(subscriberId);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SERVICE_NOT_FOUND') throw new AppError(404, 'SERVICE_NOT_FOUND', 'Service account not found');
+      if (error instanceof Error && error.message === 'SERVICE_STATUS_INVALID') throw new AppError(409, 'SERVICE_STATUS_INVALID', 'This service status change is not allowed');
       throw error;
     }
   }

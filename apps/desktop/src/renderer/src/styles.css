@@ -264,6 +264,8 @@
   .service-rate { @apply flex flex-col text-right; }
   .service-rate strong { @apply font-semibold tabular-nums; }
   .service-rate span { @apply mt-1 text-xs text-secondary; }
+  .service-row-actions { @apply mt-2 flex justify-end gap-2; }
+  .service-row-actions button { @apply border-0 bg-transparent p-0 text-xs font-medium text-primary hover:text-primary-hover; }
   .service-meta { @apply col-start-2 col-end-4 m-0 grid grid-cols-3 gap-4; }
   .service-meta dt { @apply flex items-center gap-1.5 text-xs text-secondary; }
   .service-meta dt svg { @apply size-3.5; }
@@ -301,14 +303,32 @@
   .form-actions { @apply sticky bottom-0 flex justify-end gap-3 border-t border-border bg-canvas/95 py-4; backdrop-filter: blur(12px); }
   .dialog-backdrop { @apply fixed inset-0 z-50 flex items-center justify-center p-6; background: rgba(8, 20, 39, .46); backdrop-filter: blur(5px); }
   .edit-dialog { @apply flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-canvas; box-shadow: 0 30px 80px rgba(8, 20, 39, .25); }
+  .service-dialog { @apply max-h-[calc(100vh-3rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface; box-shadow: 0 30px 80px rgba(8, 20, 39, .25); }
   .status-dialog { @apply w-full max-w-md rounded-2xl border border-border bg-surface p-6; box-shadow: 0 30px 80px rgba(8, 20, 39, .25); }
   .dialog-heading { @apply flex items-start justify-between gap-5 border-b border-border bg-surface px-6 py-5; }
   .status-dialog .dialog-heading { @apply -mx-6 -mt-6 mb-5; }
   .dialog-heading h2 { @apply text-lg; }
   .dialog-heading p { @apply mt-1 text-sm text-secondary; }
   .edit-form { @apply overflow-y-auto p-6; }
+  .service-form { @apply p-6; }
+  .service-alert { @apply mx-6 mt-5; }
+  .two-columns { @apply grid-cols-2; }
   .edit-form .form-actions { @apply -mx-6 -mb-6 px-6; }
   .status-dialog .form-actions { @apply static mt-6 -mb-2 bg-surface py-2; }
+  .plan-grid { @apply grid grid-cols-3 gap-5 p-5; }
+  .plan-card { @apply flex flex-col rounded-xl border border-border bg-surface p-5; }
+  .plan-card-heading { @apply flex items-start justify-between gap-4; }
+  .plan-card-heading > div > span { @apply text-[10px] font-semibold tracking-widest text-primary; }
+  .plan-card-heading h2 { @apply mt-1 text-base; }
+  .plan-card-heading p { @apply mt-1 text-xs text-secondary; }
+  .plan-price { @apply mt-5 text-2xl font-semibold tabular-nums; }
+  .plan-price small { @apply ml-1 text-xs font-normal text-secondary; }
+  .plan-card dl { @apply my-5 grid grid-cols-2 gap-3 border-y border-border py-4; }
+  .plan-card dl div { @apply min-w-0; }
+  .plan-card dt { @apply text-[10px] uppercase tracking-wide text-secondary; }
+  .plan-card dd { @apply m-0 mt-1 text-xs font-medium tabular-nums; }
+  .plan-description { @apply flex-1 text-xs leading-5 text-secondary; }
+  .plan-card footer { @apply mt-5 flex gap-2; }
 
   @keyframes content-arrive { from { opacity: .01; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes skeleton-shift { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
@@ -320,6 +340,7 @@
     .profile-grid { @apply grid-cols-1; }
     .profile-aside { @apply grid grid-cols-2; }
     .three-columns { @apply grid-cols-2; }
+    .plan-grid { @apply grid-cols-2; }
     .module-ready ul { @apply grid-cols-1; }
   }
   @media (prefers-reduced-transparency: reduce) { .topbar { @apply bg-surface; backdrop-filter: none; } }

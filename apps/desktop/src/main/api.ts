@@ -1,11 +1,19 @@
 import {
   authenticatedUserSchema,
   referenceDataSchema,
+  servicePlanCatalogSchema,
+  servicePlanCreatedSchema,
   subscriberDetailSchema,
   subscriberListResponseSchema,
   type AuthenticatedUser,
   type DesktopResult,
   type ReferenceData,
+  type ServiceAccountMaintenance,
+  type ServiceAccountStatusChange,
+  type ServicePlanCatalog,
+  type ServicePlanCreate,
+  type ServicePlanStatusChange,
+  type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
   type SubscriberListQuery,
@@ -80,6 +88,34 @@ export class DesktopApiClient {
 
   changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<DesktopResult<SubscriberDetail>> {
     return this.call(`/subscribers/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  createServiceAccount(subscriberId: string, input: ServiceAccountMaintenance): Promise<DesktopResult<SubscriberDetail>> {
+    return this.call(`/subscribers/${encodeURIComponent(subscriberId)}/services`, { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  updateServiceAccount(subscriberId: string, serviceId: string, input: ServiceAccountMaintenance): Promise<DesktopResult<SubscriberDetail>> {
+    return this.call(`/subscribers/${encodeURIComponent(subscriberId)}/services/${encodeURIComponent(serviceId)}`, { method: 'PATCH', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  changeServiceAccountStatus(subscriberId: string, serviceId: string, input: ServiceAccountStatusChange): Promise<DesktopResult<SubscriberDetail>> {
+    return this.call(`/subscribers/${encodeURIComponent(subscriberId)}/services/${encodeURIComponent(serviceId)}/status`, { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  getServicePlans(): Promise<DesktopResult<ServicePlanCatalog>> {
+    return this.call('/service-plans', { method: 'GET' }, servicePlanCatalogSchema);
+  }
+
+  createServicePlan(input: ServicePlanCreate): Promise<DesktopResult<{ id: string; code: string; name: string }>> {
+    return this.call('/service-plans', { method: 'POST', body: JSON.stringify(input) }, servicePlanCreatedSchema);
+  }
+
+  updateServicePlan(id: string, input: ServicePlanUpdate): Promise<DesktopResult<ServicePlanCatalog>> {
+    return this.call(`/service-plans/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }, servicePlanCatalogSchema);
+  }
+
+  changeServicePlanStatus(id: string, input: ServicePlanStatusChange): Promise<DesktopResult<ServicePlanCatalog>> {
+    return this.call(`/service-plans/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, servicePlanCatalogSchema);
   }
 
   getReferenceData(): Promise<DesktopResult<ReferenceData>> {

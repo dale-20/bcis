@@ -3,6 +3,13 @@ import {
   changePasswordInputSchema,
   loginInputSchema,
   referenceDataResultSchema,
+  serviceAccountMaintenanceSchema,
+  serviceAccountStatusChangeSchema,
+  servicePlanCatalogResultSchema,
+  servicePlanCreateSchema,
+  servicePlanCreatedResultSchema,
+  servicePlanStatusChangeSchema,
+  servicePlanUpdateSchema,
   sessionResultSchema,
   subscriberCreateSchema,
   subscriberStatusChangeSchema,
@@ -12,6 +19,12 @@ import {
   subscriberListResultSchema,
   type AuthenticatedUser,
   type ReferenceData,
+  type ServiceAccountMaintenance,
+  type ServiceAccountStatusChange,
+  type ServicePlanCatalog,
+  type ServicePlanCreate,
+  type ServicePlanStatusChange,
+  type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
   type SubscriberListQuery,
@@ -82,6 +95,40 @@ export async function updateSubscriber(id: string, input: SubscriberUpdate): Pro
 export async function changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<SubscriberDetail> {
   const command = subscriberStatusChangeSchema.parse(input);
   return unwrap(subscriberDetailResultSchema.parse(await bridge().changeSubscriberStatus(id, command)));
+}
+
+export async function createServiceAccount(subscriberId: string, input: ServiceAccountMaintenance): Promise<SubscriberDetail> {
+  const command = serviceAccountMaintenanceSchema.parse(input);
+  return unwrap(subscriberDetailResultSchema.parse(await bridge().createServiceAccount(subscriberId, command)));
+}
+
+export async function updateServiceAccount(subscriberId: string, serviceId: string, input: ServiceAccountMaintenance): Promise<SubscriberDetail> {
+  const command = serviceAccountMaintenanceSchema.parse(input);
+  return unwrap(subscriberDetailResultSchema.parse(await bridge().updateServiceAccount(subscriberId, serviceId, command)));
+}
+
+export async function changeServiceAccountStatus(subscriberId: string, serviceId: string, input: ServiceAccountStatusChange): Promise<SubscriberDetail> {
+  const command = serviceAccountStatusChangeSchema.parse(input);
+  return unwrap(subscriberDetailResultSchema.parse(await bridge().changeServiceAccountStatus(subscriberId, serviceId, command)));
+}
+
+export async function getServicePlans(): Promise<ServicePlanCatalog> {
+  return unwrap(servicePlanCatalogResultSchema.parse(await bridge().getServicePlans()));
+}
+
+export async function createServicePlan(input: ServicePlanCreate): Promise<{ id: string; code: string; name: string }> {
+  const command = servicePlanCreateSchema.parse(input);
+  return unwrap(servicePlanCreatedResultSchema.parse(await bridge().createServicePlan(command)));
+}
+
+export async function updateServicePlan(id: string, input: ServicePlanUpdate): Promise<ServicePlanCatalog> {
+  const command = servicePlanUpdateSchema.parse(input);
+  return unwrap(servicePlanCatalogResultSchema.parse(await bridge().updateServicePlan(id, command)));
+}
+
+export async function changeServicePlanStatus(id: string, input: ServicePlanStatusChange): Promise<ServicePlanCatalog> {
+  const command = servicePlanStatusChangeSchema.parse(input);
+  return unwrap(servicePlanCatalogResultSchema.parse(await bridge().changeServicePlanStatus(id, command)));
 }
 
 export async function getReferenceData(): Promise<ReferenceData> {

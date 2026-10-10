@@ -57,7 +57,7 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 - Complete subscriber profile tabs: overview, services, billing, payments, ledger, collection, history, documents, and audit.
 - Preserve all history through statuses and dated assignment/service events; never delete historical subscribers or services.
 
-Progress: subscriber identity, notes, contacts, and addresses now support audited editing. Archive/reactivate is permission-protected, reason-required, and blocked while billable services remain. Cashier mutation denial and transaction rollback are covered by integration tests. Service, plan, collector, area, profile-tab, and global financial search work remains in this increment.
+Progress: subscriber identity, notes, contacts, and addresses now support audited editing. Archive/reactivate is permission-protected, reason-required, and blocked while billable services remain. Service accounts support audited create/edit/status operations with separate maintenance and technician status permissions. Plans support create/edit/activate/deactivate; rate changes update future service rates without mutating finalized invoices. Cashier denial, transaction rollback, status transitions, and historical invoice preservation are covered by PostgreSQL integration tests. Collector, area, profile-tab, and global financial search work remains in this increment.
 
 **Gate:** Admin can maintain master data; Cashier can search/view but receives 403 for mutations; plan-rate changes do not alter finalized invoices.
 

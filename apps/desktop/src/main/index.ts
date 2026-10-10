@@ -11,6 +11,13 @@ import {
   desktopRequestSchemas,
   HEALTH_CHANNEL,
   REFERENCE_DATA_CHANNEL,
+  PLANS_CREATE_CHANNEL,
+  PLANS_LIST_CHANNEL,
+  PLANS_STATUS_CHANNEL,
+  PLANS_UPDATE_CHANNEL,
+  SERVICES_CREATE_CHANNEL,
+  SERVICES_STATUS_CHANNEL,
+  SERVICES_UPDATE_CHANNEL,
   SUBSCRIBERS_CREATE_CHANNEL,
   SUBSCRIBERS_STATUS_CHANNEL,
   SUBSCRIBERS_UPDATE_CHANNEL,
@@ -68,6 +75,13 @@ void app.whenReady().then(() => {
   ipcMain.handle(SUBSCRIBERS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createSubscriber(desktopRequestSchemas.subscriberCreate.parse(input)); });
   ipcMain.handle(SUBSCRIBERS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberUpdate.parse(input); return api.updateSubscriber(command.id, command.input); });
   ipcMain.handle(SUBSCRIBERS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberStatus.parse(input); return api.changeSubscriberStatus(command.id, command.input); });
+  ipcMain.handle(SERVICES_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceCreate.parse(input); return api.createServiceAccount(command.subscriberId, command.input); });
+  ipcMain.handle(SERVICES_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceUpdate.parse(input); return api.updateServiceAccount(command.subscriberId, command.serviceId, command.input); });
+  ipcMain.handle(SERVICES_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.serviceStatus.parse(input); return api.changeServiceAccountStatus(command.subscriberId, command.serviceId, command.input); });
+  ipcMain.handle(PLANS_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.getServicePlans(); });
+  ipcMain.handle(PLANS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createServicePlan(desktopRequestSchemas.planCreate.parse(input)); });
+  ipcMain.handle(PLANS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.planUpdate.parse(input); return api.updateServicePlan(command.id, command.input); });
+  ipcMain.handle(PLANS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.planStatus.parse(input); return api.changeServicePlanStatus(command.id, command.input); });
   ipcMain.handle(REFERENCE_DATA_CHANNEL, (event) => { assertTrustedSender(event); return api.getReferenceData(); });
   ipcMain.handle(DASHBOARD_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getDashboard(desktopRequestSchemas.dashboard.parse(input)); });
   ipcMain.handle(REPORT_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReport(desktopRequestSchemas.report.parse(input)); });

@@ -69,11 +69,14 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('row', { name: 'Open Amihan Abad' }).click();
     await expect(page.getByRole('heading', { name: 'Amihan Abad' })).toBeVisible();
     await expect(page.getByText('SVC-00001-2')).toBeVisible();
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit subscriber', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Edit subscriber' })).toBeVisible();
     await page.getByLabel('Notes').fill('Verified through the desktop subscriber workflow.');
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Verified through the desktop subscriber workflow.')).toBeVisible();
+    await page.locator('.service-row').first().getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit service account' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await page.screenshot({ path: 'test-results/subscriber-profile.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
     await expect(page.getByRole('button', { name: 'New subscriber' })).toBeVisible();
@@ -82,8 +85,15 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.screenshot({ path: 'test-results/subscriber-form.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
 
+    await page.getByRole('link', { name: 'Services', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Services & plans' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New plan' })).toBeVisible();
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Edit service plan' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changePassword', 'changeSubscriberStatus', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateSubscriber'].sort(),
+      bridge: ['changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
       node: false,
       process: false,
     });

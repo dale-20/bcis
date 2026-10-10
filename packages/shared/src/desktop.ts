@@ -1,13 +1,25 @@
 import { z } from 'zod';
 import {
   referenceDataSchema,
+  serviceAccountMaintenanceSchema,
+  serviceAccountStatusChangeSchema,
+  servicePlanCatalogSchema,
   subscriberCreateSchema,
   subscriberDetailSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
   subscriberStatusChangeSchema,
   subscriberUpdateSchema,
+  servicePlanCreateSchema,
+  servicePlanStatusChangeSchema,
+  servicePlanUpdateSchema,
   type ReferenceData,
+  type ServiceAccountMaintenance,
+  type ServiceAccountStatusChange,
+  type ServicePlanCatalog,
+  type ServicePlanCreate,
+  type ServicePlanStatusChange,
+  type ServicePlanUpdate,
   type SubscriberCreate,
   type SubscriberDetail,
   type SubscriberListQuery,
@@ -26,6 +38,13 @@ export const SUBSCRIBERS_GET_CHANNEL = 'bcis:subscribers:get';
 export const SUBSCRIBERS_CREATE_CHANNEL = 'bcis:subscribers:create';
 export const SUBSCRIBERS_UPDATE_CHANNEL = 'bcis:subscribers:update';
 export const SUBSCRIBERS_STATUS_CHANNEL = 'bcis:subscribers:status';
+export const SERVICES_CREATE_CHANNEL = 'bcis:services:create';
+export const SERVICES_UPDATE_CHANNEL = 'bcis:services:update';
+export const SERVICES_STATUS_CHANNEL = 'bcis:services:status';
+export const PLANS_LIST_CHANNEL = 'bcis:plans:list';
+export const PLANS_CREATE_CHANNEL = 'bcis:plans:create';
+export const PLANS_UPDATE_CHANNEL = 'bcis:plans:update';
+export const PLANS_STATUS_CHANNEL = 'bcis:plans:status';
 export const REFERENCE_DATA_CHANNEL = 'bcis:reference-data:get';
 export const DASHBOARD_GET_CHANNEL = 'bcis:dashboard:get';
 export const REPORT_GET_CHANNEL = 'bcis:report:get';
@@ -64,6 +83,15 @@ export const referenceDataResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: referenceDataSchema }),
   z.object({ ok: z.literal(false), error: apiFailureSchema }),
 ]);
+export const servicePlanCatalogResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: servicePlanCatalogSchema }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
+export const servicePlanCreatedSchema = z.object({ id: z.uuid(), code: z.string(), name: z.string() });
+export const servicePlanCreatedResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: servicePlanCreatedSchema }),
+  z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -76,6 +104,13 @@ export interface DesktopBridge {
   createSubscriber: (input: SubscriberCreate) => Promise<DesktopResult<SubscriberDetail>>;
   updateSubscriber: (id: string, input: SubscriberUpdate) => Promise<DesktopResult<SubscriberDetail>>;
   changeSubscriberStatus: (id: string, input: SubscriberStatusChange) => Promise<DesktopResult<SubscriberDetail>>;
+  createServiceAccount: (subscriberId: string, input: ServiceAccountMaintenance) => Promise<DesktopResult<SubscriberDetail>>;
+  updateServiceAccount: (subscriberId: string, serviceId: string, input: ServiceAccountMaintenance) => Promise<DesktopResult<SubscriberDetail>>;
+  changeServiceAccountStatus: (subscriberId: string, serviceId: string, input: ServiceAccountStatusChange) => Promise<DesktopResult<SubscriberDetail>>;
+  getServicePlans: () => Promise<DesktopResult<ServicePlanCatalog>>;
+  createServicePlan: (input: ServicePlanCreate) => Promise<DesktopResult<z.infer<typeof servicePlanCreatedSchema>>>;
+  updateServicePlan: (id: string, input: ServicePlanUpdate) => Promise<DesktopResult<ServicePlanCatalog>>;
+  changeServicePlanStatus: (id: string, input: ServicePlanStatusChange) => Promise<DesktopResult<ServicePlanCatalog>>;
   getReferenceData: () => Promise<DesktopResult<ReferenceData>>;
   getDashboard: (query: DashboardQuery) => Promise<DesktopResult<Dashboard>>;
   getReport: (query: ReportRequest) => Promise<DesktopResult<ReportData>>;
@@ -91,6 +126,12 @@ export const desktopRequestSchemas = {
   subscriberCreate: subscriberCreateSchema,
   subscriberUpdate: z.object({ id: z.uuid(), input: subscriberUpdateSchema }),
   subscriberStatus: z.object({ id: z.uuid(), input: subscriberStatusChangeSchema }),
+  serviceCreate: z.object({ subscriberId: z.uuid(), input: serviceAccountMaintenanceSchema }),
+  serviceUpdate: z.object({ subscriberId: z.uuid(), serviceId: z.uuid(), input: serviceAccountMaintenanceSchema }),
+  serviceStatus: z.object({ subscriberId: z.uuid(), serviceId: z.uuid(), input: serviceAccountStatusChangeSchema }),
+  planCreate: servicePlanCreateSchema,
+  planUpdate: z.object({ id: z.uuid(), input: servicePlanUpdateSchema }),
+  planStatus: z.object({ id: z.uuid(), input: servicePlanStatusChangeSchema }),
   dashboard: dashboardQuerySchema,
   report: reportRequestSchema,
   reportExport: reportRequestSchema.extend({ format: z.enum(['PDF', 'XLSX']) }),

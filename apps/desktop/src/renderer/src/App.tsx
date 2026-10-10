@@ -33,6 +33,7 @@ import { ConnectionPanel } from './components/ConnectionPanel';
 import { AuthScreen } from './features/auth/AuthScreen';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
+import { PlansPage } from './features/services/PlansPage';
 import { ModulePage } from './features/shell/ModulePage';
 import { defaultPath, hasAnyPermission, pageLabel, visibleNavigation, type NavigationItemId } from './features/shell/navigation';
 import { SubscribersPage } from './features/subscribers/SubscribersPage';
@@ -90,7 +91,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/dashboard" element={<Allowed user={user} permissions={['dashboard.view']}><DashboardPage /></Allowed>} />
     <Route path="/subscribers" element={<Allowed user={user} permissions={['subscriber.view']}><SubscribersPage user={user} mode="list" onNavigate={navigate} /></Allowed>} />
     <Route path="/subscribers/new" element={<Allowed user={user} permissions={['subscriber.manage']}><SubscribersPage user={user} mode="create" onNavigate={navigate} /></Allowed>} />
-    <Route path="/subscribers/services" element={<Allowed user={user} permissions={['service.view']}><ModulePage {...modulePages.services} /></Allowed>} />
+    <Route path="/subscribers/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
     <Route path="/subscribers/:subscriberId" element={<Allowed user={user} permissions={['subscriber.view']}><SubscribersPage user={user} mode="profile" onNavigate={navigate} /></Allowed>} />
     <Route path="/billing/current" element={<Allowed user={user} permissions={['billing.view']}><ModulePage {...modulePages.billingCurrent} /></Allowed>} />
     <Route path="/billing/generate" element={<Allowed user={user} permissions={['billing.generate']}><ModulePage {...modulePages.billingGenerate} /></Allowed>} />
@@ -106,7 +107,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/receivables/overdue" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.overdue} /></Allowed>} />
     <Route path="/receivables/aging" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.aging} /></Allowed>} />
     <Route path="/receivables/suspensions" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.suspensions} /></Allowed>} />
-    <Route path="/services" element={<Allowed user={user} permissions={['service.view']}><ModulePage {...modulePages.services} /></Allowed>} />
+    <Route path="/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
     <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage /></Allowed>} />
     <Route path="/administration/users" element={<Allowed user={user} permissions={['user.manage']}><ModulePage {...modulePages.users} /></Allowed>} />
     <Route path="/administration/audit" element={<Allowed user={user} permissions={['audit.view']}><ModulePage {...modulePages.audit} /></Allowed>} />
