@@ -1,14 +1,19 @@
 # Payment posting and reversal
 
-The API accepts authoritative money only as canonical positive integer-centavo strings. Cash posts immediately. GCash submission records the payment and proof as pending; it cannot allocate invoices, create a receipt, or credit the ledger until an authorized verification request succeeds.
+The API accepts authoritative money only as canonical positive integer-centavo strings. Cash, bank transfer, cheque, and other payments post immediately. Bank transfer and cheque require a reference; Other requires an explanation in notes. GCash submission records the payment and proof as pending; it cannot allocate invoices, create a receipt, or credit the ledger until an authorized verification request succeeds. The current cashier screen exposes immediate-post methods; GCash capture/review UI remains in Increment 5 so it can include real, restricted proof-file handling.
+
+Customer credit policy: any payment left after all outstanding invoices are paid remains available customer credit. Available credit does not automatically pay a future invoice and is not included in the next payment's invoice allocation. A future credit-application workflow must show the customer, source receipt, target invoice, exact centavo amount, and confirmation, then write an immutable application and audit record in one transaction. Reversing a payment is blocked after any of its credit has been consumed.
 
 ## Routes
 
 | Route | Permission | Result |
 | --- | --- | --- |
-| `POST /payments` | `payment.create` | Posts Cash or creates pending GCash. A UUID idempotency key is required. |
+| `GET /payments/preview` | `payment.create` | Read-only oldest-first allocation and new-credit estimate for one subscriber and amount. Posting recalculates under lock. |
+| `GET /payments` | `billing.view` | Server-paginated history search by subscriber, account, receipt, or reference, with method/status/date filters. |
+| `GET /payments/:id` | `billing.view` | Payment, receipt, actors, timestamps, allocations, credit, notes, and reversal detail. |
+| `POST /payments` | `payment.create` | Posts Cash, bank transfer, cheque, or Other; or creates pending GCash. A UUID idempotency key is required. |
 | `POST /payments/:id/gcash-verification` | `payment.verify_gcash` | Verifies and posts, or rejects, one pending GCash proof. |
-| `POST /payments/:id/reverse` | `payment.reverse` | Preserves the payment, adds a linked reversal, voids its receipt, restores allocations/credit, and adds a compensating ledger entry. |
+| `POST /payments/:id/reverse` | `payment.reverse` and `receipt.void` | Preserves the payment, adds a linked reversal, voids its receipt, restores allocations/credit, and adds a compensating ledger entry. |
 
 GCash references are trimmed and uppercased before storage. A case-insensitive partial unique index remains the final duplicate boundary. Proof metadata stores its SHA-256 digest, restricted MIME type, size, storage key, original name, status, verifier, and review time. The proof itself still requires the future restricted attachment-storage boundary.
 
@@ -33,4 +38,4 @@ Migration `0003_empty_gorgon.sql` adds receipt numbering, payment idempotency, a
 | AT-05 | GCash remains pending before review; verified canonical reference reuse returns conflict. |
 | AT-06 | Reversal retains the original, links reversal/void/audit, restores the invoice, and compensates the ledger. |
 
-The same suite proves Cashier reversal denial, concurrent idempotent replay, database-trigger immutability, and whole-transaction rollback on receipt failure.
+The same suite proves preview has no financial side effects, Cashier reversal denial, concurrent idempotent replay, database-trigger immutability, method-specific Bank Transfer/Cheque/Other validation, and whole-transaction rollback on receipt failure. Built Electron E2E covers Cashier navigation, subscriber lookup, preview, posting, receipt display, history, and detail.

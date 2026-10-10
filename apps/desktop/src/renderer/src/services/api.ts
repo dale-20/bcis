@@ -58,6 +58,11 @@ import {
   type PostInvoiceAdjustment, type ProcessOverdue, type InvoiceMutationResult, type OverdueResult, type VoidInvoice,
   postInvoiceAdjustmentSchema, processOverdueSchema, voidInvoiceSchema,
   subscriberLedgerDesktopResultSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
+  paymentDetailDesktopResultSchema, paymentListDesktopResultSchema, paymentListQuerySchema,
+  paymentPreviewDesktopResultSchema, paymentPreviewQuerySchema, paymentResultDesktopResultSchema,
+  postPaymentInputSchema, reversePaymentInputSchema,
+  type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
+  type PaymentResult, type PostPaymentInput, type ReversePaymentInput,
 } from '@bcis/shared';
 
 export class DesktopServiceError extends Error {
@@ -263,5 +268,29 @@ export async function processOverdueInvoices(input: ProcessOverdue): Promise<Ove
 export async function getSubscriberLedger(id: string, input: SubscriberLedgerQuery = {}): Promise<SubscriberLedger> {
   const query = subscriberLedgerQuerySchema.parse(input);
   return unwrap(subscriberLedgerDesktopResultSchema.parse(await bridge().getSubscriberLedger(id, query)));
+}
+
+export async function previewPayment(input: PaymentPreviewQuery): Promise<PaymentPreview> {
+  const query = paymentPreviewQuerySchema.parse(input);
+  return unwrap(paymentPreviewDesktopResultSchema.parse(await bridge().previewPayment(query)));
+}
+
+export async function listPayments(input: PaymentListQuery): Promise<PaymentList> {
+  const query = paymentListQuerySchema.parse(input);
+  return unwrap(paymentListDesktopResultSchema.parse(await bridge().listPayments(query)));
+}
+
+export async function getPayment(id: string): Promise<PaymentDetail> {
+  return unwrap(paymentDetailDesktopResultSchema.parse(await bridge().getPayment(id)));
+}
+
+export async function postPayment(input: PostPaymentInput): Promise<PaymentResult> {
+  const command = postPaymentInputSchema.parse(input);
+  return unwrap(paymentResultDesktopResultSchema.parse(await bridge().postPayment(command)));
+}
+
+export async function reversePayment(id: string, input: ReversePaymentInput): Promise<PaymentResult> {
+  const command = reversePaymentInputSchema.parse(input);
+  return unwrap(paymentResultDesktopResultSchema.parse(await bridge().reversePayment(id, command)));
 }
 

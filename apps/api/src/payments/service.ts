@@ -1,4 +1,4 @@
-import type { PaymentResult, PostPaymentInput, ReversePaymentInput, VerifyGcashInput } from '@bcis/shared';
+import type { PaymentListQuery, PaymentPreviewQuery, PaymentResult, PostPaymentInput, ReversePaymentInput, VerifyGcashInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
 import { PaymentRepository } from './repository.js';
@@ -16,6 +16,25 @@ function databaseError(error: unknown): { code?: string; constraint?: string } {
 export class PaymentService {
   private readonly repository: PaymentRepository;
   constructor(database: Database) { this.repository = new PaymentRepository(database); }
+
+  async preview(input: PaymentPreviewQuery) { return this.repository.preview(input); }
+
+  async list(query: PaymentListQuery) {
+    const result = await this.repository.list(query);
+    return {
+      items: result.rows,
+      page: query.page,
+      pageSize: query.pageSize,
+      total: result.total,
+      pageCount: result.total === 0 ? 0 : Math.ceil(result.total / query.pageSize),
+    };
+  }
+
+  async detail(paymentId: string) {
+    const result = await this.repository.detail(paymentId);
+    if (!result) throw new AppError(404, 'PAYMENT_NOT_FOUND', 'Payment not found');
+    return result;
+  }
 
   async create(input: PostPaymentInput, actorUserId: string, requestId: string): Promise<PaymentResult> {
     try { return this.toResult(await this.repository.create(input, { actorUserId, requestId })); }

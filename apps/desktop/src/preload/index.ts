@@ -32,6 +32,7 @@ import {
   INVOICES_LIST_CHANNEL, INVOICE_GET_CHANNEL,
   INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
   SUBSCRIBER_LEDGER_CHANNEL,
+  PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -77,5 +78,10 @@ const bridge: DesktopBridge = Object.freeze({
   voidInvoice: (id: string, input: Parameters<DesktopBridge['voidInvoice']>[1]) => ipcRenderer.invoke(INVOICE_VOID_CHANNEL, { id, input }),
   processOverdueInvoices: (input: Parameters<DesktopBridge['processOverdueInvoices']>[0]) => ipcRenderer.invoke(BILLING_OVERDUE_PROCESS_CHANNEL, input),
   getSubscriberLedger: (id: string, query: Parameters<DesktopBridge['getSubscriberLedger']>[1]) => ipcRenderer.invoke(SUBSCRIBER_LEDGER_CHANNEL, { id, query }),
+  previewPayment: (query: Parameters<DesktopBridge['previewPayment']>[0]) => ipcRenderer.invoke(PAYMENTS_PREVIEW_CHANNEL, query),
+  listPayments: (query: Parameters<DesktopBridge['listPayments']>[0]) => ipcRenderer.invoke(PAYMENTS_LIST_CHANNEL, query),
+  getPayment: (id: string) => ipcRenderer.invoke(PAYMENT_DETAIL_CHANNEL, id),
+  postPayment: (input: Parameters<DesktopBridge['postPayment']>[0]) => ipcRenderer.invoke(PAYMENT_POST_CHANNEL, input),
+  reversePayment: (id: string, input: Parameters<DesktopBridge['reversePayment']>[1]) => ipcRenderer.invoke(PAYMENT_REVERSE_CHANNEL, { id, input }),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

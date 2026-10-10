@@ -37,6 +37,7 @@ import {
   INVOICES_LIST_CHANNEL, INVOICE_GET_CHANNEL,
   INVOICE_ADJUST_CHANNEL, INVOICE_VOID_CHANNEL, BILLING_OVERDUE_PROCESS_CHANNEL,
   SUBSCRIBER_LEDGER_CHANNEL,
+  PAYMENTS_PREVIEW_CHANNEL, PAYMENTS_LIST_CHANNEL, PAYMENT_DETAIL_CHANNEL, PAYMENT_POST_CHANNEL, PAYMENT_REVERSE_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -118,6 +119,11 @@ void app.whenReady().then(() => {
   ipcMain.handle(INVOICE_VOID_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.invoiceVoid.parse(input); return api.voidInvoice(command.id, command.input); });
   ipcMain.handle(BILLING_OVERDUE_PROCESS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.processOverdueInvoices(desktopRequestSchemas.overdueProcess.parse(input)); });
   ipcMain.handle(SUBSCRIBER_LEDGER_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberLedger.parse(input); return api.getSubscriberLedger(command.id, command.query); });
+  ipcMain.handle(PAYMENTS_PREVIEW_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.previewPayment(desktopRequestSchemas.paymentPreview.parse(input)); });
+  ipcMain.handle(PAYMENTS_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.listPayments(desktopRequestSchemas.paymentList.parse(input)); });
+  ipcMain.handle(PAYMENT_DETAIL_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getPayment(desktopRequestSchemas.paymentId.parse(input)); });
+  ipcMain.handle(PAYMENT_POST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.postPayment(desktopRequestSchemas.paymentCreate.parse(input)); });
+  ipcMain.handle(PAYMENT_REVERSE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.paymentReverse.parse(input); return api.reversePayment(command.id, command.input); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

@@ -1,6 +1,6 @@
 # BCIS mandatory feature delivery plan
 
-This plan turns `requirements.pdf` into reviewable feature increments. It reflects the repository state on 2026-10-10. The server already contains much of the financial domain, but the desktop exposes only authentication, dashboard, subscribers, reports, service history, and connection diagnostics. A backend test or route does not make a workflow complete until the authorized user can perform it safely through the desktop application.
+This plan turns `requirements.pdf` into reviewable feature increments. It reflects the repository state on 2026-10-11. A backend test or route does not make a workflow complete until the authorized user can perform it safely through the desktop application.
 
 ## Delivery rules
 
@@ -17,15 +17,14 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 - Secure login, password change, logout, sessions, lockout, seven roles, database-backed permissions, and denied-action audit.
 - Subscriber list, search, create, profile, multiple addresses/services, plans, areas, collectors, and synthetic seed data.
 - Server domain and tests for monthly billing, immutable invoices, ledger entries, payments, oldest-first allocation, credit, GCash verification, reversals, collection batches, remittance differences, aging, dashboards, reports, and backup restoration.
-- Desktop screens for dashboard, subscribers/profile, reports/exports, service history, and connection status.
+- Desktop screens for dashboard, subscribers/profile, billing cycles/invoices/ledger, cashier payment posting/history/receipts/reversals, reports/exports, service history, and connection status.
 - Windows build/release configuration and acceptance documentation.
 
 ### Main gaps
 
 - Most operational server workflows have no desktop screen or typed preload method.
 - Subscriber, plan, service, collector, and area maintenance lacks complete edit/archive/status workflows.
-- Billing lacks list/detail/preview/void-adjustment desktop workflows and several supporting queries.
-- Payments lack history, allocation preview, receipt preview/printing, GCash queue, reversal review, and proof-file storage UI.
+- Payments still lack GCash proof upload/review UI and restricted proof-file storage.
 - Collections lack batch lists, route-sheet printing, recording, remittance, reconciliation, and closing UI.
 - Suspension/reconnection, user administration, audit viewer, settings, and guided backup/restore are incomplete.
 - Physical three-PC, maximum-volume, and full desktop acceptance evidence remains incomplete.
@@ -83,6 +82,8 @@ Delivered: preview reads the same eligibility/period rules as generation and wri
 
 ## Increment 4 - Cashier payments, receipts, and customer credit
 
+**Status: COMPLETE for Cash, Bank Transfer, Cheque, and Other (2026-10-11).** The desktop has a real balance search, server allocation preview, atomic post, receipt print, paginated history/detail, and authorized reversal. GCash remains proof-gated and its desktop upload/review flow is deliberately the next increment; the cashier screen makes this visible and cannot bypass proof verification.
+
 **Goal:** Deliver the fast cashier workflow required by the laboratory.
 
 - Build Receive Payment as search -> balance -> amount/method -> allocation preview -> confirmation -> atomic post -> receipt.
@@ -93,7 +94,9 @@ Delivered: preview reads the same eligibility/period rules as generation and wri
 - Add permission-controlled reversal/receipt-void workflow requiring reason and showing balance impact.
 - Use idempotency keys and disable repeat submission while the server result is pending.
 
-**Gate:** Desktop and PostgreSQL tests prove AT-01, AT-02, AT-03, AT-04, and AT-06. Every centavo is conserved and receipts are unique.
+Delivered: the preview serializes against posting for the selected subscriber and exposes oldest-first allocations, current outstanding, existing available credit, and the new unapplied amount without writing financial records. Posting still revalidates under the subscriber lock. Cash, bank transfer, cheque, and other method-specific validation post through Fastify; references, notes, actor and timestamps appear in the immutable server-paginated history. Receipt numbers remain sequence-backed; issued receipts have an accessible print layout. Admin/Owner reversal requires both reversal and receipt-void permissions, restores balances, and preserves the voided receipt record. Credit policy is documented in `docs/payments.md`: existing credit is not automatically applied to later invoices; a future credit application must be explicit, confirmed, and audited.
+
+**Gate:** PASS. The real PostgreSQL suite proves AT-01, AT-02, AT-03, AT-04, and AT-06 plus methods, RBAC, preview side-effect freedom, history, receipts, and reversal. `npm run check` passes 92 tests and Electron E2E passes the live cashier workflow. GCash proof upload/review remains pending under Increment 5.
 
 ## Increment 5 - GCash proof and verification
 

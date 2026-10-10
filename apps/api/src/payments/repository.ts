@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-import type { PostPaymentInput, VerifyGcashInput } from '@bcis/shared';
+import type { PaymentListQuery, PaymentPreviewQuery, PostPaymentInput, VerifyGcashInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
   auditLogs, invoices, ledgerEntries, paymentAllocations, paymentProofs,
@@ -10,9 +10,134 @@ import { AppError } from '../errors.js';
 type Transaction = Parameters<Parameters<Database['db']['transaction']>[0]>[0];
 
 interface ActorContext { actorUserId: string; requestId: string }
+interface PaymentHistoryRow {
+  payment_id: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string;
+  payment_date: Date; created_at: Date; method: string; status: string; amount_centavos: string;
+  reference_number: string | null; created_by: string; posted_by: string | null; posted_at: Date | null;
+  receipt_number: string | null; receipt_status: string | null; receipt_issued_at: Date | null;
+  allocated_centavos: string; unapplied_credit_centavos: string;
+}
+
+function mapPaymentHistoryRow(row: PaymentHistoryRow) {
+  return {
+    paymentId: row.payment_id, subscriberId: row.subscriber_id, subscriberAccountNumber: row.subscriber_account_number,
+    subscriberName: row.subscriber_name, paymentDate: row.payment_date.toISOString(), createdAt: row.created_at.toISOString(),
+    method: row.method, status: row.status, amountCentavos: row.amount_centavos, referenceNumber: row.reference_number,
+    createdBy: row.created_by, postedBy: row.posted_by, postedAt: row.posted_at?.toISOString() ?? null,
+    receiptNumber: row.receipt_number, receiptStatus: row.receipt_status, receiptIssuedAt: row.receipt_issued_at?.toISOString() ?? null,
+    allocatedCentavos: row.allocated_centavos, unappliedCreditCentavos: row.unapplied_credit_centavos,
+  };
+}
 
 export class PaymentRepository {
   constructor(private readonly database: Database) {}
+
+  async preview(input: PaymentPreviewQuery) {
+    return this.database.db.transaction(async (transaction) => {
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock_shared(hashtext(${`subscriber:${input.subscriberId}`}))`);
+      const subscriberResult = await this.database.pool.query<{ id: string; account_number: string; display_name: string }>(
+        `select id,account_number,trim(concat_ws(' ',first_name,middle_name,last_name)) display_name from subscribers where id=$1`,
+        [input.subscriberId],
+      );
+      const subscriber = subscriberResult.rows[0];
+      if (!subscriber) throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
+      const [invoiceResult, creditResult] = await Promise.all([
+        this.database.pool.query<{ id: string; invoice_number: string; period: string; due_date: string; balance: string }>(
+          `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.due_date::text, i.balance_centavos::text balance
+           from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id
+           where i.subscriber_id=$1 and i.status in ('UNPAID','PARTIALLY_PAID','OVERDUE') and i.balance_centavos>0
+           order by i.due_date,i.invoice_date,i.invoice_number,i.id`, [input.subscriberId],
+        ),
+        this.database.pool.query<{ available: string }>(
+          `select coalesce(sum(remaining_amount_centavos),0)::text available from subscriber_credits where subscriber_id=$1 and status in ('AVAILABLE','PARTIALLY_USED')`,
+          [input.subscriberId],
+        ),
+      ]);
+      let remaining = BigInt(input.amountCentavos);
+      const allocations = invoiceResult.rows.map((invoice) => {
+        const balance = BigInt(invoice.balance);
+        const amount = remaining < balance ? remaining : balance;
+        remaining -= amount;
+        return {
+          invoiceId: invoice.id, invoiceNumber: invoice.invoice_number, period: invoice.period, dueDate: invoice.due_date,
+          balanceBeforeCentavos: invoice.balance, allocationCentavos: amount.toString(), balanceAfterCentavos: (balance - amount).toString(),
+        };
+      }).filter((invoice) => invoice.allocationCentavos !== '0');
+      const allocated = BigInt(input.amountCentavos) - remaining;
+      const outstanding = invoiceResult.rows.reduce((total, invoice) => total + BigInt(invoice.balance), 0n);
+      return {
+        subscriberId: subscriber.id, subscriberAccountNumber: subscriber.account_number, subscriberName: subscriber.display_name,
+        amountCentavos: input.amountCentavos, outstandingCentavos: outstanding.toString(),
+        existingAvailableCreditCentavos: creditResult.rows[0]?.available ?? '0',
+        allocatedCentavos: allocated.toString(), unappliedCreditCentavos: remaining.toString(), allocations,
+      };
+    });
+  }
+
+  async list(query: PaymentListQuery) {
+    const values: unknown[] = [];
+    const filters: string[] = [];
+    const add = (value: unknown): string => { values.push(value); return `$${values.length}`; };
+    if (query.query) {
+      const term = add(`%${query.query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+      filters.push(`(s.account_number ilike ${term} escape '\\' or concat_ws(' ',s.first_name,s.middle_name,s.last_name) ilike ${term} escape '\\' or p.reference_number ilike ${term} escape '\\' or r.receipt_number ilike ${term} escape '\\')`);
+    }
+    if (query.method !== 'ALL') filters.push(`p.method=${add(query.method)}::payment_method`);
+    if (query.status !== 'ALL') filters.push(`p.status=${add(query.status)}::payment_status`);
+    if (query.from) filters.push(`p.payment_date>=${add(query.from)}::date`);
+    if (query.to) filters.push(`p.payment_date<(${add(query.to)}::date + interval '1 day')`);
+    const where = filters.length ? `where ${filters.join(' and ')}` : '';
+    const countValues = [...values];
+    const limit = add(query.pageSize);
+    const offset = add((query.page - 1) * query.pageSize);
+    const from = `from payments p join subscribers s on s.id=p.subscriber_id join users creator on creator.id=p.created_by_user_id
+      left join users poster on poster.id=p.posted_by_user_id left join receipts r on r.payment_id=p.id
+      left join lateral (select sum(amount_centavos) allocated from payment_allocations where payment_id=p.id) a on true
+      left join lateral (select sum(remaining_amount_centavos) remaining from subscriber_credits where source_payment_id=p.id) c on true`;
+    const [countResult, rows] = await Promise.all([
+      this.database.pool.query<{ total: number }>(`select count(*)::int total ${from} ${where}`, countValues),
+      this.database.pool.query<PaymentHistoryRow>(
+        `select p.id payment_id,p.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,
+         p.payment_date,p.created_at,p.method::text,p.status::text,p.amount_centavos::text,p.reference_number,creator.display_name created_by,
+         poster.display_name posted_by,p.posted_at,r.receipt_number,r.status::text receipt_status,r.issued_at receipt_issued_at,
+         coalesce(a.allocated,0)::text allocated_centavos,coalesce(c.remaining,0)::text unapplied_credit_centavos ${from} ${where}
+         order by p.payment_date desc,p.created_at desc,p.id desc limit ${limit} offset ${offset}`,
+        values,
+      ),
+    ]);
+    return { rows: rows.rows.map(mapPaymentHistoryRow), total: countResult.rows[0]?.total ?? 0 };
+  }
+
+  async detail(paymentId: string) {
+    const payment = await this.database.pool.query<PaymentHistoryRow & { notes: string | null; sender_details: string | null }>(
+      `select p.id payment_id,p.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,
+       p.payment_date,p.created_at,p.method::text,p.status::text,p.amount_centavos::text,p.reference_number,p.notes,p.sender_details,creator.display_name created_by,
+       poster.display_name posted_by,p.posted_at,r.receipt_number,r.status::text receipt_status,r.issued_at receipt_issued_at,
+       coalesce(a.allocated,0)::text allocated_centavos,coalesce(c.remaining,0)::text unapplied_credit_centavos
+       from payments p join subscribers s on s.id=p.subscriber_id join users creator on creator.id=p.created_by_user_id
+       left join users poster on poster.id=p.posted_by_user_id left join receipts r on r.payment_id=p.id
+       left join lateral (select sum(amount_centavos) allocated from payment_allocations where payment_id=p.id) a on true
+       left join lateral (select sum(remaining_amount_centavos) remaining from subscriber_credits where source_payment_id=p.id) c on true
+       where p.id=$1`, [paymentId],
+    );
+    const row = payment.rows[0];
+    if (!row) return null;
+    const [allocations, reversals] = await Promise.all([
+      this.database.pool.query<{ invoice_id: string; invoice_number: string; period: string; due_date: string; amount: string }>(
+        `select i.id invoice_id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.due_date::text,a.amount_centavos::text amount
+         from payment_allocations a join invoices i on i.id=a.invoice_id join billing_cycles bc on bc.id=i.billing_cycle_id
+         where a.payment_id=$1 order by a.allocation_order`, [paymentId],
+      ),
+      this.database.pool.query<{ reason: string; reversed_by: string; reversed_at: Date }>(
+        `select pr.reason,u.display_name reversed_by,pr.reversed_at from payment_reversals pr join users u on u.id=pr.reversed_by_user_id where pr.payment_id=$1`, [paymentId],
+      ),
+    ]);
+    return {
+      ...mapPaymentHistoryRow(row), notes: row.notes, senderDetails: row.sender_details,
+      allocations: allocations.rows.map((allocation) => ({ invoiceId: allocation.invoice_id, invoiceNumber: allocation.invoice_number, period: allocation.period, dueDate: allocation.due_date, amountCentavos: allocation.amount })),
+      reversal: reversals.rows[0] ? { reason: reversals.rows[0].reason, reversedBy: reversals.rows[0].reversed_by, reversedAt: reversals.rows[0].reversed_at.toISOString() } : null,
+    };
+  }
 
   async create(input: PostPaymentInput, context: ActorContext) {
     const result = await this.database.db.transaction(async (transaction) => {
@@ -22,7 +147,10 @@ export class PaymentRepository {
       if (existing) return existing.id;
 
       await this.lockSubscriber(transaction, input.subscriberId);
-      const normalizedReference = input.method === 'GCASH' ? input.referenceNumber.trim().toUpperCase() : null;
+      const referenceNumber = 'referenceNumber' in input ? input.referenceNumber : undefined;
+      const normalizedReference = input.method === 'GCASH' || input.method === 'BANK_TRANSFER' || input.method === 'CHEQUE'
+        ? referenceNumber?.trim().toUpperCase() ?? null
+        : referenceNumber?.trim() ?? null;
       if (normalizedReference) {
         const [duplicate] = await transaction.select({ id: payments.id }).from(payments)
           .where(and(eq(payments.method, 'GCASH'), sql`lower(${payments.referenceNumber}) = lower(${normalizedReference})`)).limit(1);
@@ -35,7 +163,7 @@ export class PaymentRepository {
         paymentDate: new Date(input.paymentDate),
         amountCentavos: BigInt(input.amountCentavos),
         method: input.method,
-        status: input.method === 'CASH' ? 'POSTED' : 'PENDING_VERIFICATION',
+        status: input.method === 'GCASH' ? 'PENDING_VERIFICATION' : 'POSTED',
         referenceNumber: normalizedReference,
         senderDetails: input.method === 'GCASH' ? input.senderDetails : null,
         notes: input.notes ?? null,

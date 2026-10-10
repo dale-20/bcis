@@ -54,6 +54,12 @@ import {
   subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
   subscriberLedgerSchema,
 } from './billing.js';
+import {
+  paymentDetailSchema, paymentListQuerySchema, paymentListSchema, paymentPreviewQuerySchema, paymentPreviewSchema,
+  postPaymentInputSchema, paymentResultSchema, reversePaymentInputSchema,
+  type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
+  type PostPaymentInput, type PaymentResult, type ReversePaymentInput,
+} from './payments.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -95,6 +101,11 @@ export const INVOICE_ADJUST_CHANNEL = 'bcis:invoice:adjust';
 export const INVOICE_VOID_CHANNEL = 'bcis:invoice:void';
 export const BILLING_OVERDUE_PROCESS_CHANNEL = 'bcis:billing:overdue-process';
 export const SUBSCRIBER_LEDGER_CHANNEL = 'bcis:subscriber-ledger:get';
+export const PAYMENTS_PREVIEW_CHANNEL = 'bcis:payments:preview';
+export const PAYMENTS_LIST_CHANNEL = 'bcis:payments:list';
+export const PAYMENT_DETAIL_CHANNEL = 'bcis:payment:detail';
+export const PAYMENT_POST_CHANNEL = 'bcis:payment:post';
+export const PAYMENT_REVERSE_CHANNEL = 'bcis:payment:reverse';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -165,6 +176,10 @@ export const invoiceDetailResultSchema = desktopResult(invoiceDetailSchema);
 export const invoiceMutationResultDesktopSchema = desktopResult(invoiceMutationResultSchema);
 export const overdueResultDesktopSchema = desktopResult(overdueResultSchema);
 export const subscriberLedgerDesktopResultSchema = desktopResult(subscriberLedgerSchema);
+export const paymentPreviewDesktopResultSchema = desktopResult(paymentPreviewSchema);
+export const paymentListDesktopResultSchema = desktopResult(paymentListSchema);
+export const paymentDetailDesktopResultSchema = desktopResult(paymentDetailSchema);
+export const paymentResultDesktopResultSchema = desktopResult(paymentResultSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -208,6 +223,11 @@ export interface DesktopBridge {
   voidInvoice: (id: string, input: VoidInvoice) => Promise<DesktopResult<InvoiceMutationResult>>;
   processOverdueInvoices: (input: ProcessOverdue) => Promise<DesktopResult<OverdueResult>>;
   getSubscriberLedger: (id: string, query: SubscriberLedgerQuery) => Promise<DesktopResult<SubscriberLedger>>;
+  previewPayment: (query: PaymentPreviewQuery) => Promise<DesktopResult<PaymentPreview>>;
+  listPayments: (query: PaymentListQuery) => Promise<DesktopResult<PaymentList>>;
+  getPayment: (id: string) => Promise<DesktopResult<PaymentDetail>>;
+  postPayment: (input: PostPaymentInput) => Promise<DesktopResult<PaymentResult>>;
+  reversePayment: (id: string, input: ReversePaymentInput) => Promise<DesktopResult<PaymentResult>>;
 }
 
 export const desktopRequestSchemas = {
@@ -241,5 +261,10 @@ export const desktopRequestSchemas = {
   invoiceVoid: z.object({ id: z.uuid(), input: voidInvoiceSchema }),
   overdueProcess: processOverdueSchema,
   subscriberLedger: z.object({ id: z.uuid(), query: subscriberLedgerQuerySchema }),
+  paymentPreview: paymentPreviewQuerySchema,
+  paymentList: paymentListQuerySchema,
+  paymentId: z.uuid(),
+  paymentCreate: postPaymentInputSchema,
+  paymentReverse: z.object({ id: z.uuid(), input: reversePaymentInputSchema }),
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { apiUrlSchema, billingPeriodSchema, centavosSchema, readinessSchema, signedCentavosSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
+import { apiUrlSchema, billingPeriodSchema, centavosSchema, postPaymentInputSchema, readinessSchema, signedCentavosSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
 
 describe('centavo transport contract', () => {
   it.each(['0', '1', '99900', '300000', '9007199254740993', '9223372036854775807'])('preserves exact integer %s', (value) => {
@@ -52,6 +52,22 @@ describe('subscriber contracts', () => {
   it('bounds server pagination', () => {
     expect(subscriberListQuerySchema.parse({ page: '2', pageSize: '20' })).toMatchObject({ page: 2, pageSize: 20 });
     expect(subscriberListQuerySchema.safeParse({ page: 1, pageSize: 101 }).success).toBe(false);
+  });
+});
+
+describe('payment entry contracts', () => {
+  const base = { subscriberId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d0', amountCentavos: '99900', paymentDate: '2026-10-11T08:00:00.000Z', idempotencyKey: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d1' };
+  it.each([
+    { method: 'CASH' },
+    { method: 'BANK_TRANSFER', referenceNumber: 'BANK-TRANSFER-1' },
+    { method: 'CHEQUE', referenceNumber: 'CHEQUE-1' },
+    { method: 'OTHER', notes: 'Synthetic counter payment' },
+  ])('accepts method-specific input %#', (method) => {
+    expect(postPaymentInputSchema.safeParse({ ...base, ...method }).success).toBe(true);
+  });
+  it('requires a traceable cheque reference and an explanation for other methods', () => {
+    expect(postPaymentInputSchema.safeParse({ ...base, method: 'CHEQUE' }).success).toBe(false);
+    expect(postPaymentInputSchema.safeParse({ ...base, method: 'OTHER' }).success).toBe(false);
   });
 });
 describe('API contracts', () => {

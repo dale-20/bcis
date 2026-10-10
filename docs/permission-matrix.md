@@ -43,8 +43,10 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /auth/logout` | Valid bearer session | Session revoked and logout recorded |
 | `GET /admin/users` | Valid session, changed demo password, `user.manage` | Missing permission recorded as `authorization.denied` |
 | `POST /payments` | Valid session and `payment.create` | Posting or pending GCash submission is audited atomically |
+| `GET /payments/preview` | Valid session and `payment.create` | Read-only oldest-first allocation estimate; no financial record is written |
+| `GET /payments`, `GET /payments/:id` | Valid session and `billing.view` | Paginated payment/receipt history and immutable detail |
 | `POST /payments/:id/gcash-verification` | Valid session and `payment.verify_gcash` | Verification/rejection records verifier, time, and audit evidence |
-| `POST /payments/:id/reverse` | Valid session and `payment.reverse` | Reversal reason, actor, restored value, receipt void, and audit are atomic |
+| `POST /payments/:id/reverse` | Valid session and both `payment.reverse` and `receipt.void` | Reversal reason, actor, restored value, receipt void, and audit are atomic |
 | `GET /collections/reference-data` | Valid session and `collection.view` | Read-only collectors and areas |
 | `POST /collection-batches` | Valid session and `collection.manage` | Route snapshot and expected receivable audited atomically |
 | `POST /collection-batches/:id/collections` | Valid session and `collection.manage` | Links one same-day posted payment to one route row |

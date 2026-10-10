@@ -124,6 +124,23 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.locator('.invoice-total').getByText('VOID')).toBeVisible();
     await page.getByRole('button', { name: 'Close invoice detail' }).click();
 
+    await page.getByRole('link', { name: 'Payments', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Receive payment' })).toBeVisible();
+    await page.getByLabel('Find subscriber').fill('BCIS-00001');
+    await page.locator('.payment-subscriber-results button').first().click();
+    await page.getByLabel('Amount received (PHP)').fill('10.00');
+    await expect(page.getByRole('heading', { name: 'Allocation preview' })).toBeVisible();
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Confirm and post' }).click();
+    await expect(page.getByRole('heading', { name: /Receipt OR-/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Print receipt' })).toBeEnabled();
+    await page.getByRole('link', { name: 'Payment History' }).click();
+    await expect(page.getByRole('heading', { name: 'Payment history' })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await page.locator('.payment-history-table tbody tr').first().click();
+    await expect(page.getByText('Immutable payment record')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Print receipt' })).toBeVisible();
+
     await page.getByRole('link', { name: 'Services', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Services & plans' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New plan' })).toBeVisible();
@@ -140,7 +157,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listInvoices', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'previewBilling', 'processOverdueInvoices', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getPayment', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reversePayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });

@@ -41,6 +41,10 @@ import {
   type PostInvoiceAdjustment, type ProcessOverdue, type InvoiceMutationResult, type OverdueResult, type VoidInvoice,
   postInvoiceAdjustmentSchema, processOverdueSchema, voidInvoiceSchema,
   subscriberLedgerSchema, subscriberLedgerQuerySchema, type SubscriberLedger, type SubscriberLedgerQuery,
+  paymentDetailSchema, paymentListSchema, paymentListQuerySchema, paymentPreviewSchema, paymentPreviewQuerySchema,
+  paymentResultSchema, postPaymentInputSchema, reversePaymentInputSchema,
+  type PaymentDetail, type PaymentList, type PaymentListQuery, type PaymentPreview, type PaymentPreviewQuery,
+  type PaymentResult, type PostPaymentInput, type ReversePaymentInput,
 } from '@bcis/shared';
 import { z } from 'zod';
 
@@ -234,6 +238,30 @@ export class DesktopApiClient {
     if (parsedQuery.from) parameters.set('from', parsedQuery.from);
     if (parsedQuery.to) parameters.set('to', parsedQuery.to);
     return this.call(`/subscribers/${encodeURIComponent(id)}/ledger?${parameters.toString()}`, { method: 'GET' }, subscriberLedgerSchema);
+  }
+
+  previewPayment(query: PaymentPreviewQuery): Promise<DesktopResult<PaymentPreview>> {
+    const input = paymentPreviewQuerySchema.parse(query);
+    const parameters = new URLSearchParams(input);
+    return this.call(`/payments/preview?${parameters.toString()}`, { method: 'GET' }, paymentPreviewSchema);
+  }
+
+  listPayments(query: PaymentListQuery): Promise<DesktopResult<PaymentList>> {
+    const input = paymentListQuerySchema.parse(query);
+    const parameters = new URLSearchParams(Object.entries(input).filter((entry): entry is [string, string | number] => entry[1] !== undefined).map(([key, value]) => [key, String(value)]));
+    return this.call(`/payments?${parameters.toString()}`, { method: 'GET' }, paymentListSchema);
+  }
+
+  getPayment(id: string): Promise<DesktopResult<PaymentDetail>> {
+    return this.call(`/payments/${encodeURIComponent(id)}`, { method: 'GET' }, paymentDetailSchema);
+  }
+
+  postPayment(input: PostPaymentInput): Promise<DesktopResult<PaymentResult>> {
+    return this.call('/payments', { method: 'POST', body: JSON.stringify(postPaymentInputSchema.parse(input)) }, paymentResultSchema);
+  }
+
+  reversePayment(id: string, input: ReversePaymentInput): Promise<DesktopResult<PaymentResult>> {
+    return this.call(`/payments/${encodeURIComponent(id)}/reverse`, { method: 'POST', body: JSON.stringify(reversePaymentInputSchema.parse(input)) }, paymentResultSchema);
   }
 
   async downloadReport(query: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {

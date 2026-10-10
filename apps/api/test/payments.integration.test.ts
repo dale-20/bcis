@@ -87,6 +87,17 @@ afterAll(async () => { await app.close(); await database.close(); });
 
 describe.sequential('AT-01 through AT-06 payment invariants', () => {
   it('AT-01 posts an exact cash payment, clears the invoice, balances the ledger, and issues a unique receipt', async () => {
+    const beforePreview = await database.db.select().from(payments).where(eq(payments.subscriberId, subscriberIds.exact));
+    const preview = await app.inject({ method: 'GET', url: `/payments/preview?subscriberId=${subscriberIds.exact}&amountCentavos=99900`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toMatchObject({
+      amountCentavos: '99900', outstandingCentavos: '99900', allocatedCentavos: '99900', unappliedCreditCentavos: '0',
+      allocations: [{ invoiceNumber: expect.stringMatching(/^INV-202608-/), balanceBeforeCentavos: '99900', allocationCentavos: '99900', balanceAfterCentavos: '0' }],
+    });
+    const afterPreview = await database.db.select().from(payments).where(eq(payments.subscriberId, subscriberIds.exact));
+    expect(afterPreview).toHaveLength(beforePreview.length);
+    const deniedPreview = await app.inject({ method: 'GET', url: `/payments/preview?subscriberId=${subscriberIds.exact}&amountCentavos=1`, headers: { authorization: `Bearer ${viewerToken}` } });
+    expect(deniedPreview.statusCode).toBe(403);
     const response = await postCash(subscriberIds.exact, '99900');
     expect(response.statusCode).toBe(200);
     const result = response.json<PaymentResult>();
@@ -99,6 +110,20 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     expect(invoice).toMatchObject({ status: 'PAID', balanceCentavos: 0n });
     const entries = await database.db.select().from(ledgerEntries).where(eq(ledgerEntries.subscriberId, subscriberIds.exact)).orderBy(asc(ledgerEntries.occurredAt));
     expect(entries.reduce((balance, entry) => balance + entry.debitCentavos - entry.creditCentavos, 0n)).toBe(0n);
+    const detail = await app.inject({ method: 'GET', url: `/payments/${result.paymentId}`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({
+      paymentId: result.paymentId, subscriberId: subscriberIds.exact, method: 'CASH', status: 'POSTED',
+      receiptNumber: result.receiptNumber, amountCentavos: '99900', allocatedCentavos: '99900', createdBy: 'Demo Cashier',
+      allocations: [{ invoiceId: exactInvoiceId, amountCentavos: '99900' }], reversal: null,
+    });
+    const history = await app.inject({ method: 'GET', url: `/payments?query=${result.receiptNumber}&method=CASH&status=POSTED&page=1&pageSize=10`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toMatchObject({ total: 1, items: [{ paymentId: result.paymentId, receiptNumber: result.receiptNumber, receiptStatus: 'ISSUED' }] });
+    const deniedHistory = await app.inject({ method: 'GET', url: '/payments?page=1&pageSize=10', headers: { authorization: `Bearer ${viewerToken}` } });
+    expect(deniedHistory.statusCode).toBe(403);
+    const invalidRange = await app.inject({ method: 'GET', url: '/payments?from=2026-08-31&to=2026-08-01&page=1&pageSize=10', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(invalidRange.statusCode).toBe(400);
   });
 
   it('AT-02 posts a partial payment and preserves the exact remaining balance', async () => {
@@ -168,12 +193,37 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     expect(original?.status).toBe('REVERSED');
     expect(reversal).toMatchObject({ reason: 'Synthetic correction' });
     expect(receipt).toMatchObject({ status: 'VOID', voidReason: 'Synthetic correction' });
+    const detail = await app.inject({ method: 'GET', url: `/payments/${exactPaymentId}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(detail.json()).toMatchObject({ status: 'REVERSED', receiptStatus: 'VOID', reversal: { reason: 'Synthetic correction', reversedBy: 'Demo Administrator' } });
     const entries = await database.db.select().from(ledgerEntries).where(eq(ledgerEntries.subscriberId, subscriberIds.exact));
     expect(entries.reduce((balance, entry) => balance + entry.debitCentavos - entry.creditCentavos, 0n)).toBe(199_800n);
     const audit = await database.db.select().from(auditLogs).where(and(eq(auditLogs.action, 'payment.reversed'), eq(auditLogs.entityId, exactPaymentId)));
     expect(audit).toHaveLength(1);
     await expect(database.db.delete(paymentAllocations).where(eq(paymentAllocations.paymentId, exactPaymentId))).rejects.toMatchObject({ cause: { code: '55000' } });
     await expect(database.db.update(payments).set({ amountCentavos: 1n }).where(eq(payments.id, exactPaymentId))).rejects.toMatchObject({ cause: { code: '55000' } });
+  });
+
+  it('posts bank transfer, cheque, and other with method-specific reference validation', async () => {
+    const methods = [
+      { service: 'SVC-00027-1', method: 'BANK_TRANSFER', referenceNumber: 'BANK-TRACE-8821' },
+      { service: 'SVC-00028-1', method: 'CHEQUE', referenceNumber: 'CHK-10428' },
+      { service: 'SVC-00029-1', method: 'OTHER', referenceNumber: 'COUNTER-03', notes: 'Synthetic counter adjustment' },
+    ] as const;
+    for (const item of methods) {
+      const { service: serviceNumber, ...methodInput } = item;
+      const subscriberId = await subscriberFor(serviceNumber, 99_900n);
+      const response = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+        subscriberId, amountCentavos: '1', paymentDate: '2026-08-21T08:00:00.000Z', idempotencyKey: randomUUID(), ...methodInput,
+      } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<PaymentResult>()).toMatchObject({ method: item.method, status: 'POSTED', amountCentavos: '1' });
+      const stored = await app.inject({ method: 'GET', url: `/payments?query=${item.referenceNumber}&page=1&pageSize=10`, headers: { authorization: `Bearer ${cashierToken}` } });
+      expect(stored.json<{ items: { referenceNumber: string }[] }>().items[0]?.referenceNumber).toBe(item.referenceNumber);
+    }
+    const invalidCheque = await app.inject({ method: 'POST', url: '/payments', headers: { authorization: `Bearer ${cashierToken}` }, payload: {
+      subscriberId: subscriberIds.partial, amountCentavos: '1', paymentDate: '2026-08-21T08:00:00.000Z', idempotencyKey: randomUUID(), method: 'CHEQUE', referenceNumber: 'x',
+    } });
+    expect(invalidCheque.statusCode).toBe(400);
   });
 
   it('replays concurrent idempotent requests without duplicate payments or receipts', async () => {
