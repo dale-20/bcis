@@ -63,6 +63,9 @@ import {
   type GcashProofContent, type GcashProofMetadata, type GcashProofQueue, type VerifyGcashInput,
 } from './payments.js';
 import { collectionBatchListQuerySchema, collectionBatchListSchema, collectionBatchSchema, createCollectionBatchInputSchema, eligibleCollectionPaymentsSchema, recordCollectionInputSchema, remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema, type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput, type EligibleCollectionPayment, type RemittanceInput } from './collections.js';
+import { receivableAgingQuerySchema, receivableAgingResponseSchema, type ReceivableAgingQuery, type ReceivableAgingResponse } from './receivables.js';
+
+export const RECEIVABLE_AGING_CHANNEL = 'bcis:receivables:aging';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -202,6 +205,7 @@ export const gcashProofContentDesktopResultSchema = desktopResult(gcashProofCont
 export const collectionBatchListDesktopResultSchema = desktopResult(collectionBatchListSchema);
 export const collectionBatchDesktopResultSchema = desktopResult(collectionBatchSchema);
 export const eligibleCollectionPaymentsDesktopResultSchema = desktopResult(eligibleCollectionPaymentsSchema);
+export const receivableAgingDesktopResultSchema = desktopResult(receivableAgingResponseSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -263,6 +267,7 @@ export interface DesktopBridge {
   reconcileCollectionBatch: (id: string, input: z.infer<typeof reconciliationInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
   closeCollectionBatch: (id: string, input: z.infer<typeof closeBatchInputSchema>) => Promise<DesktopResult<CollectionBatch>>;
   getEligibleCollectionPayments: (id: string, accountId: string) => Promise<DesktopResult<EligibleCollectionPayment[]>>;
+  getReceivableAging: (query: ReceivableAgingQuery) => Promise<DesktopResult<ReceivableAgingResponse>>;
 }
 
 export const desktopRequestSchemas = {
@@ -311,6 +316,7 @@ export const desktopRequestSchemas = {
   collectionRemittance: z.object({ id: z.uuid(), input: remittanceInputSchema }),
   collectionReconciliation: z.object({ id: z.uuid(), input: reconciliationInputSchema }),
   collectionClose: z.object({ id: z.uuid(), input: closeBatchInputSchema }),
+  receivableAging: receivableAgingQuerySchema,
   gcashProofUpload: gcashProofUploadInputSchema,
 };
 

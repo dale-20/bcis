@@ -69,6 +69,8 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 **Increment 6 verification:** Collection Supervisor batch UI and report flows are exposed through typed, sender-validated IPC. New service assignments and collector changes persist effective dates; existing assignment rows are not fabricated or backfilled because their original effective dates and actors are not recoverable. Cashier posts the payment first; the supervisor selects an eligible same-day posted receipt for the route account.
 
+**Increment 7 progress:** Outstanding, overdue, and AR aging now use the protected paginated API through the typed Electron preload. The screens support business date, collector, and area filters and show exact outstanding/bucket totals; the aging page explains the day-90 boundary. Delinquency account summaries, overdue subscriber counts, plan/service-type/age filters, configurable policy, suspension approvals, and reconnection scheduling remain open.
+
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 
 - [ ] Current/overdue receivable, overdue subscriber count, follow-up/suspension candidates.

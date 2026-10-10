@@ -29,13 +29,18 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   const proofDirectory = await mkdtemp(path.join(tmpdir(), 'bcis-desktop-gcash-'));
   const proofFile = path.join(proofDirectory, 'synthetic-proof.png');
   await writeFile(proofFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=', 'base64'));
-  await runNode('apps/api/dist/db/seed-demo.js', { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: 'test', DEMO_ACCOUNT_PASSWORD: seedPassword });
-  const server = spawn(process.execPath, ['apps/api/dist/server.js'], {
-    env: { ...process.env, DATABASE_URL: databaseUrl, API_HOST: '127.0.0.1', API_PORT: '3101', LOG_LEVEL: 'silent' },
-    stdio: 'ignore', windowsHide: true,
-  });
   const database = new pg.Client({ connectionString: databaseUrl });
   await database.connect();
+  await database.query('DROP SCHEMA public CASCADE');
+  await database.query('CREATE SCHEMA public');
+  await database.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
+  const testEnvironment = { ...process.env, DATABASE_URL: databaseUrl, NODE_ENV: 'test', DEMO_ACCOUNT_PASSWORD: seedPassword };
+  await runNode('apps/api/dist/db/migrate.js', testEnvironment);
+  await runNode('apps/api/dist/db/seed-demo.js', testEnvironment);
+  const server = spawn(process.execPath, ['apps/api/dist/server.js'], {
+    env: { ...testEnvironment, API_HOST: '127.0.0.1', API_PORT: '3101', LOG_LEVEL: 'silent' },
+    stdio: 'ignore', windowsHide: true,
+  });
   let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
   try {
     await expect.poll(async () => { try { return (await fetch(`${endpoint}/health/ready`)).status; } catch { return 0; } }).toBe(200);
@@ -185,9 +190,8 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Collection batches' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent route batches' })).toBeVisible();
     await expect(page.getByText(/total · showing page 1 of/)).toBeVisible();
-
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getPayment', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'reversePayment', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'verifyGcashPayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getPayment', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listPayments', 'listSubscribers', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'reversePayment', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'verifyGcashPayment', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });
@@ -199,14 +203,23 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
 
     await page.evaluate(await readFile(require.resolve('axe-core/axe.min.js'), 'utf8'));
     const violations = await page.evaluate(async () => {
-      const axeWindow = window as typeof window & { axe: { run: () => Promise<{ violations: { id: string; impact: string }[] }> } };
-      return (await axeWindow.axe.run()).violations.map(({ id, impact }) => ({ id, impact }));
+      const axeWindow = window as typeof window & { axe: { run: () => Promise<{ violations: { id: string; impact: string; nodes: { target: string[]; html: string }[] }[] }> } };
+      return (await axeWindow.axe.run()).violations.map(({ id, impact, nodes }) => ({ id, impact, nodes: nodes.map(({ target, html }) => ({ target, html })) }));
     });
     expect(violations).toEqual([]);
     await page.screenshot({ path: 'test-results/subscriber-directory.png' });
     await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
     await page.screenshot({ path: 'test-results/subscriber-minimum-size.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    await page.getByRole('link', { name: 'Receivables', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Outstanding receivables' })).toBeVisible();
+    await expect(page.getByLabel('As of')).toBeVisible();
+    await expect(page.locator('.receivable-table, .empty-state')).toBeVisible();
+    await page.getByRole('link', { name: 'Aging', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Accounts receivable aging' })).toBeVisible();
+    await expect(page.getByText(/Day 90 belongs to 61–90/)).toBeVisible();
+    await page.screenshot({ path: 'test-results/receivables-aging.png' });
 
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();

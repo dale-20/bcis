@@ -1,5 +1,6 @@
 import {
   authResultSchema,
+  receivableAgingDesktopResultSchema, receivableAgingQuerySchema,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -30,6 +31,7 @@ import {
   subscriberListQuerySchema,
   subscriberListResultSchema,
   type AuthenticatedUser,
+  type ReceivableAgingQuery, type ReceivableAgingResponse,
   type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput,
   type CollectionAreaCreate,
   type CollectionAreaUpdate,
@@ -335,6 +337,11 @@ export async function getCollectionBatch(id: string): Promise<CollectionBatch> {
 
 export async function getEligibleCollectionPayments(id: string, accountId: string) {
   return unwrap(eligibleCollectionPaymentsDesktopResultSchema.parse(await bridge().getEligibleCollectionPayments(id, accountId)));
+}
+
+export async function getReceivableAging(query: ReceivableAgingQuery): Promise<ReceivableAgingResponse> {
+  const command = receivableAgingQuerySchema.parse(query);
+  return unwrap(receivableAgingDesktopResultSchema.parse(await bridge().getReceivableAging(command)));
 }
 
 export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {

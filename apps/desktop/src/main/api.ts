@@ -1,5 +1,6 @@
 import {
   authenticatedUserSchema,
+  receivableAgingQuerySchema, receivableAgingResponseSchema,
   collectionReferenceCatalogSchema,
   collectionBatchListSchema, collectionBatchSchema, eligibleCollectionPaymentsSchema,
   referenceDataSchema,
@@ -10,6 +11,7 @@ import {
   subscriberFinancialProfileSchema,
   subscriberListResponseSchema,
   type AuthenticatedUser,
+  type ReceivableAgingQuery, type ReceivableAgingResponse,
   type CollectionAreaCreate,
   type CollectionAreaUpdate,
   type CollectionReferenceCatalog,
@@ -234,6 +236,14 @@ export class DesktopApiClient {
 
   getServiceHistory(id: string): Promise<DesktopResult<ServiceHistory>> {
     return this.call(`/subscribers/${encodeURIComponent(id)}/service-history`, { method: 'GET' }, serviceHistorySchema);
+  }
+
+  getReceivableAging(query: ReceivableAgingQuery): Promise<DesktopResult<ReceivableAgingResponse>> {
+    const parsed = receivableAgingQuerySchema.parse(query);
+    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), page: String(parsed.page), pageSize: String(parsed.pageSize) });
+    if (parsed.collectorId) parameters.set('collectorId', parsed.collectorId);
+    if (parsed.collectionAreaId) parameters.set('collectionAreaId', parsed.collectionAreaId);
+    return this.call(`/receivables/aging?${parameters.toString()}`, { method: 'GET' }, receivableAgingResponseSchema);
   }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {

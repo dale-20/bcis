@@ -130,6 +130,8 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 7 - Receivables, suspension, and reconnection
 
+**Progress:** Receivable review is connected end to end for outstanding balances, overdue invoices, and aging with server-side pagination, date/collector/area filters, and bucket totals. Remaining Increment 7 requirements are tracked in `docs/implementation-checklist.md`; do not treat this increment as complete until its gate passes.
+
 **Goal:** Turn aging data into controlled service operations.
 
 - Add Outstanding, Overdue, Aging, and Suspension Candidates screens.

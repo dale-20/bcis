@@ -39,6 +39,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { PlansPage } from './features/services/PlansPage';
 import { ModulePage } from './features/shell/ModulePage';
+import { ReceivablesPage } from './features/receivables/ReceivablesPage';
 import { defaultPath, hasAnyPermission, pageLabel, visibleNavigation, type NavigationItemId } from './features/shell/navigation';
 import { SubscribersPage } from './features/subscribers/SubscribersPage';
 import { SESSION_INVALID_EVENT, changePassword, getSession, login, logout } from './services/api';
@@ -113,9 +114,9 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/collections/batches" element={<Allowed user={user} permissions={['collection.view']}><CollectionBatchesPage user={user} /></Allowed>} />
     <Route path="/collections/batches/:batchId" element={<Allowed user={user} permissions={['collection.view']}><BatchRoute user={user} /></Allowed>} />
     <Route path="/collections/remittance" element={<Allowed user={user} permissions={['collection.view']}><CollectionRemittancePage user={user} /></Allowed>} />
-    <Route path="/receivables/outstanding" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.outstanding} /></Allowed>} />
-    <Route path="/receivables/overdue" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.overdue} /></Allowed>} />
-    <Route path="/receivables/aging" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.aging} /></Allowed>} />
+    <Route path="/receivables/outstanding" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="outstanding" /></Allowed>} />
+    <Route path="/receivables/overdue" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="overdue" /></Allowed>} />
+    <Route path="/receivables/aging" element={<Allowed user={user} permissions={['receivables.view']}><ReceivablesPage mode="aging" /></Allowed>} />
     <Route path="/receivables/suspensions" element={<Allowed user={user} permissions={['receivables.view']}><ModulePage {...modulePages.suspensions} /></Allowed>} />
     <Route path="/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
     <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage /></Allowed>} />

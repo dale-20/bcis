@@ -37,6 +37,7 @@ import {
   COLLECTION_BATCHES_LIST_CHANNEL, COLLECTION_BATCH_CREATE_CHANNEL, COLLECTION_BATCH_GET_CHANNEL, COLLECTION_RECORD_CHANNEL,
   COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
   COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
+  RECEIVABLE_AGING_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -100,5 +101,6 @@ const bridge: DesktopBridge = Object.freeze({
   reconcileCollectionBatch: (id: string, input: Parameters<DesktopBridge['reconcileCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_RECONCILE_CHANNEL, { id, input }),
   closeCollectionBatch: (id: string, input: Parameters<DesktopBridge['closeCollectionBatch']>[1]) => ipcRenderer.invoke(COLLECTION_CLOSE_CHANNEL, { id, input }),
   getEligibleCollectionPayments: (id: string, accountId: string) => ipcRenderer.invoke(COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL, { id, accountId }),
+  getReceivableAging: (query: Parameters<DesktopBridge['getReceivableAging']>[0]) => ipcRenderer.invoke(RECEIVABLE_AGING_CHANNEL, query),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

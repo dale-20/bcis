@@ -43,6 +43,7 @@ import {
   COLLECTION_BATCHES_LIST_CHANNEL, COLLECTION_BATCH_CREATE_CHANNEL, COLLECTION_BATCH_GET_CHANNEL, COLLECTION_RECORD_CHANNEL,
   COLLECTION_SUBMIT_CHANNEL, COLLECTION_REMIT_CHANNEL, COLLECTION_RECONCILE_CHANNEL, COLLECTION_CLOSE_CHANNEL,
   COLLECTION_ELIGIBLE_PAYMENTS_CHANNEL,
+  RECEIVABLE_AGING_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -154,6 +155,7 @@ void app.whenReady().then(() => {
   ipcMain.handle(COLLECTION_REMIT_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionRemittance.parse(input); return api.remitCollectionBatch(command.id, command.input); });
   ipcMain.handle(COLLECTION_RECONCILE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionReconciliation.parse(input); return api.reconcileCollectionBatch(command.id, command.input); });
   ipcMain.handle(COLLECTION_CLOSE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.collectionClose.parse(input); return api.closeCollectionBatch(command.id, command.input); });
+  ipcMain.handle(RECEIVABLE_AGING_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReceivableAging(desktopRequestSchemas.receivableAging.parse(input)); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);
