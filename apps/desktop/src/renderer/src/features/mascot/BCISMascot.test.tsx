@@ -1,25 +1,29 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BCISMascot } from './BCISMascot';
 import { announceMascotEvent } from './mascot-events';
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
 
+beforeEach(() => {
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+});
+
 describe('BCIS Buddy', () => {
   it('uses event-specific poses and restrained messages', () => {
     render(<BCISMascot />);
-    announceMascotEvent('payment-posted');
+    act(() => announceMascotEvent('payment-posted'));
     expect(screen.getByText('Payment posted successfully.')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'BCIS Buddy, success' })).toBeInTheDocument();
   });
 
   it('announces connection loss without claiming financial success', () => {
     render(<BCISMascot />);
-    announceMascotEvent('connection-lost');
+    act(() => announceMascotEvent('connection-lost'));
     expect(screen.getByRole('img', { name: 'BCIS Buddy, surprised' })).toBeInTheDocument();
-    expect(screen.getByText('Connection to the office server was lost.')).toBeInTheDocument();
+    expect(screen.getByText('BCIS server is unavailable or not ready.')).toBeInTheDocument();
     expect(screen.queryByText('Payment posted successfully.')).toBeNull();
   });
 
