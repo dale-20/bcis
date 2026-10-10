@@ -78,6 +78,21 @@ export const RECONNECTIONS_MINE_CHANNEL = 'bcis:service-control:reconnections:mi
 export const TECHNICIANS_LIST_CHANNEL = 'bcis:service-control:technicians:list';
 export const RECONNECTION_ASSIGN_CHANNEL = 'bcis:service-control:reconnection:assign';
 export const RECONNECTION_COMPLETE_CHANNEL = 'bcis:service-control:reconnection:complete';
+export const ADMIN_USERS_LIST_CHANNEL = 'bcis:admin:users:list';
+export const ADMIN_USER_CREATE_CHANNEL = 'bcis:admin:user:create';
+export const ADMIN_USER_UPDATE_CHANNEL = 'bcis:admin:user:update';
+export const ADMIN_USER_PASSWORD_RESET_CHANNEL = 'bcis:admin:user:password-reset';
+export const AUDIT_SEARCH_CHANNEL = 'bcis:audit:search';
+
+export const managedRoleSchema = z.enum(['OWNER', 'ADMIN', 'CASHIER', 'COLLECTION_SUPERVISOR', 'AUDITOR', 'TECHNICIAN', 'VIEWER']);
+export const managedUserCreateSchema = z.object({ username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9._-]+$/), displayName: z.string().trim().min(1).max(120), role: managedRoleSchema, password: z.string().min(8).max(128) }).strict();
+export const managedUserPatchSchema = z.object({ displayName: z.string().trim().min(1).max(120).optional(), role: managedRoleSchema.optional(), isActive: z.boolean().optional() }).strict().refine((value) => Object.keys(value).length > 0);
+export const auditSearchSchema = z.object({ actor: z.string().max(64).default(''), action: z.string().max(100).default(''), entity: z.string().max(80).default(''), requestId: z.string().max(100).default(''), from: z.iso.date().optional(), to: z.iso.date().optional(), page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(25) }).strict();
+export const managedUserListSchema = z.object({ items: z.array(z.object({ id: z.uuid(), username: z.string(), displayName: z.string(), isActive: z.boolean(), mustChangePassword: z.boolean(), roles: z.array(z.string()) })) });
+export const auditSearchResultSchema = z.object({ items: z.array(z.object({ id: z.uuid(), actorId: z.uuid().nullable(), actor: z.string().nullable(), action: z.string(), entityType: z.string(), entityId: z.string().nullable(), reason: z.string().nullable(), oldValues: z.unknown().nullable(), newValues: z.unknown().nullable(), requestId: z.string(), createdAt: z.iso.datetime() })), page: z.number().int(), pageSize: z.number().int(), total: z.number().int() });
+export type ManagedUserCreate = z.infer<typeof managedUserCreateSchema>;
+export type ManagedUserPatch = z.infer<typeof managedUserPatchSchema>;
+export type AuditSearchQuery = z.input<typeof auditSearchSchema>;
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -223,6 +238,10 @@ export const servicePolicyDesktopResultSchema = desktopResult(serviceControlPoli
 export const suspensionListDesktopResultSchema = desktopResult(suspensionListResponseSchema);
 export const reconnectionListDesktopResultSchema = desktopResult(reconnectionListResponseSchema);
 export const technicianListDesktopResultSchema = desktopResult(serviceTechnicianListSchema);
+export const managedUserListDesktopResultSchema = desktopResult(managedUserListSchema);
+export const managedUserCreateDesktopResultSchema = desktopResult(z.object({ id: z.uuid() }));
+export const adminMutationDesktopResultSchema = desktopResult(z.null());
+export const auditSearchDesktopResultSchema = desktopResult(auditSearchResultSchema);
 export const suspensionCreateDesktopResultSchema = desktopResult(servicePlanCreatedSchema.pick({ id: true }));
 export const serviceControlMutationDesktopResultSchema = desktopResult(z.null());
 
@@ -298,6 +317,11 @@ export interface DesktopBridge {
   listTechnicians: () => Promise<DesktopResult<z.infer<typeof serviceTechnicianListSchema>>>;
   assignReconnection: (id: string, input: ReconnectionAssignment) => Promise<DesktopResult<null>>;
   completeReconnection: (id: string) => Promise<DesktopResult<null>>;
+  listManagedUsers: () => Promise<DesktopResult<z.infer<typeof managedUserListSchema>>>;
+  createManagedUser: (input: z.infer<typeof managedUserCreateSchema>) => Promise<DesktopResult<{ id: string }>>;
+  updateManagedUser: (id: string, input: z.infer<typeof managedUserPatchSchema>) => Promise<DesktopResult<null>>;
+  resetManagedUserPassword: (id: string, password: string) => Promise<DesktopResult<null>>;
+  searchAudit: (query: z.infer<typeof auditSearchSchema>) => Promise<DesktopResult<z.infer<typeof auditSearchResultSchema>>>;
 }
 
 export const desktopRequestSchemas = {
@@ -354,6 +378,10 @@ export const desktopRequestSchemas = {
   suspensionId: z.uuid(),
   reconnectionAssignment: z.object({ id: z.uuid(), input: reconnectionAssignmentSchema }),
   reconnectionId: z.uuid(),
+  managedUserCreate: managedUserCreateSchema,
+  managedUserUpdate: z.object({ id: z.uuid(), input: managedUserPatchSchema }),
+  managedUserPasswordReset: z.object({ id: z.uuid(), password: z.string().min(8).max(128) }),
+  auditSearch: auditSearchSchema,
   gcashProofUpload: gcashProofUploadInputSchema,
 };
 

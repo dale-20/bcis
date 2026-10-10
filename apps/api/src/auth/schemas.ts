@@ -15,6 +15,21 @@ export const changePasswordSchema = z.object({
   }
 });
 
+export const managedUserSchema = z.object({
+  username: usernameSchema,
+  displayName: z.string().trim().min(1).max(120),
+  role: z.enum(['OWNER', 'ADMIN', 'CASHIER', 'COLLECTION_SUPERVISOR', 'AUDITOR', 'TECHNICIAN', 'VIEWER']),
+  password: z.string().min(8).max(128),
+}).strict();
+
+export const managedUserUpdateSchema = z.object({
+  displayName: z.string().trim().min(1).max(120).optional(),
+  role: z.enum(['OWNER', 'ADMIN', 'CASHIER', 'COLLECTION_SUPERVISOR', 'AUDITOR', 'TECHNICIAN', 'VIEWER']).optional(),
+  isActive: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0);
+
+export const userPasswordResetSchema = z.object({ password: z.string().min(8).max(128) }).strict();
+
 export const demoPasswordSchema = z.string().min(8).max(128).superRefine((value, context) => {
   if (Buffer.byteLength(value, 'utf8') > 128) context.addIssue({ code: 'custom', message: 'Password exceeds 128 UTF-8 bytes' });
 });

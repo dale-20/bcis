@@ -25,7 +25,9 @@ const testScryptParameters: ScryptParameters = {
   maxMemory: 64 * 1024 * 1024,
 };
 const seededAccounts: readonly DemoAccount[] = [
+  { username: 'owner.demo', displayName: 'Demo Owner', role: 'OWNER' },
   { username: 'admin.demo', displayName: 'Demo Administrator', role: 'ADMIN' },
+  { username: 'auditor.demo', displayName: 'Demo Auditor', role: 'AUDITOR' },
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
 ];
 const initialPassword = 'Synthetic-demo-password-1';
@@ -111,6 +113,51 @@ describe.sequential('authentication and server-side authorization', () => {
     expect(backupResponse.json()).toMatchObject({ error: 'FORBIDDEN' });
     const backupDenied = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, 'backup.create'));
     expect(backupDenied).toHaveLength(1);
+  });
+
+  it('allows authorized user administration and forces a reset password change', async () => {
+    const ownerLogin = await login('owner.demo', initialPassword);
+    const changedOwner = await app.inject({ method: 'POST', url: '/auth/change-password', headers: { authorization: `Bearer ${ownerLogin.token}` }, payload: { currentPassword: initialPassword, newPassword: 'Synthetic-owner-password-2' } });
+    expect(changedOwner.statusCode).toBe(204);
+    const ownerToken = ownerLogin.token;
+    const created = await app.inject({ method: 'POST', url: '/admin/users', headers: { authorization: `Bearer ${ownerToken}` }, payload: { username: 'clerk.demo', displayName: 'Synthetic Clerk', role: 'CASHIER', password: 'Synthetic-clerk-password-1' } });
+    expect(created.statusCode).toBe(201);
+    const userId = created.json<{ id: string }>().id;
+    const duplicate = await app.inject({ method: 'POST', url: '/admin/users', headers: { authorization: `Bearer ${ownerToken}` }, payload: { username: 'CLERK.DEMO', displayName: 'Duplicate Clerk', role: 'CASHIER', password: 'Synthetic-clerk-password-1' } });
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.json()).toMatchObject({ error: 'USERNAME_TAKEN' });
+    const updated = await app.inject({ method: 'PATCH', url: `/admin/users/${userId}`, headers: { authorization: `Bearer ${ownerToken}` }, payload: { displayName: 'Synthetic Clerk Updated', role: 'AUDITOR' } });
+    expect(updated.statusCode).toBe(204);
+    const reset = await app.inject({ method: 'POST', url: `/admin/users/${userId}/password-reset`, headers: { authorization: `Bearer ${ownerToken}` }, payload: { password: 'Synthetic-clerk-password-2' } });
+    expect(reset.statusCode).toBe(204);
+    const listed = await app.inject({ method: 'GET', url: '/admin/users', headers: { authorization: `Bearer ${ownerToken}` } });
+    expect(listed.json<{ items: Array<{ id: string; role?: string; roles: string[]; mustChangePassword: boolean }> }>().items)
+      .toContainEqual(expect.objectContaining({ id: userId, roles: ['AUDITOR'], mustChangePassword: true }));
+    expect((await app.inject({ method: 'POST', url: '/auth/login', payload: { username: 'clerk.demo', password: 'Synthetic-clerk-password-2' } })).statusCode).toBe(200);
+    const audit = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, userId));
+    expect(audit.map((row) => row.action)).toEqual(expect.arrayContaining(['user.created', 'user.updated', 'user.password_reset', 'auth.login.succeeded']));
+    const userLogin = await app.inject({ method: 'POST', url: '/auth/login', payload: { username: 'clerk.demo', password: 'Synthetic-clerk-password-2' } });
+    const userToken = userLogin.json<LoginBody>().token;
+    const deactivated = await app.inject({ method: 'PATCH', url: `/admin/users/${userId}`, headers: { authorization: `Bearer ${ownerToken}` }, payload: { isActive: false } });
+    expect(deactivated.statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: '/auth/me', headers: { authorization: `Bearer ${userToken}` } })).statusCode).toBe(401);
+  });
+
+  it('exposes filtered audit detail to Owner and denies Administrator audit access', async () => {
+    const ownerLogin = await login('owner.demo', 'Synthetic-owner-password-2');
+    const ownerToken = ownerLogin.token;
+    const adminDenied = await app.inject({ method: 'GET', url: '/system/audit?action=user.created', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(adminDenied.statusCode).toBe(403);
+    const response = await app.inject({ method: 'GET', url: '/system/audit?action=user.created&page=1&pageSize=10', headers: { authorization: `Bearer ${ownerToken}` } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ items: Array<{ action: string; newValues: { username: string } }> ; total: number }>()).toMatchObject({ total: 1, items: [{ action: 'user.created', newValues: { username: 'clerk.demo' } }] });
+    const owner = await database.db.select({ id: users.id }).from(users).where(eq(users.normalizedUsername, 'owner.demo'));
+    const adminCannotDisableOwner = await app.inject({ method: 'PATCH', url: `/admin/users/${owner[0]?.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { isActive: false } });
+    expect(adminCannotDisableOwner.statusCode).toBe(403);
+    const adminCannotResetOwner = await app.inject({ method: 'POST', url: `/admin/users/${owner[0]?.id}/password-reset`, headers: { authorization: `Bearer ${adminToken}` }, payload: { password: 'Synthetic-owner-password-3' } });
+    expect(adminCannotResetOwner.statusCode).toBe(403);
+    const adminCannotGrantOwner = await app.inject({ method: 'POST', url: '/admin/users', headers: { authorization: `Bearer ${adminToken}` }, payload: { username: 'second.owner', displayName: 'Second Owner', role: 'OWNER', password: 'Synthetic-owner-password-3' } });
+    expect(adminCannotGrantOwner.statusCode).toBe(403);
   });
 
   it('requires a valid bearer session for protected routes', async () => {

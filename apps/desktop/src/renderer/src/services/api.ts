@@ -4,6 +4,9 @@ import {
   receivableAccountDesktopResultSchema, receivableAccountQuerySchema, servicePolicyDesktopResultSchema,
   suspensionListDesktopResultSchema, reconnectionListDesktopResultSchema, technicianListDesktopResultSchema,
   suspensionCreateDesktopResultSchema, serviceControlMutationDesktopResultSchema, serviceControlPolicySchema, createSuspensionInputSchema, reconnectionAssignmentSchema,
+  auditSearchSchema, auditSearchDesktopResultSchema, managedUserCreateDesktopResultSchema, managedUserCreateSchema,
+  managedUserListDesktopResultSchema, adminMutationDesktopResultSchema, managedUserPatchSchema,
+  type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -385,6 +388,22 @@ export async function assignReconnection(id: string, input: ReconnectionAssignme
 }
 export async function completeReconnection(id: string): Promise<null> {
   return unwrap(serviceControlMutationDesktopResultSchema.parse(await bridge().completeReconnection(id)));
+}
+
+export async function listManagedUsers() {
+  return unwrap(managedUserListDesktopResultSchema.parse(await bridge().listManagedUsers()));
+}
+export async function createManagedUser(input: ManagedUserCreate): Promise<{ id: string }> {
+  return unwrap(managedUserCreateDesktopResultSchema.parse(await bridge().createManagedUser(managedUserCreateSchema.parse(input))));
+}
+export async function updateManagedUser(id: string, input: ManagedUserPatch): Promise<null> {
+  return unwrap(adminMutationDesktopResultSchema.parse(await bridge().updateManagedUser(id, managedUserPatchSchema.parse(input))));
+}
+export async function resetManagedUserPassword(id: string, password: string): Promise<null> {
+  return unwrap(adminMutationDesktopResultSchema.parse(await bridge().resetManagedUserPassword(id, password)));
+}
+export async function searchAudit(query: AuditSearchQuery) {
+  return unwrap(auditSearchDesktopResultSchema.parse(await bridge().searchAudit(auditSearchSchema.parse(query))));
 }
 
 export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {

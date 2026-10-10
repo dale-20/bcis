@@ -48,6 +48,7 @@ import {
   SUSPENSIONS_LIST_CHANNEL, SUSPENSION_CREATE_CHANNEL, SUSPENSION_APPROVE_CHANNEL,
   RECONNECTIONS_LIST_CHANNEL, RECONNECTIONS_MINE_CHANNEL, TECHNICIANS_LIST_CHANNEL,
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
+  ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -171,6 +172,11 @@ void app.whenReady().then(() => {
   ipcMain.handle(TECHNICIANS_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.listTechnicians(); });
   ipcMain.handle(RECONNECTION_ASSIGN_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.reconnectionAssignment.parse(input); return api.assignReconnection(command.id, command.input); });
   ipcMain.handle(RECONNECTION_COMPLETE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.completeReconnection(desktopRequestSchemas.reconnectionId.parse(input)); });
+  ipcMain.handle(ADMIN_USERS_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.listManagedUsers(); });
+  ipcMain.handle(ADMIN_USER_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createManagedUser(desktopRequestSchemas.managedUserCreate.parse(input)); });
+  ipcMain.handle(ADMIN_USER_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.managedUserUpdate.parse(input); return api.updateManagedUser(command.id, command.input); });
+  ipcMain.handle(ADMIN_USER_PASSWORD_RESET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.managedUserPasswordReset.parse(input); return api.resetManagedUserPassword(command.id, command.password); });
+  ipcMain.handle(AUDIT_SEARCH_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.searchAudit(desktopRequestSchemas.auditSearch.parse(input)); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

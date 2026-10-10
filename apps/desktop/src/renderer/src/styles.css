@@ -512,3 +512,4 @@
 .account-receivable-filters{grid-template-columns:repeat(4,minmax(0,1fr))}.account-receivable-totals{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:900px){.account-receivable-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.account-receivable-filters,.account-receivable-totals{grid-template-columns:1fr}}
+.admin-panel{overflow:hidden;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface)}

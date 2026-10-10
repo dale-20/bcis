@@ -3,6 +3,8 @@ import {
   receivableAgingQuerySchema, receivableAgingResponseSchema,
   receivableAccountResponseSchema,
   serviceControlPolicySchema, createSuspensionInputSchema, reconnectionAssignmentSchema,
+  auditSearchSchema, auditSearchResultSchema, managedUserCreateSchema, managedUserListSchema, managedUserPatchSchema,
+  type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   receivableAccountQuerySchema as serviceReceivableAccountQuerySchema,
   reconnectionListResponseSchema, suspensionListResponseSchema, serviceTechnicianListSchema,
   collectionReferenceCatalogSchema,
@@ -281,6 +283,25 @@ export class DesktopApiClient {
     return this.call(`/service-control/reconnections/${encodeURIComponent(id)}/assignment`, { method: 'PATCH', body: JSON.stringify(reconnectionAssignmentSchema.parse(input)) }, z.null(), true, true);
   }
   completeReconnection(id: string): Promise<DesktopResult<null>> { return this.call(`/service-control/reconnections/${encodeURIComponent(id)}/complete`, { method: 'POST' }, z.null(), true, true); }
+
+  listManagedUsers(): Promise<DesktopResult<z.infer<typeof managedUserListSchema>>> {
+    return this.call('/admin/users', { method: 'GET' }, managedUserListSchema);
+  }
+  createManagedUser(input: ManagedUserCreate): Promise<DesktopResult<{ id: string }>> {
+    return this.call('/admin/users', { method: 'POST', body: JSON.stringify(managedUserCreateSchema.parse(input)) }, z.object({ id: z.uuid() }));
+  }
+  updateManagedUser(id: string, input: ManagedUserPatch): Promise<DesktopResult<null>> {
+    return this.call(`/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(managedUserPatchSchema.parse(input)) }, z.null(), true, true);
+  }
+  resetManagedUserPassword(id: string, password: string): Promise<DesktopResult<null>> {
+    return this.call(`/admin/users/${encodeURIComponent(id)}/password-reset`, { method: 'POST', body: JSON.stringify({ password }) }, z.null(), true, true);
+  }
+  searchAudit(query: AuditSearchQuery): Promise<DesktopResult<z.infer<typeof auditSearchResultSchema>>> {
+    const parsed = auditSearchSchema.parse(query);
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(parsed)) if (value !== '' && value !== undefined) search.set(key, String(value));
+    return this.call(`/system/audit?${search.toString()}`, { method: 'GET' }, auditSearchResultSchema);
+  }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {
     return this.call('/billing/cycles', { method: 'GET' }, billingCycleListSchema);

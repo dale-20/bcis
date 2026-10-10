@@ -45,6 +45,9 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /auth/change-password` | Valid bearer session | Password change recorded; other active sessions revoked |
 | `POST /auth/logout` | Valid bearer session | Session revoked and logout recorded |
 | `GET /admin/users` | Valid session, changed demo password, `user.manage` | Missing permission recorded as `authorization.denied` |
+| `POST /admin/users`, `PATCH /admin/users/:userId` | Valid session and `user.manage`; granting/managing OWNER requires OWNER role | Creation/role/status changes are audited; deactivation revokes active sessions; at least one active Owner is preserved |
+| `POST /admin/users/:userId/password-reset` | Valid session and `user.manage`; resetting an OWNER account requires OWNER role | Stores a new scrypt hash, forces password change, revokes active sessions, and records no password value |
+| `GET /system/audit` | Valid session and `audit.view` | Read-only, server-filtered by actor/action/entity/date/request ID and paginated with before/after values |
 | `POST /payments` | Valid session and `payment.create` | Posting or pending GCash submission is audited atomically |
 | `POST /payments/gcash/proofs` | Valid session and `payment.create` | Type/size validation, generated key, uploader-bound staged file |
 | `GET /payments/gcash/pending`, `GET /payments/:id/proof` | Valid session and `payment.verify_gcash` | Queue and attachment retrieval remain restricted to authorized reviewers |

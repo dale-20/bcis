@@ -25,7 +25,7 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 - Most operational server workflows have no desktop screen or typed preload method.
 - Subscriber, plan, service, collector, and area maintenance lacks complete edit/archive/status workflows.
 - Verified backup/restore does not yet include the configured GCash proof attachment directory (Increment 8).
-- Suspension/reconnection, user administration, audit viewer, settings, and guided backup/restore are incomplete.
+- General company/billing settings and guided backup/restore remain incomplete (Increment 8); current settings only cover service-control policy.
 - Physical three-PC, maximum-volume, and full desktop acceptance evidence remains incomplete.
 
 ## Increment 1 - Application shell and permission-aware navigation
@@ -146,6 +146,8 @@ Delivered: the preview serializes against posting for the selected subscriber an
 **Gate:** Aging boundaries and totals pass; two synthetic suspension/reconnection scenarios work end to end; financial actions remain unavailable to Technicians.
 
 ## Increment 8 - Administration, audit, settings, and recovery
+
+**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset and searchable audit workflows now have protected API routes, typed preload calls, dedicated desktop screens, and real PostgreSQL authorization coverage. Admin cannot view audit, mutate Owner identities, or grant Owner. Billing/company settings and guided database-plus-attachment recovery remain open; do not mark this increment complete yet.
 
 **Goal:** Complete Owner/Admin control and auditability.
 

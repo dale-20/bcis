@@ -6,6 +6,7 @@ import { AppError } from '../errors.js';
 import { PasswordHasher } from './password.js';
 import { permissionDefinitions, type PermissionCode } from './permissions.js';
 import { normalizeUsername } from './schemas.js';
+import type { RoleCode } from './permissions.js';
 
 const FAILED_LOGIN_LIMIT = 5;
 const LOCK_MINUTES = 15;
@@ -244,6 +245,90 @@ export class AuthService {
       grouped.set(row.id, current);
     }
     return [...grouped.values()];
+  }
+
+  async createManagedUser(input: { username: string; displayName: string; role: RoleCode; password: string }, actor: AuthContext, metadata: RequestMetadata) {
+    const now = this.now();
+    if (input.role === 'OWNER' && !actor.roles.includes('OWNER')) throw new AppError(403, 'OWNER_ROLE_REQUIRED', 'Only an Owner can grant the Owner role');
+    const passwordHash = await this.passwordHasher.hash(input.password);
+    return this.database.db.transaction(async (transaction) => {
+      const normalizedUsername = normalizeUsername(input.username);
+      const [existing] = await transaction.select({ id: users.id }).from(users).where(eq(users.normalizedUsername, normalizedUsername)).limit(1);
+      if (existing) throw new AppError(409, 'USERNAME_TAKEN', 'That username is already assigned');
+      const [role] = await transaction.select({ id: roles.id }).from(roles).where(eq(roles.code, input.role)).limit(1);
+      if (!role) throw new AppError(400, 'ROLE_INVALID', 'Select a supported role');
+      const [user] = await transaction.insert(users).values({
+        username: input.username.trim(), normalizedUsername,
+        displayName: input.displayName, passwordHash, isActive: true, mustChangePassword: true,
+      }).returning({ id: users.id, username: users.username, displayName: users.displayName });
+      if (!user) throw new Error('User insert did not return an identifier');
+      await transaction.insert(userRoles).values({ userId: user.id, roleId: role.id });
+      await transaction.insert(auditLogs).values({
+        actorUserId: actor.userId, sessionId: actor.sessionId, action: 'user.created', entityType: 'user', entityId: user.id,
+        newValues: { username: user.username, displayName: user.displayName, role: input.role, mustChangePassword: true },
+        requestId: metadata.requestId, ipAddress: metadata.ipAddress, createdAt: now,
+      });
+      return { id: user.id };
+    });
+  }
+
+  async updateManagedUser(id: string, input: { displayName?: string; role?: RoleCode; isActive?: boolean }, actor: AuthContext, metadata: RequestMetadata): Promise<void> {
+    const now = this.now();
+    await this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ id: users.id, username: users.username, displayName: users.displayName, isActive: users.isActive })
+        .from(users).where(eq(users.id, id)).limit(1);
+      if (!current) throw new AppError(404, 'USER_NOT_FOUND', 'User was not found');
+      if (id === actor.userId && input.isActive === false) throw new AppError(400, 'CANNOT_DEACTIVATE_SELF', 'You cannot deactivate your own account');
+      const previousRoles = await transaction.select({ code: roles.code }).from(userRoles).innerJoin(roles, eq(userRoles.roleId, roles.id)).where(eq(userRoles.userId, id));
+      const isOwner = previousRoles.some((row) => row.code === 'OWNER');
+      if (isOwner && !actor.roles.includes('OWNER')) throw new AppError(403, 'OWNER_ROLE_REQUIRED', 'Only an Owner can manage an Owner account');
+      if (input.role === 'OWNER' && !actor.roles.includes('OWNER')) throw new AppError(403, 'OWNER_ROLE_REQUIRED', 'Only an Owner can grant the Owner role');
+      const removingActiveOwner = isOwner && ((input.role !== undefined && input.role !== 'OWNER') || input.isActive === false);
+      if (removingActiveOwner) {
+        const [ownerCount] = await transaction.select({ total: sql<number>`count(*)::int` }).from(users)
+          .innerJoin(userRoles, eq(userRoles.userId, users.id)).innerJoin(roles, eq(userRoles.roleId, roles.id))
+          .where(and(eq(roles.code, 'OWNER'), eq(users.isActive, true)));
+        if ((ownerCount?.total ?? 0) <= 1) throw new AppError(400, 'LAST_ACTIVE_OWNER', 'At least one active Owner account must remain');
+      }
+      const oldValues = { displayName: current.displayName, isActive: current.isActive, roles: previousRoles.map((row) => row.code) };
+      const changes: { displayName?: string; isActive?: boolean; updatedAt: Date } = { updatedAt: now };
+      if (input.displayName !== undefined) changes.displayName = input.displayName;
+      if (input.isActive !== undefined) changes.isActive = input.isActive;
+      await transaction.update(users).set(changes).where(eq(users.id, id));
+      let nextRole = previousRoles[0]?.code;
+      if (input.role !== undefined) {
+        const [role] = await transaction.select({ id: roles.id }).from(roles).where(eq(roles.code, input.role)).limit(1);
+        if (!role) throw new AppError(400, 'ROLE_INVALID', 'Select a supported role');
+        await transaction.delete(userRoles).where(eq(userRoles.userId, id));
+        await transaction.insert(userRoles).values({ userId: id, roleId: role.id });
+        nextRole = input.role;
+      }
+      if (input.isActive === false) await transaction.update(userSessions).set({ revokedAt: now, revokedReason: 'ACCOUNT_DEACTIVATED' })
+        .where(and(eq(userSessions.userId, id), isNull(userSessions.revokedAt)));
+      await transaction.insert(auditLogs).values({
+        actorUserId: actor.userId, sessionId: actor.sessionId, action: 'user.updated', entityType: 'user', entityId: id,
+        oldValues, newValues: { displayName: input.displayName ?? current.displayName, isActive: input.isActive ?? current.isActive, role: nextRole },
+        requestId: metadata.requestId, ipAddress: metadata.ipAddress, createdAt: now,
+      });
+    });
+  }
+
+  async resetManagedUserPassword(id: string, password: string, actor: AuthContext, metadata: RequestMetadata): Promise<void> {
+    const passwordHash = await this.passwordHasher.hash(password);
+    const now = this.now();
+    await this.database.db.transaction(async (transaction) => {
+      const [user] = await transaction.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+      if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'User was not found');
+      const [ownerRole] = await transaction.select({ userId: userRoles.userId }).from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id)).where(and(eq(userRoles.userId, id), eq(roles.code, 'OWNER'))).limit(1);
+      if (ownerRole && !actor.roles.includes('OWNER')) throw new AppError(403, 'OWNER_ROLE_REQUIRED', 'Only an Owner can reset an Owner account password');
+      await transaction.update(users).set({ passwordHash, mustChangePassword: true, failedLoginCount: 0, lockedUntil: null, updatedAt: now }).where(eq(users.id, id));
+      await transaction.update(userSessions).set({ revokedAt: now, revokedReason: 'ADMIN_PASSWORD_RESET' })
+        .where(and(eq(userSessions.userId, id), isNull(userSessions.revokedAt)));
+      await transaction.insert(auditLogs).values({ actorUserId: actor.userId, sessionId: actor.sessionId,
+        action: 'user.password_reset', entityType: 'user', entityId: id,
+        newValues: { mustChangePassword: true }, requestId: metadata.requestId, ipAddress: metadata.ipAddress, createdAt: now });
+    });
   }
 
   private async loadGrants(userId: string): Promise<{ roles: string[]; permissions: PermissionCode[] }> {
