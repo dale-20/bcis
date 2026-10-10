@@ -1,0 +1,9 @@
+# BCIS Buddy
+
+BCIS Buddy is an optional renderer companion mounted only inside the authenticated Electron workspace. It uses a custom, layered SVG in the BCIS visual palette; no network, database, or filesystem access is added. The visual is made from independently animated face, arms, legs, and body parts rather than a single image with a bobbing transform.
+
+The current implementation provides idle breathing, a login wave, a success cheer, processing motion, walking motion while dragged, thinking tilt styling, warning/error shake, surprised expression, and a quiet sleep pose after inactivity. It supports pointer-captured dragging constrained to the renderer viewport, minimize/restore, reduced-motion preferences, optional short sound cues (off by default), and versioned local preference storage. Position is clamped again after window resize.
+
+The renderer service layer emits fixed, non-sensitive event names after validated outcomes: subscriber creation, billing start/success/failure, posted payments, verified GCash posting, overdue account search results, report start/finish/failure, and verified backup creation. Connection status feedback is emitted by the connection screen when its readiness query observes a change. No subscriber names, balances, payment amounts, or proof content enter mascot messages. Payment success is emitted only when the validated API result has status `POSTED`.
+
+This is a staged 2D CSS/SVG implementation, not a Rive/Spine rig or frame-by-frame animation pack. It has no imported brand-guide artwork; the supplied concept informed a new vector illustration. There is not yet a dedicated authored pose for every possible service notification, nor an interactive walking path outside direct dragging. Those limitations should be considered before describing the mascot as a production-complete animation rig.

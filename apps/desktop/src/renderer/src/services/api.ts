@@ -82,6 +82,7 @@ import {
   type PaymentResult, type PostPaymentInput, type ReversePaymentInput,
   type VerifyGcashInput,
 } from '@bcis/shared';
+import { announceMascotEvent } from '../features/mascot/mascot-events';
 
 export class DesktopServiceError extends Error {
   constructor(readonly code: string, message: string) {
@@ -132,7 +133,9 @@ export async function getSubscriber(id: string): Promise<SubscriberDetail> {
 
 export async function createSubscriber(input: SubscriberCreate): Promise<SubscriberDetail> {
   const command = subscriberCreateSchema.parse(input);
-  return unwrap(subscriberDetailResultSchema.parse(await bridge().createSubscriber(command)));
+  const subscriber = unwrap(subscriberDetailResultSchema.parse(await bridge().createSubscriber(command)));
+  announceMascotEvent('subscriber-created');
+  return subscriber;
 }
 
 export async function updateSubscriber(id: string, input: SubscriberUpdate): Promise<SubscriberDetail> {
@@ -226,16 +229,32 @@ export async function getDashboard(input: DashboardQuery): Promise<Dashboard> {
 }
 
 export async function getReport(input: ReportRequest): Promise<ReportData> {
-  const result = await bridge().getReport(reportRequestSchema.parse(input));
-  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
-  return reportDataSchema.parse(result.data);
+  announceMascotEvent('report-start');
+  try {
+    const result = await bridge().getReport(reportRequestSchema.parse(input));
+    if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+    const report = reportDataSchema.parse(result.data);
+    announceMascotEvent('report-finish');
+    return report;
+  } catch (error) {
+    announceMascotEvent('report-error');
+    throw error;
+  }
 }
 
 export async function exportReport(input: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<ExportResult> {
   const query = { ...reportRequestSchema.parse(input), format: input.format };
-  const result = await bridge().exportReport(query);
-  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
-  return exportResultSchema.parse(result.data);
+  announceMascotEvent('report-start');
+  try {
+    const result = await bridge().exportReport(query);
+    if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+    const exported = exportResultSchema.parse(result.data);
+    if (exported.saved) announceMascotEvent('report-finish');
+    return exported;
+  } catch (error) {
+    announceMascotEvent('report-error');
+    throw error;
+  }
 }
 
 export async function getServiceHistory(subscriberId: string): Promise<ServiceHistory> {
@@ -253,7 +272,15 @@ export async function previewBilling(input: GenerateBillingCycleInput): Promise<
 }
 
 export async function generateBilling(input: GenerateBillingCycleInput): Promise<BillingGenerationResult> {
-  return unwrap(billingGenerationResultDesktopSchema.parse(await bridge().generateBilling(generateBillingCycleInputSchema.parse(input))));
+  announceMascotEvent('billing-start');
+  try {
+    const result = unwrap(billingGenerationResultDesktopSchema.parse(await bridge().generateBilling(generateBillingCycleInputSchema.parse(input))));
+    announceMascotEvent('billing-success');
+    return result;
+  } catch (error) {
+    announceMascotEvent('billing-error');
+    throw error;
+  }
 }
 
 export async function getBillingCycle(id: string): Promise<BillingCycleDetail> {
@@ -304,7 +331,14 @@ export async function getPayment(id: string): Promise<PaymentDetail> {
 
 export async function postPayment(input: PostPaymentInput): Promise<PaymentResult> {
   const command = postPaymentInputSchema.parse(input);
-  return unwrap(paymentResultDesktopResultSchema.parse(await bridge().postPayment(command)));
+  try {
+    const payment = unwrap(paymentResultDesktopResultSchema.parse(await bridge().postPayment(command)));
+    if (payment.status === 'POSTED') announceMascotEvent('payment-posted');
+    return payment;
+  } catch (error) {
+    announceMascotEvent('payment-error');
+    throw error;
+  }
 }
 
 export async function reversePayment(id: string, input: ReversePaymentInput): Promise<PaymentResult> {
@@ -328,7 +362,9 @@ export async function getGcashProof(paymentId: string) {
 
 export async function verifyGcashPayment(paymentId: string, input: VerifyGcashInput): Promise<PaymentResult> {
   const command = verifyGcashInputSchema.parse(input);
-  return unwrap(paymentResultDesktopResultSchema.parse(await bridge().verifyGcashPayment(paymentId, command)));
+  const payment = unwrap(paymentResultDesktopResultSchema.parse(await bridge().verifyGcashPayment(paymentId, command)));
+  if (command.decision === 'VERIFIED' && payment.status === 'POSTED') announceMascotEvent('gcash-approved');
+  return payment;
 }
 
 export async function listCollectionBatches(query: CollectionBatchListQuery): Promise<CollectionBatchList> {
@@ -356,7 +392,9 @@ export async function getReceivableAging(query: ReceivableAgingQuery): Promise<R
 
 export async function getReceivableAccounts(query: ReceivableAccountQuery): Promise<ReceivableAccountResponse> {
   const command = receivableAccountQuerySchema.parse(query);
-  return unwrap(receivableAccountDesktopResultSchema.parse(await bridge().getReceivableAccounts(command)));
+  const result = unwrap(receivableAccountDesktopResultSchema.parse(await bridge().getReceivableAccounts(command)));
+  if (command.overdueOnly && result.total > 0) announceMascotEvent('overdue-found');
+  return result;
 }
 export async function getServiceControlPolicy(): Promise<ServiceControlPolicy> {
   return unwrap(servicePolicyDesktopResultSchema.parse(await bridge().getServiceControlPolicy()));
