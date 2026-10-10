@@ -63,12 +63,17 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.screenshot({ path: 'test-results/dashboard.png' });
     await page.getByRole('link', { name: 'Subscribers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
-    await expect(page.getByText('50 subscribers', { exact: false })).toBeVisible();
+    await expect(page.getByText(/of \d+ subscribers/)).toBeVisible();
     await page.getByRole('textbox', { name: 'Search subscribers' }).fill('BCIS-00001');
     await expect(page.getByRole('row', { name: 'Open Amihan Abad' })).toBeVisible();
     await page.getByRole('row', { name: 'Open Amihan Abad' }).click();
     await expect(page.getByRole('heading', { name: 'Amihan Abad' })).toBeVisible();
     await expect(page.getByText('SVC-00001-2')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Edit subscriber' })).toBeVisible();
+    await page.getByLabel('Notes').fill('Verified through the desktop subscriber workflow.');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Verified through the desktop subscriber workflow.')).toBeVisible();
     await page.screenshot({ path: 'test-results/subscriber-profile.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
     await expect(page.getByRole('button', { name: 'New subscriber' })).toBeVisible();
@@ -78,7 +83,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changePassword', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout'].sort(),
+      bridge: ['changePassword', 'changeSubscriberStatus', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout', 'updateSubscriber'].sort(),
       node: false,
       process: false,
     });

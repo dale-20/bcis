@@ -103,6 +103,37 @@ export const subscriberCreateSchema = z.object({
 });
 export type SubscriberCreate = z.infer<typeof subscriberCreateSchema>;
 
+const subscriberMaintenanceFields = {
+  accountNumber: identifierSchema,
+  firstName: z.string().trim().min(1).max(80),
+  middleName: optionalText(80),
+  lastName: z.string().trim().min(1).max(80),
+  organizationName: optionalText(160),
+  billingDay: z.number().int().min(1).max(28),
+  dueDay: z.number().int().min(1).max(31),
+  notes: optionalText(2000),
+};
+
+export const subscriberUpdateSchema = z.object({
+  ...subscriberMaintenanceFields,
+  contacts: z.array(subscriberContactInputSchema.extend({ id: z.uuid().optional() })).min(1).max(10),
+  addresses: z.array(subscriberAddressInputSchema.extend({ id: z.uuid().optional() })).min(1).max(10),
+}).superRefine((value, context) => {
+  if (value.contacts.filter((contact) => contact.isPrimary).length !== 1) {
+    context.addIssue({ code: 'custom', path: ['contacts'], message: 'Select exactly one primary contact' });
+  }
+  if (value.addresses.filter((address) => address.isPrimary).length !== 1) {
+    context.addIssue({ code: 'custom', path: ['addresses'], message: 'Select exactly one primary address' });
+  }
+});
+export type SubscriberUpdate = z.infer<typeof subscriberUpdateSchema>;
+
+export const subscriberStatusChangeSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE', 'ARCHIVED']),
+  reason: z.string().trim().min(3).max(255),
+});
+export type SubscriberStatusChange = z.infer<typeof subscriberStatusChangeSchema>;
+
 export const subscriberDetailSchema = z.object({
   id: z.uuid(),
   accountNumber: z.string(),

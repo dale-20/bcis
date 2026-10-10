@@ -50,7 +50,7 @@ export function SubscribersPage({ user, mode, onNavigate }: { user: Authenticate
 
   if (mode === 'profile') {
     if (!subscriberId) return <section className="page-state error-state"><h2>Subscriber unavailable</h2><p>The subscriber identifier is missing.</p><Button variant="outline" onClick={() => onNavigate('/subscribers')}>Back to subscribers</Button></section>;
-    return <SubscriberProfile id={subscriberId} onBack={() => onNavigate('/subscribers')} />;
+    return <SubscriberProfile id={subscriberId} user={user} onBack={() => onNavigate('/subscribers')} />;
   }
   if (mode === 'create') {
     if (referenceQuery.isPending) return <PageLoading label="Loading plans and collection routes..." />;

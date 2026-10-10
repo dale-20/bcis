@@ -30,5 +30,25 @@ describe('DesktopApiClient', () => {
     expect(result).toEqual({ ok: false, error: { code: 'SESSION_INVALID', message: 'Authentication required' } });
     expect(api.session()).toEqual({ ok: true, data: null });
   });
+
+  it('uses fixed protected routes for subscriber maintenance', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'private-token', expiresAt: new Date().toISOString(), user }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'TEST', message: 'Expected test response' }), { status: 409, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'TEST', message: 'Expected test response' }), { status: 409, headers: { 'Content-Type': 'application/json' } }));
+    const api = new DesktopApiClient('http://127.0.0.1:3001', request as unknown as typeof fetch);
+    await api.login({ username: 'admin.demo', password: 'synthetic-password' });
+    const id = '018f70ea-7c89-7b61-bef2-4dfb1aaf33d0';
+    await api.updateSubscriber(id, {
+      accountNumber: 'BCIS-00001', firstName: 'Test', lastName: 'Subscriber', billingDay: 1, dueDay: 11,
+      contacts: [{ type: 'MOBILE', value: '09170000000', isPrimary: true }],
+      addresses: [{ type: 'SERVICE', line1: '1 Test Street', barangay: 'Casisang', municipality: 'Malaybalay City', province: 'Bukidnon', isPrimary: true }],
+    });
+    await api.changeSubscriberStatus(id, { status: 'ARCHIVED', reason: 'Synthetic closure' });
+    expect((request.mock.calls[1]?.[0] as URL).pathname).toBe(`/subscribers/${id}`);
+    expect((request.mock.calls[1]?.[1] as RequestInit).method).toBe('PATCH');
+    expect((request.mock.calls[2]?.[0] as URL).pathname).toBe(`/subscribers/${id}/status`);
+    expect((request.mock.calls[2]?.[1] as RequestInit).method).toBe('POST');
+  });
 });
 

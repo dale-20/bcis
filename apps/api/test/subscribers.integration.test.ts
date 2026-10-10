@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { ReferenceData, SubscriberCreate, SubscriberDetail, SubscriberListResponse } from '@bcis/shared';
+import type { ReferenceData, SubscriberCreate, SubscriberDetail, SubscriberListResponse, SubscriberUpdate } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -53,6 +53,7 @@ afterAll(async () => {
 describe.sequential('subscriber operations', () => {
   let adminToken = '';
   let cashierToken = '';
+  let createdSubscriberId = '';
   let references: ReferenceData;
 
   it('activates Admin and Cashier sessions', async () => {
@@ -121,6 +122,80 @@ describe.sequential('subscriber operations', () => {
     expect(response.statusCode).toBe(201);
     expect(response.json<SubscriberDetail>()).toMatchObject({ accountNumber: 'BCIS-90001' });
     expect(response.json<SubscriberDetail>().services).toHaveLength(2);
+    createdSubscriberId = response.json<SubscriberDetail>().id;
+  });
+
+  it('updates subscriber identity, contacts, and addresses with an audit record', async () => {
+    const profile = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` } })).json<SubscriberDetail>();
+    const input: SubscriberUpdate = {
+      accountNumber: profile.accountNumber,
+      firstName: 'Updated',
+      middleName: '',
+      lastName: profile.lastName,
+      organizationName: 'Synthetic Test Organization',
+      billingDay: 9,
+      dueDay: 19,
+      notes: 'Maintained through the subscriber profile.',
+      contacts: [
+        ...profile.contacts.map((contact, index) => ({ id: contact.id, type: contact.type, value: index === 0 ? '0917 000 9111' : contact.value, isPrimary: contact.isPrimary })),
+        { type: 'EMAIL' as const, value: 'subscriber@example.test', isPrimary: false },
+      ],
+      addresses: profile.addresses.map((address, index) => ({ id: address.id, type: address.type, line1: index === 0 ? '11 Updated Integration Street' : address.line1, line2: address.line2 ?? '', barangay: address.barangay, municipality: address.municipality, province: address.province, postalCode: address.postalCode ?? '', isPrimary: address.isPrimary })),
+    };
+    const response = await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` }, payload: input });
+    expect(response.statusCode).toBe(200);
+    expect(response.json<SubscriberDetail>()).toMatchObject({ firstName: 'Updated', organizationName: 'Synthetic Test Organization', billingDay: 9, dueDay: 19 });
+    expect(response.json<SubscriberDetail>().contacts[0]?.value).toBe('0917 000 9111');
+    expect(response.json<SubscriberDetail>().contacts).toHaveLength(2);
+    expect(response.json<SubscriberDetail>().contacts.some((contact) => contact.value === 'subscriber@example.test')).toBe(true);
+    expect(response.json<SubscriberDetail>().addresses[0]?.line1).toBe('11 Updated Integration Street');
+    const audit = await database.pool.query<{ action: string }>('SELECT action FROM audit_logs WHERE entity_id = $1 AND action = $2', [createdSubscriberId, 'subscriber.updated']);
+    expect(audit.rows).toHaveLength(1);
+  });
+
+  it('rolls back all subscriber edits when removing an address used by a service', async () => {
+    const before = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` } })).json<SubscriberDetail>();
+    const usedAddressId = before.addresses.find((address) => !address.isPrimary)?.id;
+    expect(usedAddressId).toBeTypeOf('string');
+    const response = await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` }, payload: {
+      accountNumber: before.accountNumber, firstName: 'Must Roll Back', middleName: before.middleName ?? '', lastName: before.lastName,
+      organizationName: before.organizationName ?? '', billingDay: before.billingDay, dueDay: before.dueDay, notes: before.notes ?? '',
+      contacts: before.contacts.map((contact) => ({ id: contact.id, type: contact.type, value: contact.value, isPrimary: contact.isPrimary })),
+      addresses: before.addresses.filter((address) => address.id !== usedAddressId).map((address) => ({ id: address.id, type: address.type, line1: address.line1, line2: address.line2 ?? '', barangay: address.barangay, municipality: address.municipality, province: address.province, postalCode: address.postalCode ?? '', isPrimary: address.isPrimary })),
+    } });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({ error: 'ADDRESS_IN_USE' });
+    const after = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${adminToken}` } })).json<SubscriberDetail>();
+    expect(after.firstName).toBe(before.firstName);
+    expect(after.addresses).toHaveLength(before.addresses.length);
+  });
+
+  it('denies Cashier subscriber maintenance actions', async () => {
+    const profile = (await app.inject({ method: 'GET', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${cashierToken}` } })).json<SubscriberDetail>();
+    const input: SubscriberUpdate = {
+      accountNumber: profile.accountNumber, firstName: profile.firstName, middleName: profile.middleName ?? '', lastName: profile.lastName,
+      organizationName: profile.organizationName ?? '', billingDay: profile.billingDay, dueDay: profile.dueDay, notes: profile.notes ?? '',
+      contacts: profile.contacts.map((contact) => ({ id: contact.id, type: contact.type, value: contact.value, isPrimary: contact.isPrimary })),
+      addresses: profile.addresses.map((address) => ({ id: address.id, type: address.type, line1: address.line1, line2: address.line2 ?? '', barangay: address.barangay, municipality: address.municipality, province: address.province, postalCode: address.postalCode ?? '', isPrimary: address.isPrimary })),
+    };
+    expect((await app.inject({ method: 'PATCH', url: `/subscribers/${createdSubscriberId}`, headers: { authorization: `Bearer ${cashierToken}` }, payload: input })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/status`, headers: { authorization: `Bearer ${cashierToken}` }, payload: { status: 'ARCHIVED', reason: 'Cashier must not archive' } })).statusCode).toBe(403);
+  });
+
+  it('blocks archival with live services, then archives and reactivates with immutable audit history', async () => {
+    const blocked = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/status`, headers: { authorization: `Bearer ${adminToken}` }, payload: { status: 'ARCHIVED', reason: 'Synthetic account closure' } });
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toMatchObject({ error: 'ACTIVE_SERVICES_EXIST' });
+
+    await database.pool.query("UPDATE service_accounts SET status = 'TERMINATED' WHERE subscriber_id = $1", [createdSubscriberId]);
+    const archived = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/status`, headers: { authorization: `Bearer ${adminToken}` }, payload: { status: 'ARCHIVED', reason: 'Synthetic account closure' } });
+    expect(archived.statusCode).toBe(200);
+    expect(archived.json<SubscriberDetail>().status).toBe('ARCHIVED');
+    const reactivated = await app.inject({ method: 'POST', url: `/subscribers/${createdSubscriberId}/status`, headers: { authorization: `Bearer ${adminToken}` }, payload: { status: 'ACTIVE', reason: 'Synthetic account restored' } });
+    expect(reactivated.statusCode).toBe(200);
+    expect(reactivated.json<SubscriberDetail>().status).toBe('ACTIVE');
+    const audit = await database.pool.query<{ reason: string }>('SELECT reason FROM audit_logs WHERE entity_id = $1 AND action = $2 ORDER BY created_at', [createdSubscriberId, 'subscriber.status_changed']);
+    expect(audit.rows.map((row) => row.reason)).toEqual(['Synthetic account closure', 'Synthetic account restored']);
   });
 
   it('rolls back nested records when a unique account identifier conflicts', async () => {

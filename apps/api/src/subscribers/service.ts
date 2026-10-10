@@ -6,6 +6,8 @@ import type {
   SubscriberDetail,
   SubscriberListQuery,
   SubscriberListResponse,
+  SubscriberStatusChange,
+  SubscriberUpdate,
 } from './types.js';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
@@ -81,6 +83,35 @@ export class SubscriberService {
       if (databaseCode(error) === '23505') {
         throw new AppError(409, 'DUPLICATE_IDENTIFIER', 'The account or service number is already in use');
       }
+      throw error;
+    }
+  }
+
+  async update(id: string, input: SubscriberUpdate, actorUserId: string, requestId: string): Promise<SubscriberDetail> {
+    try {
+      await this.repository.update(id, input, actorUserId, requestId);
+      return await this.get(id);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SUBSCRIBER_NOT_FOUND') throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
+      if (error instanceof Error && (error.message === 'CHILD_NOT_OWNED' || error.message === 'DUPLICATE_CHILD_ID')) {
+        throw new AppError(400, 'SUBSCRIBER_CHILD_INVALID', 'A contact or address does not belong to this subscriber');
+      }
+      if (error instanceof Error && error.message === 'ADDRESS_IN_USE') {
+        throw new AppError(409, 'ADDRESS_IN_USE', 'An address assigned to a service account cannot be removed');
+      }
+      if (databaseCode(error) === '23505') throw new AppError(409, 'DUPLICATE_IDENTIFIER', 'The account number or contact value is already in use');
+      throw error;
+    }
+  }
+
+  async changeStatus(id: string, input: SubscriberStatusChange, actorUserId: string, requestId: string): Promise<SubscriberDetail> {
+    try {
+      await this.repository.changeStatus(id, input, actorUserId, requestId);
+      return await this.get(id);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'SUBSCRIBER_NOT_FOUND') throw new AppError(404, 'SUBSCRIBER_NOT_FOUND', 'Subscriber not found');
+      if (error instanceof Error && error.message === 'STATUS_TRANSITION_INVALID') throw new AppError(409, 'STATUS_TRANSITION_INVALID', 'This subscriber status change is not allowed');
+      if (error instanceof Error && error.message === 'ACTIVE_SERVICES_EXIST') throw new AppError(409, 'ACTIVE_SERVICES_EXIST', 'Disconnect or terminate every service account before making the subscriber inactive or archived');
       throw error;
     }
   }

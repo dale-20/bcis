@@ -5,7 +5,9 @@ import {
   referenceDataResultSchema,
   sessionResultSchema,
   subscriberCreateSchema,
+  subscriberStatusChangeSchema,
   subscriberDetailResultSchema,
+  subscriberUpdateSchema,
   subscriberListQuerySchema,
   subscriberListResultSchema,
   type AuthenticatedUser,
@@ -14,6 +16,8 @@ import {
   type SubscriberDetail,
   type SubscriberListQuery,
   type SubscriberListResponse,
+  type SubscriberStatusChange,
+  type SubscriberUpdate,
   dashboardQuerySchema, dashboardSchema, reportDataSchema, reportRequestSchema, serviceHistorySchema, exportResultSchema,
   type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory,
 } from '@bcis/shared';
@@ -68,6 +72,16 @@ export async function getSubscriber(id: string): Promise<SubscriberDetail> {
 export async function createSubscriber(input: SubscriberCreate): Promise<SubscriberDetail> {
   const command = subscriberCreateSchema.parse(input);
   return unwrap(subscriberDetailResultSchema.parse(await bridge().createSubscriber(command)));
+}
+
+export async function updateSubscriber(id: string, input: SubscriberUpdate): Promise<SubscriberDetail> {
+  const command = subscriberUpdateSchema.parse(input);
+  return unwrap(subscriberDetailResultSchema.parse(await bridge().updateSubscriber(id, command)));
+}
+
+export async function changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<SubscriberDetail> {
+  const command = subscriberStatusChangeSchema.parse(input);
+  return unwrap(subscriberDetailResultSchema.parse(await bridge().changeSubscriberStatus(id, command)));
 }
 
 export async function getReferenceData(): Promise<ReferenceData> {

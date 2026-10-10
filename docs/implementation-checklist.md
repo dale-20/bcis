@@ -26,7 +26,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 3 — Core operational data (PDF §§3.2–3.3, 5)
 
-- [ ] Subscribers: identity, unique account number, contacts, addresses, area, collector, billing/due day, status, notes; create/list/detail are complete, while edit and archive remain pending.
+- [x] Subscribers: identity, unique account number, contacts, addresses, billing/due day, status, and notes support create/list/detail/edit plus guarded archive/reactivate; service area and collector remain attached through service accounts.
 - [x] One subscriber may own multiple services and addresses. Unique service numbers and foreign keys for owned records.
 - [x] Internet/Cable/Combo plans: code/name/price/fees/description/active status; speed/channel attributes where applicable.
 - [x] Service accounts: plan, installation address, activation/billing start dates, billing/due day, current rate/status/collector.

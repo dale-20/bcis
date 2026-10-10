@@ -247,6 +247,7 @@
   .profile-cycle div { @apply text-right; }
   .profile-cycle dt { @apply text-xs text-secondary; }
   .profile-cycle dd { @apply m-0 mt-1 text-lg font-semibold tabular-nums; }
+  .profile-actions { @apply flex shrink-0 items-center gap-2; }
   .profile-grid { @apply mt-7 grid grid-cols-[minmax(0,1.7fr)_minmax(280px,.8fr)] items-start gap-6; }
   .profile-aside { @apply flex flex-col gap-6; }
   .profile-section { @apply overflow-hidden rounded-xl border border-border bg-surface; }
@@ -283,7 +284,7 @@
   .subscriber-form { @apply flex flex-col gap-6; }
   .form-section { @apply rounded-xl border border-border bg-surface p-6; }
   .form-section-title { @apply mb-5; }
-  .form-section-title h2 { @apply text-base; }
+  .form-section-title h2, .form-section-title h3 { @apply text-base; }
   .form-section-title p { @apply mt-1 text-xs text-secondary; }
   .form-section-title.with-action { @apply flex items-start justify-between gap-4; }
   .form-grid { @apply grid gap-5; }
@@ -298,6 +299,16 @@
   .choice-label input { @apply accent-primary; }
   .align-end { @apply self-end; }
   .form-actions { @apply sticky bottom-0 flex justify-end gap-3 border-t border-border bg-canvas/95 py-4; backdrop-filter: blur(12px); }
+  .dialog-backdrop { @apply fixed inset-0 z-50 flex items-center justify-center p-6; background: rgba(8, 20, 39, .46); backdrop-filter: blur(5px); }
+  .edit-dialog { @apply flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-canvas; box-shadow: 0 30px 80px rgba(8, 20, 39, .25); }
+  .status-dialog { @apply w-full max-w-md rounded-2xl border border-border bg-surface p-6; box-shadow: 0 30px 80px rgba(8, 20, 39, .25); }
+  .dialog-heading { @apply flex items-start justify-between gap-5 border-b border-border bg-surface px-6 py-5; }
+  .status-dialog .dialog-heading { @apply -mx-6 -mt-6 mb-5; }
+  .dialog-heading h2 { @apply text-lg; }
+  .dialog-heading p { @apply mt-1 text-sm text-secondary; }
+  .edit-form { @apply overflow-y-auto p-6; }
+  .edit-form .form-actions { @apply -mx-6 -mb-6 px-6; }
+  .status-dialog .form-actions { @apply static mt-6 -mb-2 bg-surface py-2; }
 
   @keyframes content-arrive { from { opacity: .01; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes skeleton-shift { from { transform: translateX(-100%); } to { transform: translateX(100%); } }

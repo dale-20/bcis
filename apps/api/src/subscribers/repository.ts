@@ -1,4 +1,4 @@
-import { and, asc, countDistinct, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, notInArray, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import {
   auditLogs,
@@ -12,7 +12,11 @@ import {
   subscriberContacts,
   subscribers,
 } from '../db/schema.js';
-import type { SubscriberCreate, SubscriberListQuery } from '@bcis/shared';
+import type { SubscriberCreate, SubscriberListQuery, SubscriberStatusChange, SubscriberUpdate } from '@bcis/shared';
+
+function normalizedContact(type: SubscriberUpdate['contacts'][number]['type'], value: string): string {
+  return type === 'EMAIL' ? value.toLowerCase() : value.replace(/[^0-9+]/g, '');
+}
 
 function literalSearch(value: string): string {
   return `%${value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
@@ -218,6 +222,107 @@ export class SubscriberRepository {
         requestId,
       });
       return subscriber.id;
+    });
+  }
+
+  async update(id: string, input: SubscriberUpdate, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select().from(subscribers).where(eq(subscribers.id, id)).limit(1).for('update');
+      if (!current) throw new Error('SUBSCRIBER_NOT_FOUND');
+
+      const existingContacts = await transaction.select().from(subscriberContacts).where(eq(subscriberContacts.subscriberId, id));
+      const existingAddresses = await transaction.select().from(subscriberAddresses).where(eq(subscriberAddresses.subscriberId, id));
+      const contactIds = input.contacts.flatMap((contact) => contact.id ? [contact.id] : []);
+      const addressIds = input.addresses.flatMap((address) => address.id ? [address.id] : []);
+      if (new Set(contactIds).size !== contactIds.length || new Set(addressIds).size !== addressIds.length) throw new Error('DUPLICATE_CHILD_ID');
+      const existingContactIds = new Set(existingContacts.map((contact) => contact.id));
+      const existingAddressIds = new Set(existingAddresses.map((address) => address.id));
+      if (contactIds.some((contactId) => !existingContactIds.has(contactId)) || addressIds.some((addressId) => !existingAddressIds.has(addressId))) {
+        throw new Error('CHILD_NOT_OWNED');
+      }
+
+      const removedContactIds = existingContacts.map((contact) => contact.id).filter((contactId) => !contactIds.includes(contactId));
+      const removedAddressIds = existingAddresses.map((address) => address.id).filter((addressId) => !addressIds.includes(addressId));
+      if (removedAddressIds.length > 0) {
+        const [usage] = await transaction.select({ value: count() }).from(serviceAccounts)
+          .where(inArray(serviceAccounts.installationAddressId, removedAddressIds));
+        if ((usage?.value ?? 0) > 0) throw new Error('ADDRESS_IN_USE');
+      }
+
+      await transaction.update(subscribers).set({
+        accountNumber: input.accountNumber,
+        firstName: input.firstName,
+        middleName: input.middleName || null,
+        lastName: input.lastName,
+        organizationName: input.organizationName || null,
+        billingDay: input.billingDay,
+        dueDay: input.dueDay,
+        notes: input.notes || null,
+        updatedAt: new Date(),
+      }).where(eq(subscribers.id, id));
+
+      for (const contact of input.contacts) {
+        const values = { type: contact.type, value: contact.value, normalizedValue: normalizedContact(contact.type, contact.value), isPrimary: contact.isPrimary };
+        if (contact.id) await transaction.update(subscriberContacts).set(values).where(and(eq(subscriberContacts.id, contact.id), eq(subscriberContacts.subscriberId, id)));
+        else await transaction.insert(subscriberContacts).values({ subscriberId: id, ...values });
+      }
+      if (removedContactIds.length > 0) await transaction.delete(subscriberContacts).where(inArray(subscriberContacts.id, removedContactIds));
+
+      for (const address of input.addresses) {
+        const values = {
+          type: address.type, line1: address.line1, line2: address.line2 || null,
+          barangay: address.barangay, municipality: address.municipality, province: address.province,
+          postalCode: address.postalCode || null, isPrimary: address.isPrimary,
+        };
+        if (address.id) await transaction.update(subscriberAddresses).set(values).where(and(eq(subscriberAddresses.id, address.id), eq(subscriberAddresses.subscriberId, id)));
+        else await transaction.insert(subscriberAddresses).values({ subscriberId: id, ...values });
+      }
+      if (removedAddressIds.length > 0) await transaction.delete(subscriberAddresses).where(inArray(subscriberAddresses.id, removedAddressIds));
+
+      await transaction.insert(auditLogs).values({
+        actorUserId,
+        action: 'subscriber.updated',
+        entityType: 'subscriber',
+        entityId: id,
+        oldValues: {
+          accountNumber: current.accountNumber,
+          firstName: current.firstName,
+          middleName: current.middleName,
+          lastName: current.lastName,
+          organizationName: current.organizationName,
+          billingDay: current.billingDay,
+          dueDay: current.dueDay,
+          notes: current.notes,
+          contacts: existingContacts.map(({ id: contactId, type, value, isPrimary }) => ({ id: contactId, type, value, isPrimary })),
+          addresses: existingAddresses.map(({ id: addressId, type, line1, line2, barangay, municipality, province, postalCode, isPrimary }) => ({ id: addressId, type, line1, line2, barangay, municipality, province, postalCode, isPrimary })),
+        },
+        newValues: input,
+        requestId,
+      });
+      return id;
+    });
+  }
+
+  async changeStatus(id: string, input: SubscriberStatusChange, actorUserId: string, requestId: string) {
+    return this.database.db.transaction(async (transaction) => {
+      const [current] = await transaction.select({ status: subscribers.status }).from(subscribers)
+        .where(eq(subscribers.id, id)).limit(1).for('update');
+      if (!current) throw new Error('SUBSCRIBER_NOT_FOUND');
+      const allowed = current.status === 'ACTIVE' && (input.status === 'INACTIVE' || input.status === 'ARCHIVED')
+        || current.status === 'INACTIVE' && (input.status === 'ACTIVE' || input.status === 'ARCHIVED')
+        || current.status === 'ARCHIVED' && input.status === 'ACTIVE';
+      if (!allowed) throw new Error('STATUS_TRANSITION_INVALID');
+      if (input.status === 'INACTIVE' || input.status === 'ARCHIVED') {
+        const [billable] = await transaction.select({ value: count() }).from(serviceAccounts)
+          .where(and(eq(serviceAccounts.subscriberId, id), notInArray(serviceAccounts.status, ['DISCONNECTED', 'TERMINATED'])));
+        if ((billable?.value ?? 0) > 0) throw new Error('ACTIVE_SERVICES_EXIST');
+      }
+      await transaction.update(subscribers).set({ status: input.status, updatedAt: new Date() }).where(eq(subscribers.id, id));
+      await transaction.insert(auditLogs).values({
+        actorUserId, action: 'subscriber.status_changed', entityType: 'subscriber', entityId: id,
+        reason: input.reason, oldValues: { status: current.status }, newValues: { status: input.status }, requestId,
+      });
+      return id;
     });
   }
 }

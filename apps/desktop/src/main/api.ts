@@ -10,6 +10,8 @@ import {
   type SubscriberDetail,
   type SubscriberListQuery,
   type SubscriberListResponse,
+  type SubscriberStatusChange,
+  type SubscriberUpdate,
   dashboardSchema, reportDataSchema, serviceHistorySchema,
   type Dashboard, type DashboardQuery, type ReportData, type ReportRequest, type ServiceHistory,
 } from '@bcis/shared';
@@ -70,6 +72,14 @@ export class DesktopApiClient {
 
   createSubscriber(input: SubscriberCreate): Promise<DesktopResult<SubscriberDetail>> {
     return this.call('/subscribers', { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  updateSubscriber(id: string, input: SubscriberUpdate): Promise<DesktopResult<SubscriberDetail>> {
+    return this.call(`/subscribers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(input) }, subscriberDetailSchema);
+  }
+
+  changeSubscriberStatus(id: string, input: SubscriberStatusChange): Promise<DesktopResult<SubscriberDetail>> {
+    return this.call(`/subscribers/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify(input) }, subscriberDetailSchema);
   }
 
   getReferenceData(): Promise<DesktopResult<ReferenceData>> {

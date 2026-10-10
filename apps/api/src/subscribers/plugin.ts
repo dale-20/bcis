@@ -7,6 +7,8 @@ import {
   subscriberDetailSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
+  subscriberStatusChangeSchema,
+  subscriberUpdateSchema,
 } from '@bcis/shared';
 import type { AuthService } from '../auth/service.js';
 import type { Database } from '../db/client.js';
@@ -92,6 +94,34 @@ export const subscriberPlugin: FastifyPluginAsync<SubscriberPluginOptions> = asy
     if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
     const result = await service.create(subscriberCreateSchema.parse(request.body), context.userId, request.id);
     return reply.code(201).send(subscriberDetailSchema.parse(result));
+  });
+
+  app.patch('/subscribers/:id', {
+    preHandler: [authenticate, canManage],
+    schema: {
+      params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } },
+      body: { type: 'object' },
+      response: { 200: subscriberDetailResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+    },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const id = (request.params as { id: string }).id;
+    return subscriberDetailSchema.parse(await service.update(id, subscriberUpdateSchema.parse(request.body), context.userId, request.id));
+  });
+
+  app.post('/subscribers/:id/status', {
+    preHandler: [authenticate, canManage],
+    schema: {
+      params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } },
+      body: { type: 'object' },
+      response: { 200: subscriberDetailResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse, 404: errorResponse, 409: errorResponse },
+    },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const id = (request.params as { id: string }).id;
+    return subscriberDetailSchema.parse(await service.changeStatus(id, subscriberStatusChangeSchema.parse(request.body), context.userId, request.id));
   });
 
   app.get('/reference-data', {

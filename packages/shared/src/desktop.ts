@@ -5,11 +5,15 @@ import {
   subscriberDetailSchema,
   subscriberListQuerySchema,
   subscriberListResponseSchema,
+  subscriberStatusChangeSchema,
+  subscriberUpdateSchema,
   type ReferenceData,
   type SubscriberCreate,
   type SubscriberDetail,
   type SubscriberListQuery,
   type SubscriberListResponse,
+  type SubscriberStatusChange,
+  type SubscriberUpdate,
 } from './subscribers.js';
 import { dashboardQuerySchema, reportRequestSchema, type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory } from './reports.js';
 
@@ -20,6 +24,8 @@ export const AUTH_CHANGE_PASSWORD_CHANNEL = 'bcis:auth:change-password';
 export const SUBSCRIBERS_LIST_CHANNEL = 'bcis:subscribers:list';
 export const SUBSCRIBERS_GET_CHANNEL = 'bcis:subscribers:get';
 export const SUBSCRIBERS_CREATE_CHANNEL = 'bcis:subscribers:create';
+export const SUBSCRIBERS_UPDATE_CHANNEL = 'bcis:subscribers:update';
+export const SUBSCRIBERS_STATUS_CHANNEL = 'bcis:subscribers:status';
 export const REFERENCE_DATA_CHANNEL = 'bcis:reference-data:get';
 export const DASHBOARD_GET_CHANNEL = 'bcis:dashboard:get';
 export const REPORT_GET_CHANNEL = 'bcis:report:get';
@@ -68,6 +74,8 @@ export interface DesktopBridge {
   listSubscribers: (query: SubscriberListQuery) => Promise<DesktopResult<SubscriberListResponse>>;
   getSubscriber: (id: string) => Promise<DesktopResult<SubscriberDetail>>;
   createSubscriber: (input: SubscriberCreate) => Promise<DesktopResult<SubscriberDetail>>;
+  updateSubscriber: (id: string, input: SubscriberUpdate) => Promise<DesktopResult<SubscriberDetail>>;
+  changeSubscriberStatus: (id: string, input: SubscriberStatusChange) => Promise<DesktopResult<SubscriberDetail>>;
   getReferenceData: () => Promise<DesktopResult<ReferenceData>>;
   getDashboard: (query: DashboardQuery) => Promise<DesktopResult<Dashboard>>;
   getReport: (query: ReportRequest) => Promise<DesktopResult<ReportData>>;
@@ -81,6 +89,8 @@ export const desktopRequestSchemas = {
   subscriberList: subscriberListQuerySchema,
   subscriberId: z.uuid(),
   subscriberCreate: subscriberCreateSchema,
+  subscriberUpdate: z.object({ id: z.uuid(), input: subscriberUpdateSchema }),
+  subscriberStatus: z.object({ id: z.uuid(), input: subscriberStatusChangeSchema }),
   dashboard: dashboardQuerySchema,
   report: reportRequestSchema,
   reportExport: reportRequestSchema.extend({ format: z.enum(['PDF', 'XLSX']) }),

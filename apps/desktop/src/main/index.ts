@@ -12,6 +12,8 @@ import {
   HEALTH_CHANNEL,
   REFERENCE_DATA_CHANNEL,
   SUBSCRIBERS_CREATE_CHANNEL,
+  SUBSCRIBERS_STATUS_CHANNEL,
+  SUBSCRIBERS_UPDATE_CHANNEL,
   SUBSCRIBERS_GET_CHANNEL,
   SUBSCRIBERS_LIST_CHANNEL,
   DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
@@ -64,6 +66,8 @@ void app.whenReady().then(() => {
   ipcMain.handle(SUBSCRIBERS_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.listSubscribers(desktopRequestSchemas.subscriberList.parse(input)); });
   ipcMain.handle(SUBSCRIBERS_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getSubscriber(desktopRequestSchemas.subscriberId.parse(input)); });
   ipcMain.handle(SUBSCRIBERS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createSubscriber(desktopRequestSchemas.subscriberCreate.parse(input)); });
+  ipcMain.handle(SUBSCRIBERS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberUpdate.parse(input); return api.updateSubscriber(command.id, command.input); });
+  ipcMain.handle(SUBSCRIBERS_STATUS_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); const command = desktopRequestSchemas.subscriberStatus.parse(input); return api.changeSubscriberStatus(command.id, command.input); });
   ipcMain.handle(REFERENCE_DATA_CHANNEL, (event) => { assertTrustedSender(event); return api.getReferenceData(); });
   ipcMain.handle(DASHBOARD_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getDashboard(desktopRequestSchemas.dashboard.parse(input)); });
   ipcMain.handle(REPORT_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReport(desktopRequestSchemas.report.parse(input)); });
