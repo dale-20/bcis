@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
@@ -48,6 +48,8 @@ import { defaultPath, hasAnyPermission, pageLabel, visibleNavigation, type Navig
 import { SubscribersPage } from './features/subscribers/SubscribersPage';
 import { SESSION_INVALID_EVENT, changePassword, getSession, login, logout } from './services/api';
 import { getConnection } from './services/connection';
+import { BCISMascot } from './features/mascot/BCISMascot';
+import { announceMascotEvent } from './features/mascot/mascot-events';
 
 const navigationIcons: Record<NavigationItemId, typeof LayoutDashboard> = {
   dashboard: LayoutDashboard,
@@ -63,6 +65,14 @@ const navigationIcons: Record<NavigationItemId, typeof LayoutDashboard> = {
 
 function SystemConnection() {
   const query = useQuery({ queryKey: ['connection'], queryFn: getConnection, refetchInterval: 15_000 });
+  const previousConnection = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!query.data) return;
+    const ready = query.data.ok && query.data.health.status === 'ready';
+    if (previousConnection.current === ready) return;
+    previousConnection.current = ready;
+    announceMascotEvent(ready ? 'connection-restored' : 'connection-lost');
+  }, [query.data]);
   return <div className="content-enter"><div className="page-heading"><h1>System connection</h1><p>Check this workstation's connection to the office server.</p></div><ConnectionPanel result={query.data} pending={query.isPending} refreshing={query.isFetching} error={query.isError} onRetry={() => void query.refetch()} /></div>;
 }
 
@@ -137,8 +147,11 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
 
 function Workspace({ user, onEndSession }: { user: AuthenticatedUser; onEndSession: (message?: string) => Promise<void> }) {
   const location = useLocation();
+  const welcomed = useRef(false);
   const navigation = useMemo(() => visibleNavigation(user.permissions), [user.permissions]);
   const activeSection = navigation.find((item) => location.pathname === item.path || location.pathname.startsWith(`/${item.id}`) || item.children.some((child) => location.pathname === child.path));
+
+  useEffect(() => { if (!welcomed.current) { welcomed.current = true; announceMascotEvent('login'); } }, []);
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -175,6 +188,7 @@ function Workspace({ user, onEndSession }: { user: AuthenticatedUser; onEndSessi
       </header>
       <main id="main" tabIndex={-1}><WorkspaceRoutes user={user} /></main>
     </div>
+    <BCISMascot />
   </div>;
 }
 
