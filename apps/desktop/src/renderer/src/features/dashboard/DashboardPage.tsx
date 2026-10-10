@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownRight, Banknote, CalendarRange, CircleDollarSign, Clock3, ReceiptText, Users } from 'lucide-react';
+import { PageError, PageLoading } from '../../components/PageFeedback';
 import { getDashboard } from '../../services/api';
 
 const peso = (value: string) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(Number(BigInt(value)) / 100);
@@ -9,8 +10,8 @@ const month = (value: string) => new Intl.DateTimeFormat('en-PH', { month: 'shor
 
 export function DashboardPage() {
   const query = useQuery({ queryKey: ['dashboard', range], queryFn: () => getDashboard(range), refetchInterval: 60_000 });
-  if (query.isPending) return <section className="page-state"><div className="skeleton dashboard-skeleton" /><p>Loading operational dashboard…</p></section>;
-  if (query.isError) return <section className="page-state error-state"><h2>Dashboard unavailable</h2><p>{query.error.message}</p><button onClick={() => void query.refetch()}>Try again</button></section>;
+  if (query.isPending) return <PageLoading label="Loading operational dashboard..." />;
+  if (query.isError) return <PageError title="Dashboard unavailable" message={query.error.message} onRetry={() => void query.refetch()} />;
   const data=query.data; const max=Math.max(1,...data.monthlyCollections.map(item=>Number(BigInt(item.amountCentavos)))); const agingTotal=Object.values(data.aging).reduce((sum,value)=>sum+BigInt(value),0n);
   return <div className="content-enter dashboard-page">
     <header className="page-heading page-heading-actions"><div><span className="eyebrow">Operational overview</span><h1>Dashboard</h1><p>Collections, exposure, and subscriber activity from live posted records.</p></div><div className="date-chip"><CalendarRange aria-hidden="true" />Year to date · {range.to}</div></header>

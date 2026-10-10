@@ -77,7 +77,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 ## Milestone 8 — Dashboard and reporting (PDF §§3.11, 4.1–4.3)
 
 - [ ] 4–6 compact genuine KPIs; billing vs collection, payment methods, aging, collector performance, overdue alerts, recent payments.
-- [ ] Required navigation: Dashboard; Subscribers (all/new/services); Billing (current/generate/invoices); Payments (receive/history/GCash); Collections (collectors/areas/routes/batches/remittance); Receivables (outstanding/overdue/aging/suspension); Services; Reports; Administration.
+- [x] Required permission-aware navigation: Dashboard; Subscribers (all/new/services); Billing (current/generate/invoices); Payments (receive/history/GCash); Collections (collectors/areas/routes/batches/remittance); Receivables (outstanding/overdue/aging/suspension); Services; Reports; Administration. Operational controls remain tracked in their workflow milestones.
 - [ ] Daily/weekly/monthly/annual collections, cash/GCash/method summaries, billing vs collection, revenue by plan/service/area, AR.
 - [ ] Subscriber master list/ledger/SOA; collector assignment/collection/remittance/shortage-overage/performance.
 - [ ] Adjustment/reversal/voided receipt/activity/audit reports. At least six required reports with PDF/XLSX evidence.

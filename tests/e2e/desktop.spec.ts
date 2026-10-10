@@ -55,8 +55,13 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Update password' }).click();
 
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Payments', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Receivables', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible();
     await page.screenshot({ path: 'test-results/dashboard.png' });
-    await page.getByRole('button', { name: 'Subscribers' }).click();
+    await page.getByRole('link', { name: 'Subscribers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
     await expect(page.getByText('50 subscribers', { exact: false })).toBeVisible();
     await page.getByRole('textbox', { name: 'Search subscribers' }).fill('BCIS-00001');
@@ -94,10 +99,10 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.screenshot({ path: 'test-results/subscriber-minimum-size.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-    await page.getByRole('button', { name: 'Reports' }).click();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
     await page.screenshot({ path: 'test-results/reports.png' });
-    await page.getByRole('button', { name: 'Connection' }).click();
+    await page.getByRole('link', { name: 'Connection', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Connected to BCIS' })).toBeVisible();
     await database.query('UPDATE application_metadata SET schema_version = 99');
     await page.getByRole('button', { name: 'Check again' }).click();
@@ -109,6 +114,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect.poll(async () => { try { await fetch(`${endpoint}/health`); return false; } catch { return true; } }).toBe(true);
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByRole('heading', { name: 'Unable to reach BCIS' })).toBeVisible();
+    await page.getByRole('button', { name: 'Lock' }).click();
+    await expect(page.getByRole('heading', { name: 'Sign in to BCIS' })).toBeVisible();
+    await expect(page.getByText('Workstation locked. Sign in to continue.')).toBeVisible();
     expect(pageErrors).toEqual([]);
   } finally {
     await database.query('UPDATE application_metadata SET schema_version = $1', [SCHEMA_VERSION]);

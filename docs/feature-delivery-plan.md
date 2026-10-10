@@ -32,6 +32,8 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 
 ## Increment 1 - Application shell and permission-aware navigation
 
+**Status:** Completed and verified on 2026-10-10.
+
 **Goal:** Make every required module discoverable while exposing only actions the signed-in user may use.
 
 - Add routed navigation for Dashboard, Subscribers, Billing, Payments, Collections, Receivables, Services, Reports, and Administration.

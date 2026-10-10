@@ -4,6 +4,9 @@ import { isTrustedFrame } from './security.js';
 describe('IPC sender policy', () => {
   const renderer = 'file:///C:/BCIS/out/renderer/index.html';
   it('allows only the exact main frame', () => { expect(isTrustedFrame(renderer, renderer, true)).toBe(true); });
+  it('allows navigation fragments within the trusted renderer document', () => {
+    expect(isTrustedFrame(`${renderer}#/subscribers`, renderer, true)).toBe(true);
+  });
   it('normalizes the development server root URL', () => {
     expect(isTrustedFrame('http://127.0.0.1:5173/', 'http://127.0.0.1:5173', true)).toBe(true);
   });

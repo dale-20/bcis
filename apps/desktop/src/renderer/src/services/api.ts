@@ -25,6 +25,8 @@ export class DesktopServiceError extends Error {
   }
 }
 
+export const SESSION_INVALID_EVENT = 'bcis:session-invalid';
+
 function bridge() {
   if (!window.bcis) throw new DesktopServiceError('BRIDGE_UNAVAILABLE', 'Launch BCIS through the Electron desktop application');
   return window.bcis;
