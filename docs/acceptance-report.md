@@ -17,9 +17,9 @@ Data: synthetic only
 | AT-07 | PASSED | `collections.integration.test.ts` | ₱20,000 expected/remitted yields zero and authorized close |
 | AT-08 | PASSED | `collections.integration.test.ts` | ₱500 shortage remains visible; silent close rejected |
 | AT-09 | PARTIAL | `payments.integration.test.ts` | Three simultaneous sessions passed: two postings, unique receipts, Viewer denied. Three physical PCs remain untested |
-| AT-10 | PASSED | `authorization.integration.test.ts` | Cashier receives HTTP 403 for direct user and backup-history calls; both denials audited |
+| AT-10 | PASSED | `authorization.integration.test.ts` | Cashier receives HTTP 403 for direct user, backup list/create/download calls; all denials audited |
 | AT-11 | PASSED | `billing.integration.test.ts` | Concurrent duplicate billing returns one created run and one skipped run; no duplicate invoices |
-| AT-12 | PASSED | `backup.integration.test.ts`, `tests/evidence/at12-backup-restore.json` | Owner-approved dump/hash/restore, pg_amcheck, 67 foreign keys, expected counts and mutation rollback verified |
+| AT-12 | PARTIAL | `backup.integration.test.ts`, `tests/evidence/at12-backup-restore.json` | Approved disposable-clone restore passed; PostgreSQL integrity and counts verified; 1 synthetic proof restored with matching SHA-256 and size. Live Owner-approved restore is not automated or tested. |
 
 No acceptance test remains failed after corrections. AT-09 is not marked fully passed because physical LAN workstations were unavailable.
 
@@ -53,8 +53,8 @@ Not met: installer Authenticode signature. The release is usable for laboratory 
 
 Untested: external penetration test, production TLS/certificate configuration, Windows service hardening, firewall rules, three physical PCs, power-loss recovery, maximum-volume performance, installer upgrade/uninstall migration and antivirus reputation.
 
-Final E2E rerun: **PASSED** (1/1). It exercised the built Electron application against the real API/PostgreSQL test database, login/password rotation, dashboard, subscriber search/profile/form, reports, connection degradation/recovery, exact preload surface, sandbox preferences, axe accessibility, minimum-window overflow and API outage handling.
+Final E2E rerun: **PASSED** (1/1). It exercised the built Electron application against the real API/PostgreSQL test database, login/password rotation, dashboard, subscriber search/profile/form, reports, verified database/proof backup creation, connection degradation/recovery, exact preload surface, sandbox preferences, axe accessibility, minimum-window overflow and API outage handling.
 
 ## Functional requirements still incomplete
 
-Desktop UI is incomplete for billing, receive payment/receipt printing, GCash proof queue, collection batches/reconciliation, reversal/audit review, suspension/reconnection mutation, user administration and backup/restore. Proof metadata exists, but restricted proof-image binary storage and attachment backup do not. Global subscriber search does not cover receipt, invoice and GCash reference. These items are not claimed as passed by the AT API tests.
+Remaining requirements include fuller dashboard/report coverage and Owner-approved live database replacement with maintenance/shutdown controls. AT-12's isolated approved restore and attachment integrity pass; production live recovery remains untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.

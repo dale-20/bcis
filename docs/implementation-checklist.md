@@ -55,7 +55,8 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 - [x] GCash queue: proof/reference/sender/amount capture, duplicate reference control (AT-05), authorized verify/reject, verifier identity/time.
 - [x] Only verified GCash can post. Uploaded screenshot alone never marks an account paid.
 - [x] Validate proof file type, size, safe generated keys; restricted attachment access and 24-hour cleanup of abandoned uploads.
-- [ ] Include `PAYMENT_PROOF_DIR` attachments in verified database backup/restore artifacts and prove restored file hashes (Increment 8).
+- [x] Include `PAYMENT_PROOF_DIR` attachments in verified archives and prove restored file hashes on a separate PostgreSQL test restore (Increment 8 / AT-12).
+- [ ] Owner-approved live database replacement with an enforced maintenance gate and API stop/restart remains unimplemented; see `docs/backup-restore.md`.
 - [x] Cashier flow: search, balance, amount/method, allocation preview, atomic post, receipt, and GCash evidence submission held for review.
 - [x] All financial posting, numbering, credit, allocations and audit commit/rollback together; concurrent retry/idempotency tests.
 
@@ -70,6 +71,8 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 **Increment 6 verification:** Collection Supervisor batch UI and report flows are exposed through typed, sender-validated IPC. New service assignments and collector changes persist effective dates; existing assignment rows are not fabricated or backfilled because their original effective dates and actors are not recoverable. Cashier posts the payment first; the supervisor selects an eligible same-day posted receipt for the route account.
 
 **Increment 7 verification (2026-10-11):** `npm run check` passed (97 tests), `npm run test:integration` passed (63 PostgreSQL tests), and `npm run test:e2e` passed (1 built Electron test). The desktop E2E generated overdue invoices, changed service policy, requested and approved a suspension, settled the subscriber balance through Cash posting, assigned the new reconnection to the Technician, and completed it through the Technician session. Reconnection and payment records were verified in PostgreSQL.
+
+**Increment 8 recovery verification (2026-10-11):** `npm run test:integration -- apps/api/test/backup.integration.test.ts` passed after backing up a synthetic JPEG proof, extracting the `.tar.gz`, checking its manifest and attachment SHA-256/size, restoring its database dump to a derived `_restore_at12` database, and comparing expected records. The desktop uses the protected API to create archives and save verified downloads. Automated live replacement remains unchecked until Owner approval and maintenance controls are implemented.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 

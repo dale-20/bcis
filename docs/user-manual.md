@@ -31,19 +31,15 @@ Open **Reports**, choose a report and date range, then supply a subscriber or co
 
 Open **Connection** to see the configured API endpoint and database migration state. **Check again** retries. “Migration required” means the server database schema does not match the application; an administrator must run migrations.
 
-## Financial workflows currently operated through API/test procedures
+## Financial workflows
 
-The domain services implement monthly billing, Cash/GCash posting, verification, reversals, collection batches and reconciliation, but their desktop operating screens are not complete. Do not ask ordinary users to run API commands. Until those screens exist, demonstrate these rules through the automated acceptance suite or an administrator-controlled API client in a laboratory environment.
+Use the desktop screens for subscriber/service maintenance, monthly billing, payment posting, GCash review, collection batches/remittance, receivables and service control. The API enforces permissions and remains authoritative for every financial result. Reporting and workflow coverage continues to expand; see the feature delivery plan for items still pending.
 
-## Backup procedure
+## Backup and recovery
 
-The included restore verifier is for synthetic test data only:
+Open **Administration → Backup & Restore**, select **Create backup**, and wait for the API to verify the database dump and every included GCash proof. Check the VERIFIED status and SHA-256, then select **Save copy** to store the archive in an access-controlled location separate from the API/database host. Keep the archive encrypted and apply the organization's retention policy.
 
-```powershell
-npm run verify:restore
-```
-
-It refuses non-test database names and requires an active Owner identity. Production backups must be scheduled and stored outside the application server with encryption and retention controls. Never restore a production database from an unverified file.
+Live database replacement is not available in the app. It requires Owner approval, a maintenance window, and a stopped API; never restore into the active database. The `npm run verify:restore` command is restricted to a disposable `_test` database and demonstrates recovery in a separate clone only.
 
 ## Troubleshooting
 

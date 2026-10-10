@@ -6,6 +6,7 @@ import {
   auditSearchSchema, auditSearchResultSchema, managedUserCreateSchema, managedUserListSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   organizationSettingsSchema, type OrganizationSettings,
+  backupCreatedSchema, backupListSchema, type BackupCreated, type BackupList,
   receivableAccountQuerySchema as serviceReceivableAccountQuerySchema,
   reconnectionListResponseSchema, suspensionListResponseSchema, serviceTechnicianListSchema,
   collectionReferenceCatalogSchema,
@@ -308,6 +309,34 @@ export class DesktopApiClient {
   }
   updateOrganizationSettings(input: OrganizationSettings): Promise<DesktopResult<OrganizationSettings>> {
     return this.call('/system/settings', { method: 'PUT', body: JSON.stringify(organizationSettingsSchema.parse(input)) }, organizationSettingsSchema, true, true);
+  }
+
+  listBackups(): Promise<DesktopResult<BackupList>> {
+    return this.call('/system/backups', { method: 'GET' }, backupListSchema);
+  }
+  async createBackup(): Promise<DesktopResult<BackupCreated>> {
+    if (!this.token) return { ok: false, error: { code: 'SESSION_INVALID', message: 'Sign in to continue' } };
+    try {
+      const response = await this.request(new URL('/system/backups', this.endpoint), { method: 'POST', body: '{}', redirect: 'error', signal: AbortSignal.timeout(10 * 60_000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` } });
+      if (!response.ok) {
+        const parsed = serverErrorSchema.safeParse(await response.json().catch(() => null));
+        if (response.status === 401) { this.token = null; this.user = null; }
+        return { ok: false, error: parsed.success ? { code: parsed.data.error, message: parsed.data.message } : { code: 'API_ERROR', message: 'The backup could not be created' } };
+      }
+      return { ok: true, data: backupCreatedSchema.parse(await response.json()) };
+    } catch { return { ok: false, error: { code: 'CONNECTION_ERROR', message: 'Unable to create and verify the backup' } }; }
+  }
+  async downloadBackup(id: string): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {
+    if (!this.token) return { ok: false, error: { code: 'SESSION_INVALID', message: 'Sign in to continue' } };
+    try {
+      const response = await this.request(new URL(`/system/backups/${encodeURIComponent(id)}/download`, this.endpoint), { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10 * 60_000), headers: { Authorization: `Bearer ${this.token}` } });
+      if (!response.ok) {
+        const parsed = serverErrorSchema.safeParse(await response.json().catch(() => null));
+        return { ok: false, error: parsed.success ? { code: parsed.data.error, message: parsed.data.message } : { code: 'API_ERROR', message: 'The backup could not be downloaded' } };
+      }
+      const filename = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? `bcis-backup-${id}.tar.gz`;
+      return { ok: true, data: { buffer: new Uint8Array(await response.arrayBuffer()), filename } };
+    } catch { return { ok: false, error: { code: 'CONNECTION_ERROR', message: 'Unable to download the backup' } }; }
   }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {

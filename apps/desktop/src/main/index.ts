@@ -50,6 +50,7 @@ import {
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
   ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
   ORGANIZATION_SETTINGS_GET_CHANNEL, ORGANIZATION_SETTINGS_UPDATE_CHANNEL,
+  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -180,6 +181,18 @@ void app.whenReady().then(() => {
   ipcMain.handle(AUDIT_SEARCH_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.searchAudit(desktopRequestSchemas.auditSearch.parse(input)); });
   ipcMain.handle(ORGANIZATION_SETTINGS_GET_CHANNEL, (event) => { assertTrustedSender(event); return api.getOrganizationSettings(); });
   ipcMain.handle(ORGANIZATION_SETTINGS_UPDATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.updateOrganizationSettings(desktopRequestSchemas.organizationSettings.parse(input)); });
+  ipcMain.handle(BACKUPS_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.listBackups(); });
+  ipcMain.handle(BACKUP_CREATE_CHANNEL, (event) => { assertTrustedSender(event); return api.createBackup(); });
+  ipcMain.handle(BACKUP_DOWNLOAD_CHANNEL, async (event, input: unknown) => {
+    assertTrustedSender(event);
+    const id = desktopRequestSchemas.backupId.parse(input);
+    const downloaded = await api.downloadBackup(id);
+    if (!downloaded.ok) return downloaded;
+    const chosen = await dialog.showSaveDialog(window!, { title: 'Save verified BCIS backup', defaultPath: downloaded.data.filename, filters: [{ name: 'BCIS backup archive', extensions: ['tar.gz'] }] });
+    if (chosen.canceled || !chosen.filePath) return { ok: true, data: { saved: false } };
+    await writeFile(chosen.filePath, downloaded.data.buffer);
+    return { ok: true, data: { saved: true, filename: chosen.filePath } };
+  });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

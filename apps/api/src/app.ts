@@ -16,6 +16,7 @@ import { systemPlugin } from './system/plugin.js';
 import { serviceControlPlugin } from './service-control/plugin.js';
 import { resolve } from 'node:path';
 import { GcashProofStorage } from './payments/proof-storage.js';
+import type { BackupService } from './system/backup-service.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -24,6 +25,7 @@ interface AppOptions {
   database?: Database;
   authService?: AuthService;
   proofStorage?: GcashProofStorage;
+  backupService?: BackupService;
 }
 
 export async function buildApp(options: AppOptions) {
@@ -80,7 +82,7 @@ export async function buildApp(options: AppOptions) {
       await app.register(receivablePlugin, { authService, database: options.database });
       await app.register(serviceControlPlugin, { authService, database: options.database });
       await app.register(reportPlugin, { authService, database: options.database });
-      await app.register(systemPlugin, { authService, database: options.database });
+      await app.register(systemPlugin, { authService, database: options.database, ...(options.backupService ? { backupService: options.backupService } : {}) });
     }
   }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);

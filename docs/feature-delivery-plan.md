@@ -24,8 +24,7 @@ This plan turns `requirements.pdf` into reviewable feature increments. It reflec
 
 - Most operational server workflows have no desktop screen or typed preload method.
 - Subscriber, plan, service, collector, and area maintenance lacks complete edit/archive/status workflows.
-- Verified backup/restore does not yet include the configured GCash proof attachment directory (Increment 8).
-- General company/billing settings and guided backup/restore remain incomplete (Increment 8); current settings only cover service-control policy.
+- Database-and-proof backup creation, checksum verification, history, download, and isolated AT-12 restoration are implemented (Increment 8); Owner-approved live replacement with maintenance/shutdown controls remains incomplete.
 - Physical three-PC, maximum-volume, and full desktop acceptance evidence remains incomplete.
 
 ## Increment 1 - Application shell and permission-aware navigation
@@ -147,19 +146,19 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 8 - Administration, audit, settings, and recovery
 
-**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, and suspension/reconnection policy now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL authorization coverage. Admin cannot view audit, mutate Owner identities, or grant/reset Owner. Guided database-plus-attachment backup and approved recovery remain open; do not mark this increment complete yet.
+**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, suspension/reconnection policy, and verified database-plus-proof backup creation/download now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL coverage. AT-12 restores into a disposable clone and verifies proof hashes. Admin cannot view audit, mutate Owner identities, or grant/reset Owner. Owner-approved live replacement with a distributed maintenance gate and API stop/restart remains open; do not mark this increment complete yet.
 
 **Goal:** Complete Owner/Admin control and auditability.
 
 - Add user list/create/edit, role assignment, activate/deactivate, password reset, and forced password-change controls.
 - Add read-only audit search by actor, action, entity, date, and request ID with before/after detail.
 - Add application settings UI for billing, due dates, grace periods, suspension, numbering display, and company/report information.
-- Add backup history, guided backup creation, verification status, checksum, and downloadable evidence.
-- Include `PAYMENT_PROOF_DIR` attachments in verified backup/restore artifacts and compare restored files with database SHA-256 values.
-- Keep restore Owner-only with explicit approval, maintenance-mode checks, test restore/integrity verification, and clear destructive-impact warning.
+- [x] Add backup history, guided backup creation, verification status, checksum, and downloadable evidence.
+- [x] Include `PAYMENT_PROOF_DIR` attachments in verified backup/restore artifacts and compare restored files with database SHA-256 values during isolated AT-12 restoration.
+- [ ] Add Owner-only live restore with explicit approval, distributed maintenance checks, controlled API stop/restart, and test restore/integrity verification; display the destructive-impact warning.
 - Add user activity, adjustment, reversal, and voided-receipt reports.
 
-**Gate:** AT-10 and AT-12 pass. Admin can manage users/create backups but cannot view audit or restore; Owner can perform all authorized recovery actions.
+**Gate:** AT-10 and isolated AT-12 verification pass. Live restore portion remains open: Owner approval and maintenance-controlled live recovery must be tested before increment completion.
 
 ## Increment 9 - Reporting, printing, and dashboard completion
 

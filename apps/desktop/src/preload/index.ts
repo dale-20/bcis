@@ -44,6 +44,7 @@ import {
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
   ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
   ORGANIZATION_SETTINGS_GET_CHANNEL, ORGANIZATION_SETTINGS_UPDATE_CHANNEL,
+  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -126,5 +127,8 @@ const bridge: DesktopBridge = Object.freeze({
   searchAudit: (query: Parameters<DesktopBridge['searchAudit']>[0]) => ipcRenderer.invoke(AUDIT_SEARCH_CHANNEL, query),
   getOrganizationSettings: () => ipcRenderer.invoke(ORGANIZATION_SETTINGS_GET_CHANNEL),
   updateOrganizationSettings: (input: Parameters<DesktopBridge['updateOrganizationSettings']>[0]) => ipcRenderer.invoke(ORGANIZATION_SETTINGS_UPDATE_CHANNEL, input),
+  listBackups: () => ipcRenderer.invoke(BACKUPS_LIST_CHANNEL),
+  createBackup: () => ipcRenderer.invoke(BACKUP_CREATE_CHANNEL),
+  downloadBackup: (id: string) => ipcRenderer.invoke(BACKUP_DOWNLOAD_CHANNEL, id),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

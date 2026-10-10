@@ -43,7 +43,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   await runNode('apps/api/dist/db/migrate.js', testEnvironment);
   await runNode('apps/api/dist/db/seed-demo.js', testEnvironment);
   const server = spawn(process.execPath, ['apps/api/dist/server.js'], {
-    env: { ...testEnvironment, API_HOST: '127.0.0.1', API_PORT: '3101', LOG_LEVEL: 'silent' },
+    env: { ...testEnvironment, API_HOST: '127.0.0.1', API_PORT: '3101', LOG_LEVEL: 'silent', ...(process.env.PG_BIN ? { PG_BIN: process.env.PG_BIN } : process.platform === 'win32' ? { PG_BIN: 'C:\\Program Files\\PostgreSQL\\18\\bin' } : {}), TAR_BIN: process.env.TAR_BIN ?? 'tar' },
     stdio: 'ignore', windowsHide: true,
   });
   let desktop: Awaited<ReturnType<typeof electron.launch>> | undefined;
@@ -196,7 +196,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Recent route batches' })).toBeVisible();
     await expect(page.getByText(/total · showing page 1 of/)).toBeVisible();
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['approveSuspension', 'assignReconnection', 'changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'completeReconnection', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createManagedUser', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'createSuspension', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getOrganizationSettings', 'getPayment', 'getReceivableAccounts', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceControlPolicy', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listManagedUsers', 'listMyReconnections', 'listPayments', 'listReconnections', 'listSubscribers', 'listSuspensions', 'listTechnicians', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'resetManagedUserPassword', 'reversePayment', 'searchAudit', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'updateCollectionArea', 'updateCollector', 'updateManagedUser', 'updateOrganizationSettings', 'updateServiceAccount', 'updateServiceControlPolicy', 'updateServicePlan', 'updateSubscriber', 'verifyGcashPayment', 'voidInvoice'].sort(),
+      bridge: ['approveSuspension', 'assignReconnection', 'changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'completeReconnection', 'createBackup', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createManagedUser', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'createSuspension', 'downloadBackup', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getOrganizationSettings', 'getPayment', 'getReceivableAccounts', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceControlPolicy', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBackups', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listManagedUsers', 'listMyReconnections', 'listPayments', 'listReconnections', 'listSubscribers', 'listSuspensions', 'listTechnicians', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'resetManagedUserPassword', 'reversePayment', 'searchAudit', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'updateCollectionArea', 'updateCollector', 'updateManagedUser', 'updateOrganizationSettings', 'updateServiceAccount', 'updateServiceControlPolicy', 'updateServicePlan', 'updateSubscriber', 'verifyGcashPayment', 'voidInvoice'].sort(),
       node: false,
       process: false,
     });
@@ -247,6 +247,12 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Suspension threshold (days)').fill('1');
     await page.getByLabel('Reconnection fee (PHP)').fill('500.00');
     await page.getByRole('button', { name: 'Save policy' }).click();
+    await page.getByRole('link', { name: 'Administration', exact: true }).click();
+    await page.getByRole('link', { name: 'Backup & Restore', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Backup & Restore' })).toBeVisible();
+    await page.getByRole('button', { name: 'Create backup' }).click();
+    await expect(page.getByText('Backup verified. SHA-256:', { exact: false })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('VERIFIED', { exact: true })).toBeVisible();
 
     await page.getByRole('link', { name: 'Billing', exact: true }).click();
     await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();

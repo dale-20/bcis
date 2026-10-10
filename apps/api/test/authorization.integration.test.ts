@@ -9,6 +9,9 @@ import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
 import { AuthService } from '../src/auth/service.js';
 import { createDatabase } from '../src/db/client.js';
 import { auditLogs, users } from '../src/db/schema.js';
+import { BackupService } from '../src/system/backup-service.js';
+import { GcashProofStorage } from '../src/payments/proof-storage.js';
+import { resolve } from 'node:path';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
 const url = process.env.TEST_DATABASE_URL;
@@ -34,7 +37,9 @@ const initialPassword = 'Synthetic-demo-password-1';
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 4 });
 const hasher = new PasswordHasher(testScryptParameters);
 const authService = new AuthService(database, hasher);
-const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: 'silent' });
+const proofStorage = new GcashProofStorage(resolve(fileURLToPath(new URL('../', import.meta.url)), process.env.PAYMENT_PROOF_DIR ?? '.local/payment-proofs'));
+const backupService = new BackupService({ database, proofStorage, databaseUrl: url, directory: resolve(fileURLToPath(new URL('../../..', import.meta.url)), '.local/test-backup-api'), pgBin: process.env.PG_BIN ?? (process.platform === 'win32' ? 'C:\\Program Files\\PostgreSQL\\18\\bin' : '') });
+const app = await buildApp({ database, authService, backupService, probeDatabase: database.probe, logLevel: 'silent' });
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
 
 interface LoginBody {
@@ -111,8 +116,12 @@ describe.sequential('authentication and server-side authorization', () => {
     const backupResponse = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${cashierToken}` } });
     expect(backupResponse.statusCode).toBe(403);
     expect(backupResponse.json()).toMatchObject({ error: 'FORBIDDEN' });
+    const cannotCreateBackup = await app.inject({ method: 'POST', url: '/system/backups', headers: { authorization: `Bearer ${cashierToken}` }, payload: {} });
+    expect(cannotCreateBackup.statusCode).toBe(403);
+    const cannotDownloadBackup = await app.inject({ method: 'GET', url: '/system/backups/00000000-0000-4000-8000-000000000000/download', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(cannotDownloadBackup.statusCode).toBe(403);
     const backupDenied = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, 'backup.create'));
-    expect(backupDenied).toHaveLength(1);
+    expect(backupDenied).toHaveLength(3);
   });
 
   it('allows authorized user administration and forces a reset password change', async () => {
@@ -175,6 +184,24 @@ describe.sequential('authentication and server-side authorization', () => {
     const invalid = await app.inject({ method: 'PUT', url: '/system/settings', headers: { authorization: `Bearer ${adminToken}` }, payload: { ...input, defaultBillingDay: 29 } });
     expect(invalid.statusCode).toBe(400);
   });
+
+  it('creates an audited verified archive and exposes only its authenticated download', async () => {
+    const ownerLogin = await login('owner.demo', 'Synthetic-owner-password-2');
+    const created = await app.inject({ method: 'POST', url: '/system/backups', headers: { authorization: `Bearer ${ownerLogin.token}` }, payload: {} });
+    expect(created.statusCode).toBe(201);
+    const backup = created.json<{ id: string; status: string; sha256: string; sizeBytes: string }>();
+    expect(backup).toMatchObject({ status: 'VERIFIED', sha256: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    expect(BigInt(backup.sizeBytes)).toBeGreaterThan(0n);
+    const history = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${ownerLogin.token}` } });
+    expect(history.statusCode).toBe(200);
+    expect(history.json<{ items: Array<Record<string, unknown>> }>().items[0]).not.toHaveProperty('storagePath');
+    const downloaded = await app.inject({ method: 'GET', url: `/system/backups/${backup.id}/download`, headers: { authorization: `Bearer ${ownerLogin.token}` } });
+    expect(downloaded.statusCode).toBe(200);
+    expect(downloaded.headers['content-type']).toContain('application/gzip');
+    expect(downloaded.rawPayload.subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
+    const logs = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, backup.id));
+    expect(logs.map((entry) => entry.action)).toContain('backup.created');
+  }, 60_000);
 
   it('requires a valid bearer session for protected routes', async () => {
     const response = await app.inject({ method: 'GET', url: '/admin/users' });

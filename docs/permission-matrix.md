@@ -71,7 +71,8 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST`, `GET /service-control/suspensions`, `POST /service-control/suspensions/:id/approve` | Valid session and `service.suspension.manage` | Delinquency threshold checked on request and rechecked transactionally at approval; approval changes service status and writes event/audit together |
 | `GET /service-control/reconnections`, `GET /service-control/technicians`, `PATCH /service-control/reconnections/:id/assignment` | Valid session and `service.reconnection.assign` | Assign only an active Technician; the operation is audited |
 | `GET /service-control/my-reconnections`, `POST /service-control/reconnections/:id/complete` | Valid session and `service.reconnection.complete`; completion also requires assignment to the signed-in user | Assigned Technician completion reactivates service, lifts its suspension, and records service-history/audit evidence atomically |
-| `GET /system/backups` | Valid session and `backup.create` | Lists bounded backup history; missing permission is audited |
+| `GET /system/backups`, `POST /system/backups`, `GET /system/backups/:id/download` | Valid session and `backup.create` | Lists history, creates and verifies a database-plus-proof archive, and revalidates it on download; creation is audited; missing permission is audited |
+| Live database replacement | Not exposed as an API route | Requires an Owner-approved maintenance window and stopped API; recovery remains an operator-controlled deployment task (see `docs/backup-restore.md`) |
 
 Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hashes. Sessions expire after 30 minutes idle or eight hours absolute time, and inactive users cannot authenticate. Passwords use salted scrypt with production parameters `N=131072`, `r=8`, `p=1`; hashes and tokens are excluded from audit payloads and response objects.
 

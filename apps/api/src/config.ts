@@ -10,6 +10,9 @@ export const environmentSchema = z.object({
   DATABASE_URL: z.url().pipe(z.string().refine((value) => ['postgres:', 'postgresql:'].includes(new URL(value).protocol))),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
   PAYMENT_PROOF_DIR: z.string().min(1).default('.local/payment-proofs'),
+  BACKUP_DIR: z.string().min(1).default('.local/backups'),
+  PG_BIN: z.string().min(1).optional(),
+  TAR_BIN: z.string().min(1).optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 export type Environment = z.infer<typeof environmentSchema>;

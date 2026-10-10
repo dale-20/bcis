@@ -42,3 +42,4 @@ export * from './collections.js';
 export * from './receivables.js';
 export * from './service-control.js';
 export * from './reports.js';
+export * from './backups.js';

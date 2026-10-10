@@ -65,6 +65,7 @@ import {
 import { collectionBatchListQuerySchema, collectionBatchListSchema, collectionBatchSchema, createCollectionBatchInputSchema, eligibleCollectionPaymentsSchema, recordCollectionInputSchema, remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema, type CollectionBatch, type CollectionBatchList, type CollectionBatchListQuery, type CreateCollectionBatchInput, type EligibleCollectionPayment, type RemittanceInput } from './collections.js';
 import { receivableAgingQuerySchema, receivableAgingResponseSchema, type ReceivableAgingQuery, type ReceivableAgingResponse } from './receivables.js';
 import { createSuspensionInputSchema, organizationSettingsSchema, receivableAccountQuerySchema, receivableAccountResponseSchema, reconnectionAssignmentSchema, reconnectionListResponseSchema, serviceControlPolicySchema, serviceTechnicianListSchema, suspensionListResponseSchema, type CreateSuspensionInput, type OrganizationSettings, type ReceivableAccountQuery, type ReceivableAccountResponse, type ReconnectionAssignment, type ReconnectionListResponse, type ServiceControlPolicy } from './service-control.js';
+import { backupCreatedSchema, backupListSchema } from './backups.js';
 
 export const RECEIVABLE_AGING_CHANNEL = 'bcis:receivables:aging';
 export const RECEIVABLE_ACCOUNTS_CHANNEL = 'bcis:receivables:accounts';
@@ -72,6 +73,9 @@ export const SERVICE_POLICY_GET_CHANNEL = 'bcis:service-control:policy:get';
 export const SERVICE_POLICY_UPDATE_CHANNEL = 'bcis:service-control:policy:update';
 export const ORGANIZATION_SETTINGS_GET_CHANNEL = 'bcis:system:settings:get';
 export const ORGANIZATION_SETTINGS_UPDATE_CHANNEL = 'bcis:system:settings:update';
+export const BACKUPS_LIST_CHANNEL = 'bcis:system:backups:list';
+export const BACKUP_CREATE_CHANNEL = 'bcis:system:backups:create';
+export const BACKUP_DOWNLOAD_CHANNEL = 'bcis:system:backup:download';
 export const SUSPENSIONS_LIST_CHANNEL = 'bcis:service-control:suspensions:list';
 export const SUSPENSION_CREATE_CHANNEL = 'bcis:service-control:suspension:create';
 export const SUSPENSION_APPROVE_CHANNEL = 'bcis:service-control:suspension:approve';
@@ -327,6 +331,9 @@ export interface DesktopBridge {
   searchAudit: (query: z.infer<typeof auditSearchSchema>) => Promise<DesktopResult<z.infer<typeof auditSearchResultSchema>>>;
   getOrganizationSettings: () => Promise<DesktopResult<OrganizationSettings>>;
   updateOrganizationSettings: (input: OrganizationSettings) => Promise<DesktopResult<OrganizationSettings>>;
+  listBackups: () => Promise<DesktopResult<z.infer<typeof backupListSchema>>>;
+  createBackup: () => Promise<DesktopResult<z.infer<typeof backupCreatedSchema>>>;
+  downloadBackup: (id: string) => Promise<DesktopResult<{ saved: boolean; filename?: string }>>;
 }
 
 export const desktopRequestSchemas = {
@@ -388,6 +395,7 @@ export const desktopRequestSchemas = {
   managedUserPasswordReset: z.object({ id: z.uuid(), password: z.string().min(8).max(128) }),
   auditSearch: auditSearchSchema,
   organizationSettings: organizationSettingsSchema,
+  backupId: z.uuid(),
   gcashProofUpload: gcashProofUploadInputSchema,
 };
 

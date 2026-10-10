@@ -7,8 +7,9 @@ import { auditLogs, backupHistory, users } from '../db/schema.js';
 import { applicationSettings } from '../db/schema.js';
 import { defaultOrganizationSettings, organizationSettingsSchema } from '@bcis/shared';
 import { AppError } from '../errors.js';
+import type { BackupService } from './backup-service.js';
 
-interface Options { database: Database; authService: AuthService }
+interface Options { database: Database; authService: AuthService; backupService?: BackupService }
 const response = { type: 'object', additionalProperties: true } as const;
 const error = { type: 'object', additionalProperties: true } as const;
 
@@ -85,10 +86,32 @@ export const systemPlugin: FastifyPluginAsync<Options> = async (app, options) =>
   }, async () => {
     const rows = await options.database.db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50);
     return { items: rows.map((row) => ({
-      id: row.id, status: row.status, storagePath: row.storagePath, sha256: row.sha256,
+      id: row.id, status: row.status, sha256: row.sha256,
       sizeBytes: row.sizeBytes?.toString() ?? null, startedAt: row.startedAt.toISOString(),
       completedAt: row.completedAt?.toISOString() ?? null, verifiedAt: row.verifiedAt?.toISOString() ?? null,
       restoredAt: row.restoredAt?.toISOString() ?? null, errorCode: row.errorCode,
     })) };
   });
+
+  const backupService = options.backupService;
+  if (backupService) {
+    app.post('/system/backups', {
+      preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'backup.create')],
+      schema: { response: { 201: response, 401: error, 403: error, 500: error } },
+    }, async (request, reply) => {
+      const context = request.authContext;
+      if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+      const backup = await backupService.create(context, request.id, request.ip);
+      return reply.code(201).send(backup);
+    });
+
+    app.get('/system/backups/:id/download', {
+      preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'backup.create')],
+      schema: { params: { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } }, response: { 200: { type: 'string', contentMediaType: 'application/gzip' }, 401: error, 403: error, 404: error, 409: error } },
+    }, async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const artifact = await backupService.readVerified(id);
+      return reply.type('application/gzip').header('Content-Disposition', `attachment; filename="${artifact.filename}"`).send(artifact.bytes);
+    });
+  }
 };

@@ -8,6 +8,7 @@ import {
   managedUserListDesktopResultSchema, adminMutationDesktopResultSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   organizationSettingsDesktopResultSchema, organizationSettingsSchema, type OrganizationSettings,
+  backupListSchema, backupCreatedSchema,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -411,6 +412,21 @@ export async function getOrganizationSettings(): Promise<OrganizationSettings> {
 }
 export async function updateOrganizationSettings(input: OrganizationSettings): Promise<OrganizationSettings> {
   return unwrap(organizationSettingsDesktopResultSchema.parse(await bridge().updateOrganizationSettings(organizationSettingsSchema.parse(input))));
+}
+export async function listBackups() {
+  const result = await bridge().listBackups();
+  if (!result.ok) throw new Error(result.error.message);
+  return backupListSchema.parse(result.data);
+}
+export async function createBackup() {
+  const result = await bridge().createBackup();
+  if (!result.ok) throw new Error(result.error.message);
+  return backupCreatedSchema.parse(result.data);
+}
+export async function downloadBackup(id: string) {
+  const result = await bridge().downloadBackup(id);
+  if (!result.ok) throw new Error(result.error.message);
+  return result.data;
 }
 
 export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {
