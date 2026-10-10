@@ -14,6 +14,8 @@ import {
   type SubscriberDetail,
   type SubscriberListQuery,
   type SubscriberListResponse,
+  dashboardQuerySchema, dashboardSchema, reportDataSchema, reportRequestSchema, serviceHistorySchema, exportResultSchema,
+  type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory,
 } from '@bcis/shared';
 
 export class DesktopServiceError extends Error {
@@ -68,5 +70,30 @@ export async function createSubscriber(input: SubscriberCreate): Promise<Subscri
 
 export async function getReferenceData(): Promise<ReferenceData> {
   return unwrap(referenceDataResultSchema.parse(await bridge().getReferenceData()));
+}
+
+export async function getDashboard(input: DashboardQuery): Promise<Dashboard> {
+  const result = await bridge().getDashboard(dashboardQuerySchema.parse(input));
+  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+  return dashboardSchema.parse(result.data);
+}
+
+export async function getReport(input: ReportRequest): Promise<ReportData> {
+  const result = await bridge().getReport(reportRequestSchema.parse(input));
+  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+  return reportDataSchema.parse(result.data);
+}
+
+export async function exportReport(input: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<ExportResult> {
+  const query = { ...reportRequestSchema.parse(input), format: input.format };
+  const result = await bridge().exportReport(query);
+  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+  return exportResultSchema.parse(result.data);
+}
+
+export async function getServiceHistory(subscriberId: string): Promise<ServiceHistory> {
+  const result = await bridge().getServiceHistory(subscriberId);
+  if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
+  return serviceHistorySchema.parse(result.data);
 }
 

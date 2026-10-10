@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -13,6 +14,7 @@ import {
   SUBSCRIBERS_CREATE_CHANNEL,
   SUBSCRIBERS_GET_CHANNEL,
   SUBSCRIBERS_LIST_CHANNEL,
+  DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -33,7 +35,7 @@ function assertTrustedSender(event: Electron.IpcMainInvokeEvent): void {
 
 function createWindow() {
   window = new BrowserWindow({
-    title: 'BCIS · Subscription Billing & Collection', width: 1200, height: 800,
+    title: 'BCIS · Subscription Billing & Collection', width: 1440, height: 900,
     minWidth: 960, minHeight: 640, show: false, backgroundColor: '#F6F8FB', autoHideMenuBar: true,
     webPreferences: {
       preload: join(directory, '../preload/index.cjs'), contextIsolation: true,
@@ -63,6 +65,19 @@ void app.whenReady().then(() => {
   ipcMain.handle(SUBSCRIBERS_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getSubscriber(desktopRequestSchemas.subscriberId.parse(input)); });
   ipcMain.handle(SUBSCRIBERS_CREATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.createSubscriber(desktopRequestSchemas.subscriberCreate.parse(input)); });
   ipcMain.handle(REFERENCE_DATA_CHANNEL, (event) => { assertTrustedSender(event); return api.getReferenceData(); });
+  ipcMain.handle(DASHBOARD_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getDashboard(desktopRequestSchemas.dashboard.parse(input)); });
+  ipcMain.handle(REPORT_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReport(desktopRequestSchemas.report.parse(input)); });
+  ipcMain.handle(SERVICE_HISTORY_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getServiceHistory(desktopRequestSchemas.subscriberId.parse(input)); });
+  ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
+    assertTrustedSender(event);
+    const command = desktopRequestSchemas.reportExport.parse(input);
+    const downloaded = await api.downloadReport(command);
+    if (!downloaded.ok) return downloaded;
+    const chosen = await dialog.showSaveDialog(window!, { title: 'Export BCIS report', defaultPath: downloaded.data.filename, filters: [command.format === 'PDF' ? { name: 'PDF document', extensions: ['pdf'] } : { name: 'Excel workbook', extensions: ['xlsx'] }] });
+    if (chosen.canceled || !chosen.filePath) return { ok: true, data: { saved: false } };
+    await writeFile(chosen.filePath, downloaded.data.buffer);
+    return { ok: true, data: { saved: true, filename: chosen.filePath } };
+  });
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

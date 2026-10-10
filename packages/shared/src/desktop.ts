@@ -11,6 +11,7 @@ import {
   type SubscriberListQuery,
   type SubscriberListResponse,
 } from './subscribers.js';
+import { dashboardQuerySchema, reportRequestSchema, type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory } from './reports.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -20,6 +21,10 @@ export const SUBSCRIBERS_LIST_CHANNEL = 'bcis:subscribers:list';
 export const SUBSCRIBERS_GET_CHANNEL = 'bcis:subscribers:get';
 export const SUBSCRIBERS_CREATE_CHANNEL = 'bcis:subscribers:create';
 export const REFERENCE_DATA_CHANNEL = 'bcis:reference-data:get';
+export const DASHBOARD_GET_CHANNEL = 'bcis:dashboard:get';
+export const REPORT_GET_CHANNEL = 'bcis:report:get';
+export const REPORT_EXPORT_CHANNEL = 'bcis:report:export';
+export const SERVICE_HISTORY_CHANNEL = 'bcis:service-history:get';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -64,6 +69,10 @@ export interface DesktopBridge {
   getSubscriber: (id: string) => Promise<DesktopResult<SubscriberDetail>>;
   createSubscriber: (input: SubscriberCreate) => Promise<DesktopResult<SubscriberDetail>>;
   getReferenceData: () => Promise<DesktopResult<ReferenceData>>;
+  getDashboard: (query: DashboardQuery) => Promise<DesktopResult<Dashboard>>;
+  getReport: (query: ReportRequest) => Promise<DesktopResult<ReportData>>;
+  exportReport: (input: ReportRequest & { format: 'PDF' | 'XLSX' }) => Promise<DesktopResult<ExportResult>>;
+  getServiceHistory: (subscriberId: string) => Promise<DesktopResult<ServiceHistory>>;
 }
 
 export const desktopRequestSchemas = {
@@ -72,5 +81,8 @@ export const desktopRequestSchemas = {
   subscriberList: subscriberListQuerySchema,
   subscriberId: z.uuid(),
   subscriberCreate: subscriberCreateSchema,
+  dashboard: dashboardQuerySchema,
+  report: reportRequestSchema,
+  reportExport: reportRequestSchema.extend({ format: z.enum(['PDF', 'XLSX']) }),
 };
 

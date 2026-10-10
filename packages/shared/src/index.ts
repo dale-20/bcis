@@ -40,3 +40,4 @@ export * from './billing.js';
 export * from './payments.js';
 export * from './collections.js';
 export * from './receivables.js';
+export * from './reports.js';

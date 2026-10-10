@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { and, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { CollectionBatch, PaymentResult, ReceivableAgingResponse } from '@bcis/shared';
+import type { CollectionBatch, Dashboard, PaymentResult, ReceivableAgingResponse, ReportData, ServiceHistory } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -31,6 +31,7 @@ const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
 const tokens = { admin: '', cashier: '', collections: '', auditor: '' };
 let collectorId = '';
 let areaId = '';
+let subscriberId = '';
 
 async function activate(username: string) {
   const login = await app.inject({ method: 'POST', url: '/auth/login', payload: { username, password } });
@@ -90,10 +91,11 @@ beforeAll(async () => {
     const generated = await app.inject({ method: 'POST', url: '/billing/cycles/generate', headers: { authorization: `Bearer ${tokens.admin}` }, payload: { period } });
     expect(generated.statusCode).toBe(200);
   }
-  const [service] = await database.db.select({ collectorId: serviceAccounts.assignedCollectorId, areaId: serviceAccounts.collectionAreaId }).from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00001-1'));
+  const [service] = await database.db.select({ subscriberId: serviceAccounts.subscriberId, collectorId: serviceAccounts.assignedCollectorId, areaId: serviceAccounts.collectionAreaId }).from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00001-1'));
   if (!service?.collectorId || !service.areaId) throw new Error('Synthetic route assignment missing');
   collectorId = service.collectorId;
   areaId = service.areaId;
+  subscriberId = service.subscriberId;
 });
 
 afterAll(async () => { await app.close(); await database.close(); });
@@ -169,5 +171,46 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const filtered = overdue.json<ReceivableAgingResponse>();
     expect(filtered.rows.every((row) => row.daysOverdue > 0 && row.bucket !== 'CURRENT')).toBe(true);
     expect(filtered.rows.length).toBeLessThanOrEqual(10);
+  });
+
+  it('builds live dashboard and authorized financial reports from posted records', async () => {
+    const dashboard = await app.inject({ method: 'GET', url: '/dashboard?from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.cashier}` } });
+    expect(dashboard.statusCode, dashboard.body).toBe(200);
+    const summary = dashboard.json<Dashboard>();
+    expect(BigInt(summary.collectedCentavos)).toBeGreaterThan(0n);
+    expect(summary.postedPaymentCount).toBeGreaterThan(0);
+    expect(summary.monthlyCollections.length).toBeGreaterThan(0);
+    expect(summary.paymentMethods.some((row) => row.method === 'CASH')).toBe(true);
+
+    const monthly = await app.inject({ method: 'GET', url: '/reports/data?report=MONTHLY_COLLECTIONS&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(monthly.statusCode, monthly.body).toBe(200);
+    expect(monthly.json<ReportData>()).toMatchObject({ report: 'MONTHLY_COLLECTIONS', title: 'Monthly collections', columns: expect.any(Array), rows: expect.any(Array) });
+    const statement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-01-01&to=2026-12-31&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(statement.statusCode, statement.body).toBe(200);
+    expect(statement.json<ReportData>().title).toContain('Subscriber statement');
+    const denied = await app.inject({ method: 'GET', url: '/reports/data?report=AR_AGING&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.cashier}` } });
+    expect(denied.statusCode).toBe(403);
+  });
+
+  it('exports valid PDF/XLSX files and records suspension/reconnection history', async () => {
+    const pdf = await app.inject({ method: 'GET', url: '/reports/export?report=AR_AGING&from=2026-01-01&to=2026-12-31&format=PDF', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(pdf.statusCode, pdf.body).toBe(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect(pdf.rawPayload.subarray(0, 4).toString()).toBe('%PDF');
+    const xlsx = await app.inject({ method: 'GET', url: '/reports/export?report=PAYMENT_METHODS&from=2026-01-01&to=2026-12-31&format=XLSX', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(xlsx.statusCode, xlsx.body).toBe(200);
+    expect(xlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+
+    const actor = await database.pool.query<{ id: string }>("select id from users where username='admin.demo'");
+    const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
+    const userId = actor.rows[0]?.id; const serviceId = service.rows[0]?.id;
+    if (!userId || !serviceId) throw new Error('Synthetic history references missing');
+    const suspended = await database.pool.query<{ id: string }>("insert into suspension_records(service_account_id,status,reason,effective_date,approved_by_user_id,notes) values($1,'LIFTED','Synthetic overdue test','2026-10-01',$2,'Reconnected after payment') returning id", [serviceId, userId]);
+    await database.pool.query("insert into reconnection_records(service_account_id,suspension_id,status,fee_centavos,requested_at,completed_at,completed_by_user_id,notes) values($1,$2,'COMPLETED',50000,'2026-10-02T08:00:00Z','2026-10-03T08:00:00Z',$3,'Synthetic completed reconnect')", [serviceId, suspended.rows[0]?.id, userId]);
+    const history = await app.inject({ method: 'GET', url: `/subscribers/${subscriberId}/service-history`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(history.statusCode, history.body).toBe(200);
+    expect(history.json<ServiceHistory>().events.map((event) => event.type)).toEqual(['RECONNECTION', 'SUSPENSION']);
+    const exports = await database.pool.query("select count(*)::int count from audit_logs where action='report.exported'");
+    expect(exports.rows[0]?.count).toBe(2);
   });
 });

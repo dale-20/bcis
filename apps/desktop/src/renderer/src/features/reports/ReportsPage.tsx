@@ -1,0 +1,28 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Download, FileSpreadsheet, FileText, Printer, SlidersHorizontal } from 'lucide-react';
+import type { ReportKind } from '@bcis/shared';
+import { Button } from '../../components/ui/button';
+import { exportReport, getReferenceData, getReport, listSubscribers } from '../../services/api';
+
+const today=new Date(); const defaults={from:`${today.getFullYear()}-01-01`,to:today.toISOString().slice(0,10)};
+const labels:Record<ReportKind,string>={MONTHLY_COLLECTIONS:'Monthly collections',PAYMENT_METHODS:'Payment methods',OUTSTANDING_BALANCES:'Outstanding balances',AR_AGING:'AR aging',SUBSCRIBER_STATEMENT:'Subscriber statement',COLLECTOR_REMITTANCE:'Collector remittance'};
+
+export function ReportsPage(){
+  const [report,setReport]=useState<ReportKind>('MONTHLY_COLLECTIONS'); const [from,setFrom]=useState(defaults.from); const [to,setTo]=useState(defaults.to); const [subscriberId,setSubscriberId]=useState(''); const [collectorId,setCollectorId]=useState('');
+  const subscribers=useQuery({queryKey:['report-subscribers'],queryFn:()=>listSubscribers({query:'',status:'ALL',page:1,pageSize:100,sort:'name',direction:'asc'}),enabled:report==='SUBSCRIBER_STATEMENT'});
+  const refs=useQuery({queryKey:['subscriber-reference-data'],queryFn:getReferenceData,enabled:report==='COLLECTOR_REMITTANCE',staleTime:300_000});
+  const request=useMemo(()=>({report,from,to,...(subscriberId?{subscriberId}:{}),...(collectorId?{collectorId}:{})}),[report,from,to,subscriberId,collectorId]);
+  const valid=from<=to&&(report!=='SUBSCRIBER_STATEMENT'||Boolean(subscriberId));
+  const query=useQuery({queryKey:['report',request],queryFn:()=>getReport(request),enabled:valid});
+  const exporting=useMutation({mutationFn:(format:'PDF'|'XLSX')=>exportReport({...request,format})});
+  return <div className="content-enter reports-page">
+    <header className="page-heading page-heading-actions no-print"><div><span className="eyebrow">Financial reporting</span><h1>Reports</h1><p>Review, print, and export figures calculated by the BCIS server.</p></div><div className="report-actions"><Button variant="outline" onClick={()=>window.print()} disabled={!query.data}><Printer/>Print</Button><Button variant="outline" onClick={()=>exporting.mutate('PDF')} disabled={!query.data||exporting.isPending}><FileText/>PDF</Button><Button onClick={()=>exporting.mutate('XLSX')} disabled={!query.data||exporting.isPending}><FileSpreadsheet/>XLSX</Button></div></header>
+    <section className="report-controls no-print" aria-label="Report filters"><div className="filter-title"><SlidersHorizontal/><strong>Report parameters</strong></div><label><span>Report</span><select value={report} onChange={e=>{setReport(e.target.value as ReportKind);setSubscriberId('');setCollectorId('');}}>{Object.entries(labels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label><span>From</span><input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label><span>To / as of</span><input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>
+      {report==='SUBSCRIBER_STATEMENT'&&<label className="wide-filter"><span>Subscriber</span><select value={subscriberId} onChange={e=>setSubscriberId(e.target.value)}><option value="">Select subscriber…</option>{subscribers.data?.items.map(item=><option key={item.id} value={item.id}>{item.accountNumber} · {item.displayName}</option>)}</select></label>}
+      {report==='COLLECTOR_REMITTANCE'&&<label className="wide-filter"><span>Collector</span><select value={collectorId} onChange={e=>setCollectorId(e.target.value)}><option value="">All collectors</option>{refs.data?.collectors.map(item=><option key={item.id} value={item.id}>{item.collectorNumber} · {item.name}</option>)}</select></label>}
+    </section>
+    {exporting.isSuccess&&exporting.data.saved&&<p className="export-notice no-print"><Download/>Saved to {exporting.data.filename}</p>}{exporting.isError&&<p className="form-error no-print">{exporting.error.message}</p>}
+    {!valid?<section className="empty-state"><FileText/><h3>Select the required report parameters</h3><p>Choose a subscriber and valid date range to build the statement.</p></section>:query.isPending?<section className="page-state"><div className="skeleton table-skeleton"/><p>Building report…</p></section>:query.isError?<section className="page-state error-state"><h2>Report unavailable</h2><p>{query.error.message}</p></section>:<article className="report-paper"><header><div className="print-brand"><strong>BCIS</strong><span>Subscription Billing &amp; Collection</span></div><div><h2>{query.data.title}</h2><p>{query.data.subtitle}</p></div><small>Generated {new Intl.DateTimeFormat('en-PH',{dateStyle:'medium',timeStyle:'short'}).format(new Date(query.data.generatedAt))}</small></header><div className="report-table-wrap"><table className="report-table"><thead><tr>{query.data.columns.map(column=><th key={column.key} className={column.align==='right'?'numeric':''}>{column.label}</th>)}</tr></thead><tbody>{query.data.rows.map((row,index)=><tr key={index}>{query.data.columns.map(column=><td key={column.key} className={column.align==='right'?'numeric':''}>{row[column.key]}</td>)}</tr>)}</tbody></table>{query.data.rows.length===0&&<p className="empty-inline">No records match this report period.</p>}</div>{query.data.totals.length>0&&<footer className="report-totals">{query.data.totals.map(total=><div key={total.label}><span>{total.label}</span><strong>{total.value}</strong></div>)}</footer>}</article>}
+  </div>;
+}

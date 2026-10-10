@@ -10,6 +10,8 @@ import {
   type SubscriberDetail,
   type SubscriberListQuery,
   type SubscriberListResponse,
+  dashboardSchema, reportDataSchema, serviceHistorySchema,
+  type Dashboard, type DashboardQuery, type ReportData, type ReportRequest, type ServiceHistory,
 } from '@bcis/shared';
 import { z } from 'zod';
 
@@ -72,6 +74,34 @@ export class DesktopApiClient {
 
   getReferenceData(): Promise<DesktopResult<ReferenceData>> {
     return this.call('/reference-data', { method: 'GET' }, referenceDataSchema);
+  }
+
+  getDashboard(query: DashboardQuery): Promise<DesktopResult<Dashboard>> {
+    return this.call(`/dashboard?${new URLSearchParams(query).toString()}`, { method: 'GET' }, dashboardSchema);
+  }
+
+  getReport(query: ReportRequest): Promise<DesktopResult<ReportData>> {
+    const search = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    return this.call(`/reports/data?${search.toString()}`, { method: 'GET' }, reportDataSchema);
+  }
+
+  getServiceHistory(id: string): Promise<DesktopResult<ServiceHistory>> {
+    return this.call(`/subscribers/${encodeURIComponent(id)}/service-history`, { method: 'GET' }, serviceHistorySchema);
+  }
+
+  async downloadReport(query: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {
+    if (!this.token) return { ok: false, error: { code: 'SESSION_INVALID', message: 'Sign in to continue' } };
+    const search = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    try {
+      const response = await this.request(new URL(`/reports/export?${search.toString()}`, this.endpoint), { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { Authorization: `Bearer ${this.token}` } });
+      if (!response.ok) {
+        const parsed = serverErrorSchema.safeParse(await response.json().catch(() => null));
+        return { ok: false, error: parsed.success ? { code: parsed.data.error, message: parsed.data.message } : { code: 'API_ERROR', message: 'The report could not be exported' } };
+      }
+      const disposition = response.headers.get('content-disposition') ?? '';
+      const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `bcis-report.${query.format.toLowerCase()}`;
+      return { ok: true, data: { buffer: new Uint8Array(await response.arrayBuffer()), filename } };
+    } catch { return { ok: false, error: { code: 'CONNECTION_ERROR', message: 'Unable to download the report' } }; }
   }
 
   private async call<T>(path: string, init: RequestInit, schema: z.ZodType<T>, authenticated = true, emptyResponse = false): Promise<DesktopResult<T>> {

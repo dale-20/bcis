@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, CalendarDays, Contact, MapPin, RadioTower, Route, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Contact, MapPin, PlugZap, RadioTower, Route, UserRound } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { getSubscriber } from '../../services/api';
+import { getServiceHistory, getSubscriber } from '../../services/api';
 
 function money(centavos: string): string {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(BigInt(centavos)) / 100);
@@ -9,6 +9,7 @@ function money(centavos: string): string {
 
 export function SubscriberProfile({ id, onBack }: { id: string; onBack: () => void }) {
   const query = useQuery({ queryKey: ['subscriber', id], queryFn: () => getSubscriber(id) });
+  const history = useQuery({ queryKey: ['service-history', id], queryFn: () => getServiceHistory(id) });
   if (query.isPending) return <section className="page-state" aria-live="polite"><div className="skeleton profile-skeleton" /><p>Loading subscriber profile…</p></section>;
   if (query.isError) return <section className="page-state error-state"><h2>Profile unavailable</h2><p>{query.error.message}</p><Button variant="outline" onClick={() => { void query.refetch(); }}>Try again</Button></section>;
   const subscriber = query.data;
@@ -28,6 +29,9 @@ export function SubscriberProfile({ id, onBack }: { id: string; onBack: () => vo
           <div className="service-rate"><strong>{money(service.currentRateCentavos)}</strong><span>per month</span></div>
           <dl className="service-meta"><div><dt><MapPin aria-hidden="true" /> Installation</dt><dd>{service.installationAddress}</dd></div><div><dt><Route aria-hidden="true" /> Collection route</dt><dd>{service.collectionAreaName ?? 'Unassigned'} · {service.assignedCollectorName ?? 'No collector'}</dd></div><div><dt><CalendarDays aria-hidden="true" /> Billing started</dt><dd>{new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(`${service.billingStartDate}T00:00:00`))}</dd></div></dl>
         </article>)}</div>
+        <div className="history-section"><div className="section-heading"><div><h2>Suspension &amp; reconnection history</h2><p>Permanent service status events across all accounts</p></div><PlugZap aria-hidden="true" /></div>
+          {history.isPending ? <p className="empty-inline">Loading service history…</p> : history.isError ? <p className="form-error">{history.error.message}</p> : history.data.events.length === 0 ? <p className="empty-inline">No suspension or reconnection events recorded.</p> : <ol className="history-timeline">{history.data.events.map((event) => <li key={event.id}><i aria-hidden="true" /><div><strong>{event.type === 'SUSPENSION' ? 'Service suspended' : 'Service reconnection'}</strong><span>{event.serviceAccountNumber} · {event.status}</span><p>{event.reason ?? event.notes ?? 'No additional notes'}</p></div><time>{new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(`${event.occurredOn.slice(0, 10)}T00:00:00`))}</time></li>)}</ol>}
+        </div>
       </section>
 
       <aside className="profile-aside">

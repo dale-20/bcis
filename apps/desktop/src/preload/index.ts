@@ -9,6 +9,7 @@ import {
   SUBSCRIBERS_GET_CHANNEL,
   SUBSCRIBERS_LIST_CHANNEL,
   type DesktopBridge,
+  DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -22,5 +23,9 @@ const bridge: DesktopBridge = Object.freeze({
   getSubscriber: (id: string) => ipcRenderer.invoke(SUBSCRIBERS_GET_CHANNEL, id),
   createSubscriber: (input: Parameters<DesktopBridge['createSubscriber']>[0]) => ipcRenderer.invoke(SUBSCRIBERS_CREATE_CHANNEL, input),
   getReferenceData: () => ipcRenderer.invoke(REFERENCE_DATA_CHANNEL),
+  getDashboard: (query: Parameters<DesktopBridge['getDashboard']>[0]) => ipcRenderer.invoke(DASHBOARD_GET_CHANNEL, query),
+  getReport: (query: Parameters<DesktopBridge['getReport']>[0]) => ipcRenderer.invoke(REPORT_GET_CHANNEL, query),
+  exportReport: (input: Parameters<DesktopBridge['exportReport']>[0]) => ipcRenderer.invoke(REPORT_EXPORT_CHANNEL, input),
+  getServiceHistory: (id: string) => ipcRenderer.invoke(SERVICE_HISTORY_CHANNEL, id),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);
