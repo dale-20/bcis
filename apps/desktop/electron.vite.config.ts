@@ -6,7 +6,9 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ command }) => ({
   main: { plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })] },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })],
+    // Sandboxed Electron preloads can require Electron built-ins only. Bundle Zod
+    // with the shared request contracts instead of leaving a runtime require.
+    plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared', 'zod'] })],
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {

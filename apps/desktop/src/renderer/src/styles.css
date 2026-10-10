@@ -62,7 +62,7 @@
 @media print{body:has(.receipt-preview) *{visibility:hidden!important}body:has(.receipt-preview) .receipt-preview,body:has(.receipt-preview) .receipt-preview *{visibility:visible!important}body:has(.receipt-preview) .receipt-preview{position:absolute!important;inset:0 auto auto 0;width:100%;border:0!important;padding:0!important}.receipt-actions{display:none!important}.receipt-paper{max-width:none;border:0;border-radius:0;padding:0}.receipt-paper>header{border-color:#1d5fa9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
 /* BCIS Buddy is a layered SVG: each body part has its own pose, so events change the character rather than moving a static picture. */
-.bcis-mascot { position: fixed; z-index: 40; display: grid; justify-items: center; width: 154px; touch-action: none; user-select: none; }
+.bcis-mascot { position: fixed; z-index: 40; display: grid; justify-items: center; width: 154px; touch-action: none; user-select: none; pointer-events: none; }
 .mascot-art { width: 144px; height: 162px; overflow: visible; }
 .mascot-body { transform-box: fill-box; transform-origin: 50% 90%; animation: buddy-breathe 3.6s ease-in-out infinite; }
 .mascot-arm { transform-box: fill-box; transform-origin: 55% 15%; }
@@ -74,6 +74,8 @@
 .mascot-toolbar button:first-child { cursor: grab; }
 .mascot-toolbar button:first-child:active { cursor: grabbing; }
 .bcis-mascot:hover .mascot-toolbar, .bcis-mascot:focus-within .mascot-toolbar { opacity: 1; }
+.mascot-toolbar, .mascot-preferences, .mascot-dock { pointer-events: auto; }
+.mascot-bubble { pointer-events: none; }
 .mascot-toolbar button, .mascot-preferences button, .mascot-dock { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 28px; min-height: 28px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); color: var(--color-navy); box-shadow: 0 3px 12px rgb(15 39 71 / 12%); cursor: pointer; }
 .mascot-toolbar svg, .mascot-preferences svg { width: 14px; height: 14px; }
 .mascot-toolbar button:active, .mascot-preferences button:active { transform: scale(.96); }

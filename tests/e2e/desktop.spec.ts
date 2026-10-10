@@ -114,7 +114,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     const generateButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
     if (await generateButton.isEnabled().catch(() => false)) {
       await generateButton.click();
-      await expect(page.getByText('Billing run completed')).toBeVisible();
+      await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
     }
     await page.getByRole('link', { name: 'Current Billing', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Current billing' })).toBeVisible();
@@ -261,7 +261,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     const overdueCycleButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
     await expect(overdueCycleButton).toBeEnabled();
     await overdueCycleButton.click();
-    await expect(page.getByText('Billing run completed')).toBeVisible();
+    await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
 
     const syntheticSubscriber = await database.query<{ id: string; account_number: string }>("select id, account_number from subscribers where account_number='BCIS-00001'");
     const subscriber = syntheticSubscriber.rows[0];

@@ -242,7 +242,7 @@ export function BCISMascot() {
   if (!visible) return null;
   if (preferences.minimized) return <button className="mascot-dock" aria-label="Show BCIS Buddy" onClick={() => persist({ ...preferences, minimized: false })}><MascotArt mood="idle" /></button>;
 
-  return <div ref={rootRef} className={`bcis-mascot ${reducedMotion ? 'reduced-motion' : ''}`} style={{ left: position.x, top: position.y }} onContextMenu={(event) => { event.preventDefault(); setPreferencesOpen(true); }} onPointerMove={updatePosition} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
+  return <aside ref={rootRef} aria-label="BCIS Buddy assistant" className={`bcis-mascot ${reducedMotion ? 'reduced-motion' : ''}`} style={{ left: position.x, top: position.y }} onContextMenu={(event) => { event.preventDefault(); setPreferencesOpen(true); }} onPointerMove={updatePosition} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
     <div className="mascot-bubble" aria-live="polite" aria-atomic="true">{message}</div>
     <MascotArt mood={mood} />
     <div className="mascot-toolbar" role="group" aria-label="BCIS Buddy controls">
@@ -271,5 +271,5 @@ export function BCISMascot() {
       <button className="mascot-tip" onClick={showTip}>What can BCIS Buddy do?</button>
       <button className="mascot-hide" onClick={() => persist({ ...preferences, minimized: true })}>Hide Buddy</button>
     </section>}
-  </div>;
+  </aside>;
 }
