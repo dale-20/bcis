@@ -77,6 +77,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.locator('.service-row').first().getByRole('button', { name: 'Edit' }).click();
     await expect(page.getByRole('heading', { name: 'Edit service account' })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
+
     await page.getByRole('button', { name: 'Billing', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible();
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
@@ -87,6 +88,27 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'New subscriber' })).toBeVisible();
     await page.screenshot({ path: 'test-results/subscriber-form.png' });
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
+
+    await page.getByRole('link', { name: 'Billing', exact: true }).click();
+    await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Generate billing' })).toBeVisible();
+    await page.getByLabel('Period').fill('2099-12');
+    await expect(page.getByText('Eligible services')).toBeVisible();
+    const generateButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
+    if (await generateButton.isEnabled().catch(() => false)) {
+      await generateButton.click();
+      await expect(page.getByText('Billing run completed')).toBeVisible();
+    }
+    await page.getByRole('link', { name: 'Current Billing', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Current billing' })).toBeVisible();
+    await expect(page.getByText('December 2099', { exact: true }).first()).toBeVisible();
+    await page.getByRole('link', { name: 'Invoices', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Invoices', exact: true })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await page.locator('.invoice-table tbody tr').first().click();
+    await expect(page.getByRole('complementary', { name: 'Invoice detail' })).toBeVisible();
+    await expect(page.getByText('Line items')).toBeVisible();
+    await page.getByRole('button', { name: 'Close invoice detail' }).click();
 
     await page.getByRole('link', { name: 'Services', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Services & plans' })).toBeVisible();
@@ -104,7 +126,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('button', { name: 'New area' })).toBeVisible();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'listSubscribers', 'login', 'logout', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
+      bridge: ['changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'createCollectionArea', 'createCollector', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getInvoice', 'getReferenceData', 'getReport', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'listBillingCycles', 'listInvoices', 'listSubscribers', 'login', 'logout', 'previewBilling', 'updateCollectionArea', 'updateCollector', 'updateServiceAccount', 'updateServicePlan', 'updateSubscriber'].sort(),
       node: false,
       process: false,
     });

@@ -32,6 +32,7 @@ import logo from './assets/bcis-mark.png';
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { AuthScreen } from './features/auth/AuthScreen';
 import { CollectionSetupPage } from './features/collections/CollectionSetupPage';
+import { BillingPage } from './features/billing/BillingPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ReportsPage } from './features/reports/ReportsPage';
 import { PlansPage } from './features/services/PlansPage';
@@ -94,9 +95,9 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/subscribers/new" element={<Allowed user={user} permissions={['subscriber.manage']}><SubscribersPage user={user} mode="create" onNavigate={navigate} /></Allowed>} />
     <Route path="/subscribers/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
     <Route path="/subscribers/:subscriberId" element={<Allowed user={user} permissions={['subscriber.view']}><SubscribersPage user={user} mode="profile" onNavigate={navigate} /></Allowed>} />
-    <Route path="/billing/current" element={<Allowed user={user} permissions={['billing.view']}><ModulePage {...modulePages.billingCurrent} /></Allowed>} />
-    <Route path="/billing/generate" element={<Allowed user={user} permissions={['billing.generate']}><ModulePage {...modulePages.billingGenerate} /></Allowed>} />
-    <Route path="/billing/invoices" element={<Allowed user={user} permissions={['billing.view']}><ModulePage {...modulePages.invoices} /></Allowed>} />
+    <Route path="/billing/current" element={<Allowed user={user} permissions={['billing.view']}><BillingPage user={user} mode="current" /></Allowed>} />
+    <Route path="/billing/generate" element={<Allowed user={user} permissions={['billing.generate']}><BillingPage user={user} mode="generate" /></Allowed>} />
+    <Route path="/billing/invoices" element={<Allowed user={user} permissions={['billing.view']}><BillingPage user={user} mode="invoices" /></Allowed>} />
     <Route path="/payments/receive" element={<Allowed user={user} permissions={['payment.create']}><ModulePage {...modulePages.receivePayment} /></Allowed>} />
     <Route path="/payments/history" element={<Allowed user={user} permissions={['payment.create', 'payment.reverse']}><ModulePage {...modulePages.paymentHistory} /></Allowed>} />
     <Route path="/payments/gcash" element={<Allowed user={user} permissions={['payment.verify_gcash']}><ModulePage {...modulePages.gcash} /></Allowed>} />

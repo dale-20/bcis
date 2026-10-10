@@ -1,4 +1,5 @@
 import { and, asc, eq, lte, sql } from 'drizzle-orm';
+import type { InvoiceListQuery } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
   auditLogs,
@@ -122,6 +123,76 @@ export class BillingRepository {
       });
       return { cycleId: cycle.id, period, periodStart, periodEnd, status: 'FINALIZED' as const, invoicesCreated, duplicatesSkipped, totalInvoicedCentavos };
     });
+  }
+
+  async preview(period: string) {
+    const { periodStart, periodEnd } = periodBounds(period);
+    const result = await this.database.pool.query<{
+      eligible_services: number; already_invoiced_services: number; invoices_to_create: number;
+      projected_total: string; cycle_id: string | null; cycle_status: 'OPEN' | 'GENERATING' | 'FINALIZED' | 'CLOSED' | null;
+      finalized_at: Date | null; invoice_count: number; cycle_total: string;
+    }>(`select
+      count(sa.id)::int eligible_services,
+      count(i.id)::int already_invoiced_services,
+      count(sa.id) filter (where i.id is null)::int invoices_to_create,
+      coalesce(sum(sa.current_rate_centavos) filter (where i.id is null),0)::text projected_total,
+      bc.id cycle_id,bc.status::text cycle_status,bc.finalized_at,
+      count(i.id)::int invoice_count,coalesce(sum(i.total_centavos),0)::text cycle_total
+    from service_accounts sa
+    left join billing_cycles bc on bc.period_start=$1::date and bc.period_end=$2::date
+    left join invoices i on i.service_account_id=sa.id and i.billing_cycle_id=bc.id
+    where sa.status='ACTIVE' and sa.billing_start_date <= $2::date
+    group by bc.id,bc.status,bc.finalized_at`, [periodStart, periodEnd]);
+    return { period, periodStart, periodEnd, row: result.rows[0] };
+  }
+
+  async listCycles() {
+    return this.database.pool.query<{ id: string; period_start: string; period_end: string; status: 'OPEN' | 'GENERATING' | 'FINALIZED' | 'CLOSED'; finalized_at: Date | null; invoice_count: number; total: string }>(
+      `select bc.id,bc.period_start::text,bc.period_end::text,bc.status::text,bc.finalized_at,count(i.id)::int invoice_count,coalesce(sum(i.total_centavos),0)::text total
+       from billing_cycles bc left join invoices i on i.billing_cycle_id=bc.id
+       group by bc.id order by bc.period_start desc limit 36`,
+    );
+  }
+
+  async listInvoices(query: InvoiceListQuery) {
+    const values: unknown[] = [];
+    const filters: string[] = [];
+    const add = (value: unknown): string => { values.push(value); return `$${values.length}`; };
+    if (query.query) {
+      const term = add(`%${query.query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+      filters.push(`(i.invoice_number ilike ${term} escape '\\' or s.account_number ilike ${term} escape '\\' or sa.service_account_number ilike ${term} escape '\\' or concat_ws(' ',s.first_name,s.middle_name,s.last_name) ilike ${term} escape '\\')`);
+    }
+    if (query.period !== 'ALL') filters.push(`bc.period_start=${add(`${query.period}-01`)}::date`);
+    if (query.status !== 'ALL') filters.push(`i.status=${add(query.status)}::invoice_status`);
+    if (query.dueFrom) filters.push(`i.due_date>=${add(query.dueFrom)}::date`);
+    if (query.dueTo) filters.push(`i.due_date<=${add(query.dueTo)}::date`);
+    if (query.minAmountCentavos) filters.push(`i.total_centavos>=${add(query.minAmountCentavos)}::bigint`);
+    if (query.maxAmountCentavos) filters.push(`i.total_centavos<=${add(query.maxAmountCentavos)}::bigint`);
+    const where = filters.length ? `where ${filters.join(' and ')}` : '';
+    const countValues = [...values];
+    const limit = add(query.pageSize);
+    const offset = add((query.page - 1) * query.pageSize);
+    const base = `from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id join subscribers s on s.id=i.subscriber_id join service_accounts sa on sa.id=i.service_account_id ${where}`;
+    const [countResult, rows] = await Promise.all([
+      this.database.pool.query<{ total: number }>(`select count(*)::int total ${base}`, countValues),
+      this.database.pool.query<{ id: string; invoice_number: string; period: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string; service_account_id: string; service_account_number: string; invoice_date: string; due_date: string; status: 'DRAFT' | 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' | 'CREDITED'; total: string; balance: string }>(
+        `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance ${base} order by i.invoice_date desc,i.invoice_number desc limit ${limit} offset ${offset}`,
+        values,
+      ),
+    ]);
+    return { rows: rows.rows, total: countResult.rows[0]?.total ?? 0 };
+  }
+
+  async findInvoice(id: string) {
+    const invoice = await this.database.pool.query<{ id: string; invoice_number: string; period: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string; service_account_id: string; service_account_number: string; invoice_date: string; due_date: string; status: 'DRAFT' | 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' | 'CREDITED'; total: string; balance: string; finalized_at: Date }>(
+      `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance,i.finalized_at
+       from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id join subscribers s on s.id=i.subscriber_id join service_accounts sa on sa.id=i.service_account_id where i.id=$1`, [id]);
+    if (!invoice.rows[0]) return null;
+    const [items, ledger] = await Promise.all([
+      this.database.pool.query<{ id: string; type: 'SUBSCRIPTION' | 'INSTALLATION' | 'RECONNECTION' | 'DISCOUNT' | 'PENALTY' | 'ADJUSTMENT'; description: string; amount: string }>(`select id,type::text,description,amount_centavos::text amount from invoice_items where invoice_id=$1 order by created_at,id`, [id]),
+      this.database.pool.query<{ id: string; reference_number: string }>(`select id,reference_number from ledger_entries where reference_type='INVOICE' and reference_id=$1 limit 1`, [id]),
+    ]);
+    return { invoice: invoice.rows[0], items: items.rows, ledger: ledger.rows[0] ?? null };
   }
 
   async findCycle(id: string) {

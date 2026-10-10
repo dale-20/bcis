@@ -1,8 +1,13 @@
 import type { FastifyPluginAsync } from 'fastify';
 import {
   billingCycleDetailSchema,
+  billingCycleListSchema,
+  billingPreviewSchema,
   billingGenerationResultSchema,
   generateBillingCycleInputSchema,
+  invoiceDetailSchema,
+  invoiceListQuerySchema,
+  invoiceListResponseSchema,
   subscriberLedgerSchema,
 } from '@bcis/shared';
 import type { AuthService } from '../auth/service.js';
@@ -41,6 +46,13 @@ const ledgerResponse = { type: 'object', required: ['subscriberId', 'entries', '
   subscriberId: { type: 'string', format: 'uuid' }, entries: { type: 'array', items: ledgerEntryResponse }, closingBalanceCentavos: { type: 'string' },
 } } as const;
 const uuidParams = { type: 'object', required: ['id'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' } } } as const;
+const cycleSummaryResponse = { type: 'object', required: ['id', 'period', 'periodStart', 'periodEnd', 'status', 'finalizedAt', 'invoiceCount', 'totalInvoicedCentavos'], additionalProperties: false, properties: {
+  id: { type: 'string', format: 'uuid' }, period: { type: 'string' }, periodStart: { type: 'string', format: 'date' }, periodEnd: { type: 'string', format: 'date' }, status: { type: 'string' }, finalizedAt: { anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }] }, invoiceCount: { type: 'integer' }, totalInvoicedCentavos: { type: 'string' },
+} } as const;
+const invoiceListItemResponse = { type: 'object', required: ['id', 'invoiceNumber', 'period', 'subscriberId', 'subscriberAccountNumber', 'subscriberName', 'serviceAccountId', 'serviceAccountNumber', 'invoiceDate', 'dueDate', 'status', 'totalCentavos', 'balanceCentavos'], additionalProperties: false, properties: {
+  id: { type: 'string', format: 'uuid' }, invoiceNumber: { type: 'string' }, period: { type: 'string' }, subscriberId: { type: 'string', format: 'uuid' }, subscriberAccountNumber: { type: 'string' }, subscriberName: { type: 'string' }, serviceAccountId: { type: 'string', format: 'uuid' }, serviceAccountNumber: { type: 'string' }, invoiceDate: { type: 'string', format: 'date' }, dueDate: { type: 'string', format: 'date' }, status: { type: 'string' }, totalCentavos: { type: 'string' }, balanceCentavos: { type: 'string' },
+} } as const;
+const invoiceListResponse = { type: 'object', required: ['items', 'page', 'pageSize', 'total', 'pageCount'], additionalProperties: false, properties: { items: { type: 'array', items: invoiceListItemResponse }, page: { type: 'integer' }, pageSize: { type: 'integer' }, total: { type: 'integer' }, pageCount: { type: 'integer' } } } as const;
 
 export const billingPlugin: FastifyPluginAsync<BillingPluginOptions> = async (app, options) => {
   const service = new BillingService(options.database);
@@ -58,6 +70,35 @@ export const billingPlugin: FastifyPluginAsync<BillingPluginOptions> = async (ap
     const input = generateBillingCycleInputSchema.parse(request.body);
     return billingGenerationResultSchema.parse(await service.generate(input.period, context.userId, request.id));
   });
+
+  app.get('/billing/cycles', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
+    schema: { response: { 200: { type: 'object', required: ['items'], additionalProperties: false, properties: { items: { type: 'array', items: cycleSummaryResponse } } }, 401: errorResponse, 403: errorResponse } },
+  }, async () => billingCycleListSchema.parse(await service.cycles()));
+
+  app.get('/billing/cycles/preview', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.generate')],
+    schema: {
+      querystring: { type: 'object', required: ['period'], additionalProperties: false, properties: { period: { type: 'string', pattern: '^[1-9]\\d{3}-(0[1-9]|1[0-2])$' } } },
+      response: { 200: { type: 'object', required: ['period', 'periodStart', 'periodEnd', 'eligibleServices', 'alreadyInvoicedServices', 'invoicesToCreate', 'projectedTotalCentavos', 'existingCycle'], additionalProperties: false, properties: { period: { type: 'string' }, periodStart: { type: 'string', format: 'date' }, periodEnd: { type: 'string', format: 'date' }, eligibleServices: { type: 'integer' }, alreadyInvoicedServices: { type: 'integer' }, invoicesToCreate: { type: 'integer' }, projectedTotalCentavos: { type: 'string' }, existingCycle: { anyOf: [cycleSummaryResponse, { type: 'null' }] } } }, 400: errorResponse, 401: errorResponse, 403: errorResponse },
+    },
+  }, async (request) => {
+    const input = generateBillingCycleInputSchema.parse(request.query);
+    return billingPreviewSchema.parse(await service.preview(input.period));
+  });
+
+  app.get('/invoices', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
+    schema: {
+      querystring: { type: 'object', additionalProperties: false, properties: { query: { type: 'string', maxLength: 100 }, period: { type: 'string' }, status: { type: 'string' }, dueFrom: { type: 'string', format: 'date' }, dueTo: { type: 'string', format: 'date' }, minAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, maxAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' } } },
+      response: { 200: invoiceListResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse },
+    },
+  }, async (request) => invoiceListResponseSchema.parse(await service.invoices(invoiceListQuerySchema.parse(request.query))));
+
+  app.get('/invoices/:id', {
+    preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
+    schema: { params: uuidParams, response: { 200: { ...invoiceListItemResponse, required: [...invoiceListItemResponse.required, 'finalizedAt', 'items', 'ledgerEntry'], properties: { ...invoiceListItemResponse.properties, finalizedAt: { type: 'string', format: 'date-time' }, items: { type: 'array', items: itemResponse }, ledgerEntry: { anyOf: [{ type: 'object', required: ['id', 'referenceNumber'], additionalProperties: false, properties: { id: { type: 'string', format: 'uuid' }, referenceNumber: { type: 'string' } } }, { type: 'null' }] } } }, 401: errorResponse, 403: errorResponse, 404: errorResponse } },
+  }, async (request) => invoiceDetailSchema.parse(await service.invoice((request.params as { id: string }).id)));
 
   app.get('/billing/cycles/:id', {
     preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],

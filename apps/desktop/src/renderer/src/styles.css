@@ -371,6 +371,73 @@
   .audit-list li > div { @apply flex min-w-0 flex-col; }
   .audit-list li span, .audit-list li p, .audit-list time { @apply mt-1 text-xs text-secondary; }
   .audit-list time { @apply shrink-0; }
+  .billing-metrics { @apply mb-5 grid grid-cols-3 gap-4; }
+  .billing-metrics article { @apply flex items-center gap-4 rounded-xl border border-border bg-surface p-5; }
+  .billing-metrics article > span { @apply flex size-11 shrink-0 items-center justify-center rounded-xl bg-info-muted text-primary; }
+  .billing-metrics svg { @apply size-5; }
+  .billing-metrics p { @apply text-xs text-secondary; }
+  .billing-metrics strong { @apply mt-1 block text-lg font-semibold tabular-nums; }
+  .billing-split { @apply grid grid-cols-[minmax(300px,.75fr)_minmax(520px,1.4fr)] gap-5; }
+  .section-heading.compact { @apply border-b border-border px-5 py-4; }
+  .section-heading.compact h2 { @apply text-base; }
+  .section-heading.compact p { @apply mt-1 text-xs; }
+  .cycle-list { @apply divide-y divide-border; }
+  .cycle-list button { @apply flex w-full items-center justify-between gap-4 border-0 bg-transparent px-5 py-4 text-left hover:bg-muted; }
+  .cycle-list button.active { @apply bg-info-muted; box-shadow: inset 3px 0 0 hsl(var(--primary)); }
+  .cycle-list button > span { @apply flex flex-col gap-1; }
+  .cycle-list button > span:last-child { @apply items-end; }
+  .cycle-list small { @apply text-xs text-secondary; }
+  .cycle-list button > span:last-child > strong { @apply text-xs tabular-nums; }
+  .cycle-detail { @apply min-w-0; }
+  .billing-detail-grid { @apply grid grid-cols-4 gap-px border-b border-border bg-border; }
+  .billing-detail-grid > div { @apply bg-surface p-4; }
+  .billing-detail-grid dt { @apply text-[10px] font-semibold uppercase tracking-wide text-secondary; }
+  .billing-detail-grid dd { @apply m-0 mt-2 text-sm font-medium tabular-nums; }
+  .table-note { @apply border-t border-border px-5 py-3 text-xs text-secondary; }
+  .generate-layout { @apply mx-auto grid max-w-5xl grid-cols-[320px_minmax(0,1fr)] gap-5; }
+  .generate-control, .preview-card { @apply self-start; }
+  .generate-control .form-field { @apply m-5; }
+  .generation-note { @apply m-5 rounded-lg border border-border bg-muted p-4; }
+  .generation-note strong, .duplicate-callout strong, .success-callout strong { @apply text-sm; }
+  .generation-note p, .duplicate-callout p, .success-callout p { @apply mt-1 text-xs leading-5 text-secondary; }
+  .preview-hero { @apply flex flex-col items-center border-b border-border px-6 py-8 text-center; }
+  .preview-hero span { @apply text-xs font-semibold uppercase tracking-widest text-primary; }
+  .preview-hero strong { @apply mt-2 text-3xl font-semibold tabular-nums; }
+  .preview-hero small { @apply mt-1 text-xs text-secondary; }
+  .preview-counts { @apply grid grid-cols-3 border-b border-border; }
+  .preview-counts > div { @apply p-4 text-center; }
+  .preview-counts dt { @apply text-xs text-secondary; }
+  .preview-counts dd { @apply m-0 mt-1 text-xl font-semibold tabular-nums; }
+  .duplicate-callout, .success-callout { @apply m-5 rounded-lg border border-warning bg-warning-muted p-4; }
+  .success-callout { @apply border-success bg-success-muted; }
+  .generate-button { @apply mx-5 mb-5 w-[calc(100%_-_2.5rem)]; }
+  .billing-toolbar { @apply grid grid-cols-[minmax(280px,1fr)_180px_180px]; }
+  .billing-toolbar .filter-field input { @apply h-10 min-w-0 rounded-md border border-border bg-surface px-3 text-sm; }
+  .invoice-table tbody tr { @apply cursor-pointer; }
+  .invoice-table tbody tr:focus { @apply outline-2 outline-offset-[-2px] outline-ring; }
+  .invoice-table td div { @apply flex flex-col; }
+  .invoice-table td small { @apply mt-1 text-xs text-secondary; }
+  .drawer-backdrop { @apply fixed inset-0 z-50 flex justify-end bg-foreground/20; }
+  .invoice-drawer { @apply h-full w-full max-w-xl overflow-y-auto border-l border-border bg-surface; box-shadow: -24px 0 60px rgba(8,20,39,.16); }
+  .invoice-drawer > header { @apply sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-6 py-5; }
+  .invoice-drawer > header span { @apply text-xs text-secondary; }
+  .invoice-drawer > header h2 { @apply mt-1 text-xl; }
+  .invoice-total { @apply flex items-center gap-4 border-b border-border bg-muted px-6 py-5; }
+  .invoice-total > span { @apply text-xs text-secondary; }
+  .invoice-total > strong { @apply ml-auto text-2xl tabular-nums; }
+  .drawer-grid { @apply grid-cols-2; }
+  .drawer-grid dd { @apply flex flex-col; }
+  .drawer-grid small { @apply mt-1 text-xs font-normal text-secondary; }
+  .line-items { @apply p-6; }
+  .line-items h3 { @apply mb-3 text-sm; }
+  .line-items > div, .line-items footer { @apply flex items-center justify-between gap-5 border-t border-border py-4; }
+  .line-items > div > span { @apply flex flex-col; }
+  .line-items small { @apply mt-1 text-[10px] font-semibold tracking-wide text-secondary; }
+  .line-items footer { @apply border-b border-border text-base; }
+  .ledger-link { @apply mx-6 mb-6 flex flex-col rounded-lg border border-border bg-muted p-4; }
+  .ledger-link span, .ledger-link small { @apply text-xs text-secondary; }
+  .ledger-link strong { @apply my-1 text-sm; }
+  .spin { animation: spin 1s linear infinite; }
 
   @keyframes content-arrive { from { opacity: .01; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes skeleton-shift { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
@@ -383,6 +450,8 @@
     .profile-aside { @apply grid grid-cols-2; }
     .three-columns { @apply grid-cols-2; }
     .plan-grid { @apply grid-cols-2; }
+    .billing-split { @apply grid-cols-1; }
+    .generate-layout { @apply grid-cols-1; }
     .module-ready ul { @apply grid-cols-1; }
   }
   @media (prefers-reduced-transparency: reduce) { .topbar { @apply bg-surface; backdrop-filter: none; } }

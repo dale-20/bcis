@@ -33,6 +33,8 @@ import {
   SUBSCRIBERS_GET_CHANNEL,
   SUBSCRIBERS_LIST_CHANNEL,
   DASHBOARD_GET_CHANNEL, REPORT_GET_CHANNEL, REPORT_EXPORT_CHANNEL, SERVICE_HISTORY_CHANNEL,
+  BILLING_CYCLES_LIST_CHANNEL, BILLING_PREVIEW_CHANNEL, BILLING_GENERATE_CHANNEL, BILLING_CYCLE_GET_CHANNEL,
+  INVOICES_LIST_CHANNEL, INVOICE_GET_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -104,6 +106,12 @@ void app.whenReady().then(() => {
   ipcMain.handle(DASHBOARD_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getDashboard(desktopRequestSchemas.dashboard.parse(input)); });
   ipcMain.handle(REPORT_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getReport(desktopRequestSchemas.report.parse(input)); });
   ipcMain.handle(SERVICE_HISTORY_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getServiceHistory(desktopRequestSchemas.subscriberId.parse(input)); });
+  ipcMain.handle(BILLING_CYCLES_LIST_CHANNEL, (event) => { assertTrustedSender(event); return api.listBillingCycles(); });
+  ipcMain.handle(BILLING_PREVIEW_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.previewBilling(desktopRequestSchemas.billingPeriod.parse(input)); });
+  ipcMain.handle(BILLING_GENERATE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.generateBilling(desktopRequestSchemas.billingPeriod.parse(input)); });
+  ipcMain.handle(BILLING_CYCLE_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getBillingCycle(desktopRequestSchemas.billingCycleId.parse(input)); });
+  ipcMain.handle(INVOICES_LIST_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.listInvoices(desktopRequestSchemas.invoiceList.parse(input)); });
+  ipcMain.handle(INVOICE_GET_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.getInvoice(desktopRequestSchemas.invoiceId.parse(input)); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

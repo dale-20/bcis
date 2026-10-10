@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { and, eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { BillingCycleDetail, BillingGenerationResult, SubscriberLedger } from '@bcis/shared';
+import type { BillingCycleDetail, BillingCycleList, BillingGenerationResult, BillingPreview, InvoiceDetail, InvoiceListResponse, SubscriberLedger } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -61,6 +61,20 @@ describe.sequential('monthly billing and reproducible ledger', () => {
   let expectedActiveServices = 0;
   let expectedTotal = 0n;
 
+  it('previews eligible services without writing financial records', async () => {
+    const before = await database.db.select({ id: billingCycles.id }).from(billingCycles);
+    const response = await app.inject({ method: 'GET', url: '/billing/cycles/preview?period=2026-08', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(response.statusCode).toBe(200);
+    const preview = response.json<BillingPreview>();
+    expect(preview).toMatchObject({ period: '2026-08', alreadyInvoicedServices: 0, existingCycle: null });
+    expect(preview.eligibleServices).toBeGreaterThan(0);
+    expect(preview.invoicesToCreate).toBe(preview.eligibleServices);
+    expect(BigInt(preview.projectedTotalCentavos)).toBeGreaterThan(0n);
+    expect(await database.db.select({ id: billingCycles.id }).from(billingCycles)).toEqual(before);
+    const denied = await app.inject({ method: 'GET', url: '/billing/cycles/preview?period=2026-08', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(denied.statusCode).toBe(403);
+  });
+
   it('generates one finalized invoice per active service atomically under concurrent runs', async () => {
     const [expected] = await database.db.select({
       count: sql<number>`count(*)::int`,
@@ -99,6 +113,26 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     });
     expect(invoice?.items).toEqual([expect.objectContaining({ type: 'SUBSCRIPTION', amountCentavos: '99900' })]);
     expect(detail.invoices.every((candidate) => candidate.status !== 'DRAFT' && candidate.finalizedAt.length > 0)).toBe(true);
+  });
+
+  it('lists cycles and server-paginates searchable invoices with immutable detail', async () => {
+    const cyclesResponse = await app.inject({ method: 'GET', url: '/billing/cycles', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(cyclesResponse.statusCode).toBe(200);
+    expect(cyclesResponse.json<BillingCycleList>().items[0]).toMatchObject({ id: cycleId, period: '2026-08', invoiceCount: expectedActiveServices, totalInvoicedCentavos: expectedTotal.toString() });
+
+    const listResponse = await app.inject({ method: 'GET', url: '/invoices?period=2026-08&status=UNPAID&page=1&pageSize=10&query=SVC-00001-1', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(listResponse.statusCode).toBe(200);
+    const list = listResponse.json<InvoiceListResponse>();
+    expect(list.total).toBe(1);
+    expect(list.items[0]).toMatchObject({ period: '2026-08', serviceAccountNumber: 'SVC-00001-1', totalCentavos: '99900', balanceCentavos: '99900' });
+    const invoiceId = list.items[0]?.id;
+    if (!invoiceId) throw new Error('Invoice list row missing');
+    const detailResponse = await app.inject({ method: 'GET', url: `/invoices/${invoiceId}`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json<InvoiceDetail>()).toMatchObject({ id: invoiceId, items: [{ type: 'SUBSCRIPTION', amountCentavos: '99900' }], ledgerEntry: { referenceNumber: list.items[0]?.invoiceNumber } });
+
+    const duplicatePreview = await app.inject({ method: 'GET', url: '/billing/cycles/preview?period=2026-08', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(duplicatePreview.json<BillingPreview>()).toMatchObject({ eligibleServices: expectedActiveServices, alreadyInvoicedServices: expectedActiveServices, invoicesToCreate: 0, projectedTotalCentavos: '0', existingCycle: { id: cycleId, status: 'FINALIZED' } });
   });
 
   it('keeps finalized invoice values and line items immutable after plan and service changes', async () => {

@@ -50,6 +50,10 @@ import {
   type SubscriberUpdate,
   dashboardQuerySchema, dashboardSchema, reportDataSchema, reportRequestSchema, serviceHistorySchema, exportResultSchema,
   type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory,
+  billingCycleDetailResultSchema, billingCycleListResultSchema, billingGenerationResultDesktopSchema, billingPreviewResultSchema,
+  generateBillingCycleInputSchema, invoiceDetailResultSchema, invoiceListQuerySchema, invoiceListResultSchema,
+  type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
+  type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
 } from '@bcis/shared';
 
 export class DesktopServiceError extends Error {
@@ -211,5 +215,29 @@ export async function getServiceHistory(subscriberId: string): Promise<ServiceHi
   const result = await bridge().getServiceHistory(subscriberId);
   if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
   return serviceHistorySchema.parse(result.data);
+}
+
+export async function listBillingCycles(): Promise<BillingCycleList> {
+  return unwrap(billingCycleListResultSchema.parse(await bridge().listBillingCycles()));
+}
+
+export async function previewBilling(input: GenerateBillingCycleInput): Promise<BillingPreview> {
+  return unwrap(billingPreviewResultSchema.parse(await bridge().previewBilling(generateBillingCycleInputSchema.parse(input))));
+}
+
+export async function generateBilling(input: GenerateBillingCycleInput): Promise<BillingGenerationResult> {
+  return unwrap(billingGenerationResultDesktopSchema.parse(await bridge().generateBilling(generateBillingCycleInputSchema.parse(input))));
+}
+
+export async function getBillingCycle(id: string): Promise<BillingCycleDetail> {
+  return unwrap(billingCycleDetailResultSchema.parse(await bridge().getBillingCycle(id)));
+}
+
+export async function listInvoices(query: InvoiceListQuery): Promise<InvoiceListResponse> {
+  return unwrap(invoiceListResultSchema.parse(await bridge().listInvoices(invoiceListQuerySchema.parse(query))));
+}
+
+export async function getInvoice(id: string): Promise<InvoiceDetail> {
+  return unwrap(invoiceDetailResultSchema.parse(await bridge().getInvoice(id)));
 }
 

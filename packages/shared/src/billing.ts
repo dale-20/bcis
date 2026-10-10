@@ -20,6 +20,23 @@ export const billingGenerationResultSchema = z.object({
 });
 export type BillingGenerationResult = z.infer<typeof billingGenerationResultSchema>;
 
+export const billingCycleSummarySchema = z.object({
+  id: z.uuid(), period: billingPeriodSchema, periodStart: z.iso.date(), periodEnd: z.iso.date(),
+  status: z.enum(['OPEN', 'GENERATING', 'FINALIZED', 'CLOSED']), finalizedAt: z.iso.datetime().nullable(),
+  invoiceCount: z.number().int().nonnegative(), totalInvoicedCentavos: centavosSchema,
+});
+export type BillingCycleSummary = z.infer<typeof billingCycleSummarySchema>;
+export const billingCycleListSchema = z.object({ items: z.array(billingCycleSummarySchema) });
+export type BillingCycleList = z.infer<typeof billingCycleListSchema>;
+
+export const billingPreviewSchema = z.object({
+  period: billingPeriodSchema, periodStart: z.iso.date(), periodEnd: z.iso.date(),
+  eligibleServices: z.number().int().nonnegative(), alreadyInvoicedServices: z.number().int().nonnegative(),
+  invoicesToCreate: z.number().int().nonnegative(), projectedTotalCentavos: centavosSchema,
+  existingCycle: billingCycleSummarySchema.nullable(),
+});
+export type BillingPreview = z.infer<typeof billingPreviewSchema>;
+
 export const invoiceItemSchema = z.object({
   id: z.uuid(), type: invoiceItemTypeSchema, description: z.string(), amountCentavos: signedCentavosSchema,
 });
@@ -30,6 +47,38 @@ export const invoiceSummarySchema = z.object({
   totalCentavos: centavosSchema, balanceCentavos: centavosSchema, finalizedAt: z.iso.datetime(),
   items: z.array(invoiceItemSchema),
 });
+
+export const invoiceListQuerySchema = z.object({
+  query: z.string().trim().max(100).default(''),
+  period: z.union([billingPeriodSchema, z.literal('ALL')]).default('ALL'),
+  status: z.union([invoiceStatusSchema, z.literal('ALL')]).default('ALL'),
+  dueFrom: z.iso.date().optional(), dueTo: z.iso.date().optional(),
+  minAmountCentavos: centavosSchema.optional(), maxAmountCentavos: centavosSchema.optional(),
+  page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(20),
+}).superRefine((value, context) => {
+  if (value.dueFrom && value.dueTo && value.dueFrom > value.dueTo) context.addIssue({ code: 'custom', message: 'Due date range is invalid', path: ['dueTo'] });
+  if (value.minAmountCentavos && value.maxAmountCentavos && BigInt(value.minAmountCentavos) > BigInt(value.maxAmountCentavos)) context.addIssue({ code: 'custom', message: 'Amount range is invalid', path: ['maxAmountCentavos'] });
+});
+export type InvoiceListQuery = z.infer<typeof invoiceListQuerySchema>;
+
+export const invoiceListItemSchema = z.object({
+  id: z.uuid(), invoiceNumber: z.string(), period: billingPeriodSchema,
+  subscriberId: z.uuid(), subscriberAccountNumber: z.string(), subscriberName: z.string(),
+  serviceAccountId: z.uuid(), serviceAccountNumber: z.string(), invoiceDate: z.iso.date(), dueDate: z.iso.date(),
+  status: invoiceStatusSchema, totalCentavos: centavosSchema, balanceCentavos: centavosSchema,
+});
+export type InvoiceListItem = z.infer<typeof invoiceListItemSchema>;
+export const invoiceListResponseSchema = z.object({
+  items: z.array(invoiceListItemSchema), page: z.number().int().positive(), pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(), pageCount: z.number().int().nonnegative(),
+});
+export type InvoiceListResponse = z.infer<typeof invoiceListResponseSchema>;
+
+export const invoiceDetailSchema = invoiceListItemSchema.extend({
+  finalizedAt: z.iso.datetime(), items: z.array(invoiceItemSchema),
+  ledgerEntry: z.object({ id: z.uuid(), referenceNumber: z.string() }).nullable(),
+});
+export type InvoiceDetail = z.infer<typeof invoiceDetailSchema>;
 
 export const billingCycleDetailSchema = z.object({
   id: z.uuid(), period: billingPeriodSchema, periodStart: z.iso.date(), periodEnd: z.iso.date(),

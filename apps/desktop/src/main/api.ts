@@ -33,6 +33,10 @@ import {
   type SubscriberUpdate,
   dashboardSchema, reportDataSchema, serviceHistorySchema,
   type Dashboard, type DashboardQuery, type ReportData, type ReportRequest, type ServiceHistory,
+  billingCycleDetailSchema, billingCycleListSchema, billingGenerationResultSchema, billingPreviewSchema,
+  invoiceDetailSchema, invoiceListResponseSchema,
+  type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
+  type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
 } from '@bcis/shared';
 import { z } from 'zod';
 
@@ -180,6 +184,32 @@ export class DesktopApiClient {
 
   getServiceHistory(id: string): Promise<DesktopResult<ServiceHistory>> {
     return this.call(`/subscribers/${encodeURIComponent(id)}/service-history`, { method: 'GET' }, serviceHistorySchema);
+  }
+
+  listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {
+    return this.call('/billing/cycles', { method: 'GET' }, billingCycleListSchema);
+  }
+
+  previewBilling(input: GenerateBillingCycleInput): Promise<DesktopResult<BillingPreview>> {
+    return this.call(`/billing/cycles/preview?period=${encodeURIComponent(input.period)}`, { method: 'GET' }, billingPreviewSchema);
+  }
+
+  generateBilling(input: GenerateBillingCycleInput): Promise<DesktopResult<BillingGenerationResult>> {
+    return this.call('/billing/cycles/generate', { method: 'POST', body: JSON.stringify(input) }, billingGenerationResultSchema);
+  }
+
+  getBillingCycle(id: string): Promise<DesktopResult<BillingCycleDetail>> {
+    return this.call(`/billing/cycles/${encodeURIComponent(id)}`, { method: 'GET' }, billingCycleDetailSchema);
+  }
+
+  listInvoices(query: InvoiceListQuery): Promise<DesktopResult<InvoiceListResponse>> {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) if (value !== undefined) search.set(key, String(value));
+    return this.call(`/invoices?${search.toString()}`, { method: 'GET' }, invoiceListResponseSchema);
+  }
+
+  getInvoice(id: string): Promise<DesktopResult<InvoiceDetail>> {
+    return this.call(`/invoices/${encodeURIComponent(id)}`, { method: 'GET' }, invoiceDetailSchema);
   }
 
   async downloadReport(query: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<DesktopResult<{ buffer: Uint8Array; filename: string }>> {

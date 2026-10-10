@@ -44,6 +44,12 @@ import {
   type SubscriberUpdate,
 } from './subscribers.js';
 import { dashboardQuerySchema, reportRequestSchema, type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory } from './reports.js';
+import {
+  billingCycleDetailSchema, billingCycleListSchema, billingGenerationResultSchema, billingPreviewSchema,
+  generateBillingCycleInputSchema, invoiceDetailSchema, invoiceListQuerySchema, invoiceListResponseSchema,
+  type BillingCycleDetail, type BillingCycleList, type BillingGenerationResult, type BillingPreview,
+  type GenerateBillingCycleInput, type InvoiceDetail, type InvoiceListQuery, type InvoiceListResponse,
+} from './billing.js';
 
 export const AUTH_LOGIN_CHANNEL = 'bcis:auth:login';
 export const AUTH_LOGOUT_CHANNEL = 'bcis:auth:logout';
@@ -75,6 +81,12 @@ export const DASHBOARD_GET_CHANNEL = 'bcis:dashboard:get';
 export const REPORT_GET_CHANNEL = 'bcis:report:get';
 export const REPORT_EXPORT_CHANNEL = 'bcis:report:export';
 export const SERVICE_HISTORY_CHANNEL = 'bcis:service-history:get';
+export const BILLING_CYCLES_LIST_CHANNEL = 'bcis:billing-cycles:list';
+export const BILLING_PREVIEW_CHANNEL = 'bcis:billing:preview';
+export const BILLING_GENERATE_CHANNEL = 'bcis:billing:generate';
+export const BILLING_CYCLE_GET_CHANNEL = 'bcis:billing-cycle:get';
+export const INVOICES_LIST_CHANNEL = 'bcis:invoices:list';
+export const INVOICE_GET_CHANNEL = 'bcis:invoice:get';
 
 export const authenticatedUserSchema = z.object({
   userId: z.uuid(), username: z.string(), displayName: z.string(), mustChangePassword: z.boolean(),
@@ -133,6 +145,15 @@ export const referenceCreatedResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), data: z.object({ id: z.uuid() }) }),
   z.object({ ok: z.literal(false), error: apiFailureSchema }),
 ]);
+const desktopResult = <T extends z.ZodType>(schema: T) => z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), data: schema }), z.object({ ok: z.literal(false), error: apiFailureSchema }),
+]);
+export const billingCycleListResultSchema = desktopResult(billingCycleListSchema);
+export const billingPreviewResultSchema = desktopResult(billingPreviewSchema);
+export const billingGenerationResultDesktopSchema = desktopResult(billingGenerationResultSchema);
+export const billingCycleDetailResultSchema = desktopResult(billingCycleDetailSchema);
+export const invoiceListResultSchema = desktopResult(invoiceListResponseSchema);
+export const invoiceDetailResultSchema = desktopResult(invoiceDetailSchema);
 
 export interface DesktopBridge {
   getConnection: () => Promise<import('./index.js').ConnectionResult>;
@@ -166,6 +187,12 @@ export interface DesktopBridge {
   getReport: (query: ReportRequest) => Promise<DesktopResult<ReportData>>;
   exportReport: (input: ReportRequest & { format: 'PDF' | 'XLSX' }) => Promise<DesktopResult<ExportResult>>;
   getServiceHistory: (subscriberId: string) => Promise<DesktopResult<ServiceHistory>>;
+  listBillingCycles: () => Promise<DesktopResult<BillingCycleList>>;
+  previewBilling: (input: GenerateBillingCycleInput) => Promise<DesktopResult<BillingPreview>>;
+  generateBilling: (input: GenerateBillingCycleInput) => Promise<DesktopResult<BillingGenerationResult>>;
+  getBillingCycle: (id: string) => Promise<DesktopResult<BillingCycleDetail>>;
+  listInvoices: (query: InvoiceListQuery) => Promise<DesktopResult<InvoiceListResponse>>;
+  getInvoice: (id: string) => Promise<DesktopResult<InvoiceDetail>>;
 }
 
 export const desktopRequestSchemas = {
@@ -191,5 +218,9 @@ export const desktopRequestSchemas = {
   dashboard: dashboardQuerySchema,
   report: reportRequestSchema,
   reportExport: reportRequestSchema.extend({ format: z.enum(['PDF', 'XLSX']) }),
+  billingPeriod: generateBillingCycleInputSchema,
+  billingCycleId: z.uuid(),
+  invoiceList: invoiceListQuerySchema,
+  invoiceId: z.uuid(),
 };
 
