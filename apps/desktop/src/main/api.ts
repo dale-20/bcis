@@ -5,6 +5,7 @@ import {
   serviceControlPolicySchema, createSuspensionInputSchema, reconnectionAssignmentSchema,
   auditSearchSchema, auditSearchResultSchema, managedUserCreateSchema, managedUserListSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
+  organizationSettingsSchema, type OrganizationSettings,
   receivableAccountQuerySchema as serviceReceivableAccountQuerySchema,
   reconnectionListResponseSchema, suspensionListResponseSchema, serviceTechnicianListSchema,
   collectionReferenceCatalogSchema,
@@ -301,6 +302,12 @@ export class DesktopApiClient {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(parsed)) if (value !== '' && value !== undefined) search.set(key, String(value));
     return this.call(`/system/audit?${search.toString()}`, { method: 'GET' }, auditSearchResultSchema);
+  }
+  getOrganizationSettings(): Promise<DesktopResult<OrganizationSettings>> {
+    return this.call('/system/settings', { method: 'GET' }, organizationSettingsSchema);
+  }
+  updateOrganizationSettings(input: OrganizationSettings): Promise<DesktopResult<OrganizationSettings>> {
+    return this.call('/system/settings', { method: 'PUT', body: JSON.stringify(organizationSettingsSchema.parse(input)) }, organizationSettingsSchema, true, true);
   }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {

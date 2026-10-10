@@ -160,6 +160,22 @@ describe.sequential('authentication and server-side authorization', () => {
     expect(adminCannotGrantOwner.statusCode).toBe(403);
   });
 
+  it('persists company and service billing defaults with settings permission and audit', async () => {
+    const input = { companyName: 'Synthetic BCIS', companyAddress: '12 Example Street', contactNumber: '09000000000', reportFooter: 'Synthetic statement footer', defaultBillingDay: 12, defaultDueDay: 20 };
+    const saved = await app.inject({ method: 'PUT', url: '/system/settings', headers: { authorization: `Bearer ${adminToken}` }, payload: input });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject(input);
+    const loaded = await app.inject({ method: 'GET', url: '/system/settings', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(loaded.json()).toMatchObject(input);
+    const cashier = await app.inject({ method: 'GET', url: '/system/settings', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(cashier.statusCode).toBe(403);
+    const logs = await database.db.select().from(auditLogs).where(eq(auditLogs.action, 'organization.settings_updated'));
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ oldValues: expect.objectContaining({ companyName: 'BCIS' }), newValues: input });
+    const invalid = await app.inject({ method: 'PUT', url: '/system/settings', headers: { authorization: `Bearer ${adminToken}` }, payload: { ...input, defaultBillingDay: 29 } });
+    expect(invalid.statusCode).toBe(400);
+  });
+
   it('requires a valid bearer session for protected routes', async () => {
     const response = await app.inject({ method: 'GET', url: '/admin/users' });
     expect(response.statusCode).toBe(401);

@@ -7,6 +7,7 @@ import {
   auditSearchSchema, auditSearchDesktopResultSchema, managedUserCreateDesktopResultSchema, managedUserCreateSchema,
   managedUserListDesktopResultSchema, adminMutationDesktopResultSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
+  organizationSettingsDesktopResultSchema, organizationSettingsSchema, type OrganizationSettings,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -404,6 +405,12 @@ export async function resetManagedUserPassword(id: string, password: string): Pr
 }
 export async function searchAudit(query: AuditSearchQuery) {
   return unwrap(auditSearchDesktopResultSchema.parse(await bridge().searchAudit(auditSearchSchema.parse(query))));
+}
+export async function getOrganizationSettings(): Promise<OrganizationSettings> {
+  return unwrap(organizationSettingsDesktopResultSchema.parse(await bridge().getOrganizationSettings()));
+}
+export async function updateOrganizationSettings(input: OrganizationSettings): Promise<OrganizationSettings> {
+  return unwrap(organizationSettingsDesktopResultSchema.parse(await bridge().updateOrganizationSettings(organizationSettingsSchema.parse(input))));
 }
 
 export async function recordCollection(id: string, input: { batchAccountId: string; paymentId: string; notes?: string }): Promise<CollectionBatch> {

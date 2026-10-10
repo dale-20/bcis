@@ -43,6 +43,7 @@ import {
   RECONNECTIONS_LIST_CHANNEL, RECONNECTIONS_MINE_CHANNEL, TECHNICIANS_LIST_CHANNEL,
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
   ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
+  ORGANIZATION_SETTINGS_GET_CHANNEL, ORGANIZATION_SETTINGS_UPDATE_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -123,5 +124,7 @@ const bridge: DesktopBridge = Object.freeze({
   updateManagedUser: (id: string, input: Parameters<DesktopBridge['updateManagedUser']>[1]) => ipcRenderer.invoke(ADMIN_USER_UPDATE_CHANNEL, { id, input }),
   resetManagedUserPassword: (id: string, password: string) => ipcRenderer.invoke(ADMIN_USER_PASSWORD_RESET_CHANNEL, { id, password }),
   searchAudit: (query: Parameters<DesktopBridge['searchAudit']>[0]) => ipcRenderer.invoke(AUDIT_SEARCH_CHANNEL, query),
+  getOrganizationSettings: () => ipcRenderer.invoke(ORGANIZATION_SETTINGS_GET_CHANNEL),
+  updateOrganizationSettings: (input: Parameters<DesktopBridge['updateOrganizationSettings']>[0]) => ipcRenderer.invoke(ORGANIZATION_SETTINGS_UPDATE_CHANNEL, input),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

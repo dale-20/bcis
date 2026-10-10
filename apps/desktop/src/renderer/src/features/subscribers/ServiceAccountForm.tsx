@@ -1,7 +1,10 @@
 import { X } from 'lucide-react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { serviceAccountMaintenanceSchema, type ReferenceData, type ServiceAccountMaintenance, type SubscriberDetail } from '@bcis/shared';
 import { Button } from '../../components/ui/button';
+import { getOrganizationSettings } from '../../services/api';
 
 type Service = SubscriberDetail['services'][number];
 
@@ -16,7 +19,8 @@ interface Props {
 }
 
 export function ServiceAccountForm({ subscriber, references, service, pending, serverError, onCancel, onSubmit }: Props) {
-  const form = useForm<ServiceAccountMaintenance>({ defaultValues: service ? {
+  const settings = useQuery({ queryKey: ['organization-settings'], queryFn: getOrganizationSettings });
+  const values = useMemo<ServiceAccountMaintenance>(() => service ? {
     serviceAccountNumber: service.serviceAccountNumber,
     planId: service.planId,
     installationAddressId: service.installationAddressId,
@@ -30,8 +34,9 @@ export function ServiceAccountForm({ subscriber, references, service, pending, s
   } : {
     serviceAccountNumber: '', planId: '', installationAddressId: subscriber.addresses[0]?.id ?? '',
     collectionAreaId: null, assignedCollectorId: null, assignmentEffectiveFrom: new Date().toISOString().slice(0, 10), billingStartDate: new Date().toISOString().slice(0, 10),
-    billingDay: subscriber.billingDay, dueDay: subscriber.dueDay,
-  } });
+    billingDay: settings.data?.defaultBillingDay ?? subscriber.billingDay, dueDay: settings.data?.defaultDueDay ?? subscriber.dueDay,
+  }, [service, subscriber, settings.data]);
+  const form = useForm<ServiceAccountMaintenance>({ values });
   const submit = form.handleSubmit(async (values) => {
     const parsed = serviceAccountMaintenanceSchema.safeParse(values);
     if (!parsed.success) { form.setError('root', { message: parsed.error.issues[0]?.message ?? 'Review the service information' }); return; }

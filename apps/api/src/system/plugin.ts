@@ -4,12 +4,48 @@ import type { AuthService } from '../auth/service.js';
 import { authenticateWith, requirePermission } from '../auth/guards.js';
 import type { Database } from '../db/client.js';
 import { auditLogs, backupHistory, users } from '../db/schema.js';
+import { applicationSettings } from '../db/schema.js';
+import { defaultOrganizationSettings, organizationSettingsSchema } from '@bcis/shared';
+import { AppError } from '../errors.js';
 
 interface Options { database: Database; authService: AuthService }
 const response = { type: 'object', additionalProperties: true } as const;
 const error = { type: 'object', additionalProperties: true } as const;
 
 export const systemPlugin: FastifyPluginAsync<Options> = async (app, options) => {
+  app.get('/system/settings', {
+    preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'settings.manage')],
+    schema: { response: { 200: response, 401: error, 403: error } },
+  }, async () => {
+    const [row] = await options.database.db.select({ value: applicationSettings.value }).from(applicationSettings).where(eq(applicationSettings.key, 'organization_settings')).limit(1);
+    const parsed = row ? organizationSettingsSchema.safeParse(row.value) : null;
+    return parsed?.success ? parsed.data : defaultOrganizationSettings;
+  });
+
+  app.put('/system/settings', {
+    preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'settings.manage')],
+    schema: { body: { type: 'object', required: ['companyName', 'companyAddress', 'contactNumber', 'reportFooter', 'defaultBillingDay', 'defaultDueDay'], additionalProperties: false,
+      properties: { companyName: { type: 'string', minLength: 1, maxLength: 120 }, companyAddress: { type: 'string', maxLength: 240 }, contactNumber: { type: 'string', maxLength: 40 }, reportFooter: { type: 'string', maxLength: 240 }, defaultBillingDay: { type: 'integer', minimum: 1, maximum: 28 }, defaultDueDay: { type: 'integer', minimum: 1, maximum: 31 } } }, response: { 200: response, 400: error, 401: error, 403: error } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const input = organizationSettingsSchema.parse(request.body);
+    const now = new Date();
+    await options.database.db.transaction(async (transaction) => {
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('bcis:organization-settings', 0))`);
+      const [previous] = await transaction.select({ value: applicationSettings.value }).from(applicationSettings).where(eq(applicationSettings.key, 'organization_settings')).limit(1).for('update');
+      const oldValues = previous ? organizationSettingsSchema.safeParse(previous.value) : null;
+      await transaction.insert(applicationSettings).values({ key: 'organization_settings', value: input,
+        description: 'Company details and default service billing schedule', updatedByUserId: context.userId, updatedAt: now })
+        .onConflictDoUpdate({ target: applicationSettings.key, set: { value: input, updatedByUserId: context.userId, updatedAt: now } });
+      await transaction.insert(auditLogs).values({ actorUserId: context.userId, sessionId: context.sessionId,
+        action: 'organization.settings_updated', entityType: 'application_setting', entityId: 'organization_settings',
+        oldValues: oldValues?.success ? oldValues.data : defaultOrganizationSettings, newValues: input,
+        requestId: request.id, ipAddress: request.ip, createdAt: now });
+    });
+    return input;
+  });
+
   app.get('/system/audit', {
     preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'audit.view')],
     schema: { querystring: { type: 'object', additionalProperties: false, properties: {

@@ -35,6 +35,19 @@ export const serviceControlPolicySchema = z.object({
 export type ServiceControlPolicy = z.infer<typeof serviceControlPolicySchema>;
 export const defaultServiceControlPolicy: ServiceControlPolicy = { gracePeriodDays: 30, suspensionThresholdDays: 90, reconnectionFeeCentavos: '0' };
 
+export const organizationSettingsSchema = z.object({
+  companyName: z.string().trim().min(1).max(120),
+  companyAddress: z.string().trim().max(240),
+  contactNumber: z.string().trim().max(40),
+  reportFooter: z.string().trim().max(240),
+  defaultBillingDay: z.number().int().min(1).max(28),
+  defaultDueDay: z.number().int().min(1).max(31),
+}).strict();
+export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
+export const defaultOrganizationSettings: OrganizationSettings = {
+  companyName: 'BCIS', companyAddress: '', contactNumber: '', reportFooter: '', defaultBillingDay: 1, defaultDueDay: 15,
+};
+
 export const createSuspensionInputSchema = z.object({
   serviceAccountId: z.uuid(), effectiveDate: z.iso.date(), reason: z.string().trim().min(3).max(255), notes: z.string().trim().max(1000).optional(),
 }).strict();

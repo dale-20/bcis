@@ -147,7 +147,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 8 - Administration, audit, settings, and recovery
 
-**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset and searchable audit workflows now have protected API routes, typed preload calls, dedicated desktop screens, and real PostgreSQL authorization coverage. Admin cannot view audit, mutate Owner identities, or grant Owner. Billing/company settings and guided database-plus-attachment recovery remain open; do not mark this increment complete yet.
+**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, and suspension/reconnection policy now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL authorization coverage. Admin cannot view audit, mutate Owner identities, or grant/reset Owner. Guided database-plus-attachment backup and approved recovery remain open; do not mark this increment complete yet.
 
 **Goal:** Complete Owner/Admin control and auditability.
 

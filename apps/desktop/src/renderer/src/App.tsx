@@ -41,6 +41,7 @@ import { PlansPage } from './features/services/PlansPage';
 import { ServiceControlPage } from './features/services/ServiceControlPage';
 import { UsersPage } from './features/administration/UsersPage';
 import { AuditPage } from './features/administration/AuditPage';
+import { SettingsPage } from './features/administration/SettingsPage';
 import { ModulePage } from './features/shell/ModulePage';
 import { ReceivablesPage } from './features/receivables/ReceivablesPage';
 import { defaultPath, hasAnyPermission, pageLabel, visibleNavigation, type NavigationItemId } from './features/shell/navigation';
@@ -127,7 +128,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage /></Allowed>} />
     <Route path="/administration/users" element={<Allowed user={user} permissions={['user.manage']}><UsersPage /></Allowed>} />
     <Route path="/administration/audit" element={<Allowed user={user} permissions={['audit.view']}><AuditPage /></Allowed>} />
-    <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><ServiceControlPage mode="policy" user={user} /></Allowed>} />
+    <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><SettingsPage user={user} /></Allowed>} />
     <Route path="/administration/backups" element={<Allowed user={user} permissions={['backup.create', 'backup.restore']}><ModulePage {...modulePages.backups} /></Allowed>} />
     <Route path="/connection" element={<SystemConnection />} />
     <Route path="*" element={<Navigate to={fallback} replace />} />
