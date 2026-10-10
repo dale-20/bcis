@@ -57,4 +57,4 @@ Final E2E rerun: **PASSED** (1/1). It exercised the built Electron application a
 
 ## Functional requirements still incomplete
 
-Remaining requirements include fuller dashboard/report coverage and a production deployment recovery rehearsal. AT-12's isolated approved restore, cutover and attachment integrity pass; production recovery and service-manager restart remain untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.
+The activity, adjustment, reversal, and voided-receipt reports now have real PostgreSQL coverage and PDF/XLSX exports; user activity requires `audit.view`. Remaining requirements include fuller dashboard/report coverage and a production deployment recovery rehearsal. AT-12's isolated approved restore, cutover and attachment integrity pass; production recovery and service-manager restart remain untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.

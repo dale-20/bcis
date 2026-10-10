@@ -74,6 +74,8 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 **Increment 8 recovery verification (2026-10-11):** `npm run check` passed (97 tests); `npm run test:integration` passed (7 files, 69 PostgreSQL tests); `npm run test:e2e` passed (1 built Electron test). The recovery integration creates a synthetic proof backup, restores the dump and attachment into a staged database, checks SHA-256/size and database integrity, switches the isolated `_test` database, confirms gate clearance and restore audit, and removes the rollback test database. Authorization tests deny Cashier/Admin restore approval and prove Owner maintenance-gate/cancel behavior. Production service-manager restart and recovery on a production deployment remain untested.
 
+**Increment 8 report verification (2026-10-11):** User activity, billing adjustment, payment reversal, and voided receipt reports query preserved audit/financial rows. Integration tests assert synthetic records and status/reason/amount details; user activity requires `audit.view`; PDF and XLSX exports cover the added types. Dashboard KPI completeness, additional operational report breadth, and dense-report pagination remain separately tracked under Increment 9.
+
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 
 - [x] Current/overdue receivable, overdue subscriber count, follow-up/suspension candidates.
@@ -89,7 +91,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 - [x] Required permission-aware navigation: Dashboard; Subscribers (all/new/services); Billing (current/generate/invoices); Payments (receive/history/GCash); Collections (collectors/areas/routes/batches/remittance); Receivables (outstanding/overdue/aging/suspension); Services; Reports; Administration. Operational controls remain tracked in their workflow milestones.
 - [ ] Daily/weekly/monthly/annual collections, cash/GCash/method summaries, billing vs collection, revenue by plan/service/area, AR.
 - [ ] Subscriber master list/ledger/SOA; collector assignment/collection/remittance/shortage-overage/performance.
-- [ ] Adjustment/reversal/voided receipt/activity/audit reports. At least six required reports with PDF/XLSX evidence.
+- [x] Adjustment, reversal, voided-receipt, user-activity, and audit reports. At least six report types have PDF/XLSX export evidence; user activity is additionally restricted to `audit.view`.
 - [ ] ExcelJS/pdfmake exports from authoritative data; clean print layouts without navigation.
 - [ ] Dense tables: sticky headers, search/filter/sort, server pagination or virtualization, export/status badges.
 - [x] Visible form labels/required markers/grouping/inline errors; accessible GCash two-pane review.

@@ -164,6 +164,16 @@ describe.sequential('authentication and server-side authorization', () => {
     const response = await app.inject({ method: 'GET', url: '/system/audit?action=user.created&page=1&pageSize=10', headers: { authorization: `Bearer ${ownerToken}` } });
     expect(response.statusCode).toBe(200);
     expect(response.json<{ items: Array<{ action: string; newValues: { username: string } }> ; total: number }>()).toMatchObject({ total: 1, items: [{ action: 'user.created', newValues: { username: 'clerk.demo' } }] });
+    const activity = await app.inject({ method: 'GET', url: '/reports/data?report=USER_ACTIVITY&from=2020-01-01&to=2099-12-31', headers: { authorization: `Bearer ${ownerToken}` } });
+    expect(activity.statusCode).toBe(200);
+    expect(activity.json<{ rows: Array<{ actor: string; action: string }> }>().rows).toContainEqual(expect.objectContaining({ actor: 'Demo Owner', action: 'user.created' }));
+    const adminActivity = await app.inject({ method: 'GET', url: '/reports/data?report=USER_ACTIVITY&from=2020-01-01&to=2099-12-31', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(adminActivity.statusCode).toBe(403);
+    const activityExport = await app.inject({ method: 'GET', url: '/reports/export?report=USER_ACTIVITY&from=2020-01-01&to=2099-12-31&format=XLSX', headers: { authorization: `Bearer ${ownerToken}` } });
+    expect(activityExport.statusCode).toBe(200);
+    expect(activityExport.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    const deniedActivityExport = await app.inject({ method: 'GET', url: '/reports/export?report=USER_ACTIVITY&from=2020-01-01&to=2099-12-31&format=PDF', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(deniedActivityExport.statusCode).toBe(403);
     const owner = await database.db.select({ id: users.id }).from(users).where(eq(users.normalizedUsername, 'owner.demo'));
     const adminCannotDisableOwner = await app.inject({ method: 'PATCH', url: `/admin/users/${owner[0]?.id}`, headers: { authorization: `Bearer ${adminToken}` }, payload: { isActive: false } });
     expect(adminCannotDisableOwner.statusCode).toBe(403);

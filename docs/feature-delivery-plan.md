@@ -146,7 +146,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 8 - Administration, audit, settings, and recovery
 
-**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, suspension/reconnection policy, verified database-plus-proof backups, and Owner-approved recovery now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL coverage. Recovery uses a shared maintenance gate, controlled API drain/stop, offline staged restore, integrity checks, rollback database/proof retention, restore audit, and an operator restart. The entire cutover is tested against isolated `_test`; production service-manager restart remains deployment-specific. Admin cannot view audit, restore backups, mutate Owner identities, or grant/reset Owner. Required activity, adjustment, reversal, and voided-receipt reports remain open.
+**Status: COMPLETE for the planned application workflow (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, suspension/reconnection policy, verified database-plus-proof backups, Owner-approved recovery, and user activity/adjustment/reversal/voided-receipt reports now have protected API routes, typed preload calls, desktop workflows, and real PostgreSQL coverage. Recovery uses a shared maintenance gate, controlled API drain/stop, offline staged restore, integrity checks, rollback database/proof retention, restore audit, and an operator restart. The entire cutover is tested against isolated `_test`; production service-manager restart remains deployment-specific. Admin cannot view audit, restore backups, mutate Owner identities, or grant/reset Owner.
 
 **Goal:** Complete Owner/Admin control and auditability.
 
@@ -156,9 +156,9 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - [x] Add backup history, guided backup creation, verification status, checksum, and downloadable evidence.
 - [x] Include `PAYMENT_PROOF_DIR` attachments in verified backup/restore artifacts and compare restored files with database SHA-256 values during isolated AT-12 restoration.
 - [x] Add Owner-only restore approval bound to a verified archive, enforced maintenance checks, controlled API drain/stop, offline operator restore command, staged integrity verification, rollback retention, and destructive-impact warning; exercise the full cutover against isolated `_test`.
-- Add user activity, adjustment, reversal, and voided-receipt reports.
+- [x] Add user activity, adjustment, reversal, and voided-receipt reports with permission checks and PDF/XLSX export.
 
-**Gate:** AT-10 and isolated AT-12 verification pass. Increment 8 remains open for the activity, adjustment, reversal, and voided-receipt reports listed above.
+**Gate:** AT-10 and isolated AT-12 verification pass. Application workflow is complete. Production recovery rehearsal and full Step 9 dashboard/report completion remain tracked in the final acceptance/deployment gates.
 
 ## Increment 9 - Reporting, printing, and dashboard completion
 

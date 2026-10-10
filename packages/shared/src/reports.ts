@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { centavosSchema } from './money.js';
 
-export const reportKindSchema = z.enum(['MONTHLY_COLLECTIONS', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS']);
+export const reportKindSchema = z.enum(['MONTHLY_COLLECTIONS', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS']);
 export const reportFormatSchema = z.enum(['PDF', 'XLSX']);
 export const reportRequestSchema = z.object({
   report: reportKindSchema,

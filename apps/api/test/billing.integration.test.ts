@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { and, eq, sql } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { BillingCycleDetail, BillingCycleList, BillingGenerationResult, BillingPreview, InvoiceDetail, InvoiceListResponse, SubscriberLedger } from '@bcis/shared';
+import type { BillingCycleDetail, BillingCycleList, BillingGenerationResult, BillingPreview, InvoiceDetail, InvoiceListResponse, ReportData, SubscriberLedger } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -183,6 +183,15 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     await expect(database.db.delete(adjustments).where(eq(adjustments.id, posted.id))).rejects.toMatchObject({ cause: { code: '55000' } });
     const adjustmentAudit = await database.db.select().from(auditLogs).where(and(eq(auditLogs.action, 'invoice.adjustment.posted'), eq(auditLogs.entityId, target.id)));
     expect(adjustmentAudit).toHaveLength(2);
+    const report = await app.inject({ method: 'GET', url: '/reports/data?report=BILLING_ADJUSTMENTS&from=2020-01-01&to=2099-12-31', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(report.statusCode, report.body).toBe(200);
+    expect(report.json<ReportData>()).toMatchObject({ title: 'Billing adjustment report', rows: expect.arrayContaining([
+      expect.objectContaining({ invoice: target.invoiceNumber, amount: expect.stringMatching(/250\.00/), reason: 'Synthetic installation charge', status: 'POSTED' }),
+      expect.objectContaining({ invoice: target.invoiceNumber, reason: 'Synthetic loyalty discount', status: 'POSTED' }),
+    ]), totals: expect.arrayContaining([expect.objectContaining({ label: 'Posted adjustment total', value: expect.stringMatching(/200\.00/) })]) });
+    const exported = await app.inject({ method: 'GET', url: '/reports/export?report=BILLING_ADJUSTMENTS&from=2020-01-01&to=2099-12-31&format=XLSX', headers: { authorization: `Bearer ${adminToken}` } });
+    expect(exported.statusCode, exported.body).toBe(200);
+    expect(exported.rawPayload.subarray(0, 2).toString()).toBe('PK');
   });
 
   it('voids only untouched invoices with a compensating ledger entry', async () => {

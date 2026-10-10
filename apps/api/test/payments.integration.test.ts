@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { config } from 'dotenv';
 import { and, asc, eq } from 'drizzle-orm';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import type { PaymentResult } from '@bcis/shared';
+import type { PaymentResult, ReportData } from '@bcis/shared';
 import { buildApp } from '../src/app.js';
 import { PasswordHasher, type ScryptParameters } from '../src/auth/password.js';
 import { seedAuthorization, type DemoAccount } from '../src/auth/seed.js';
@@ -255,6 +255,25 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     expect(audit).toHaveLength(1);
     await expect(database.db.delete(paymentAllocations).where(eq(paymentAllocations.paymentId, exactPaymentId))).rejects.toMatchObject({ cause: { code: '55000' } });
     await expect(database.db.update(payments).set({ amountCentavos: 1n }).where(eq(payments.id, exactPaymentId))).rejects.toMatchObject({ cause: { code: '55000' } });
+    const reportQuery = 'from=2020-01-01&to=2099-12-31';
+    const reversalReport = await app.inject({ method: 'GET', url: `/reports/data?report=PAYMENT_REVERSALS&${reportQuery}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(reversalReport.statusCode, reversalReport.body).toBe(200);
+    expect(reversalReport.json<ReportData>()).toMatchObject({ title: 'Payment reversal report', rows: expect.arrayContaining([
+      expect.objectContaining({ receipt: expect.stringMatching(/^OR-/), amount: expect.stringMatching(/999\.00/), reason: 'Synthetic correction', reversedBy: 'Demo Administrator' }),
+    ]) });
+    const voidReport = await app.inject({ method: 'GET', url: `/reports/data?report=VOIDED_RECEIPTS&${reportQuery}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(voidReport.statusCode, voidReport.body).toBe(200);
+    expect(voidReport.json<ReportData>()).toMatchObject({ title: 'Voided receipt report', rows: expect.arrayContaining([
+      expect.objectContaining({ reason: 'Synthetic correction', voidedBy: 'Demo Administrator' }),
+    ]) });
+    const activityReport = await app.inject({ method: 'GET', url: `/reports/data?report=USER_ACTIVITY&${reportQuery}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(activityReport.statusCode).toBe(403);
+    const exportResponse = await app.inject({ method: 'GET', url: `/reports/export?report=PAYMENT_REVERSALS&${reportQuery}&format=PDF`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(exportResponse.statusCode, exportResponse.body).toBe(200);
+    expect(exportResponse.rawPayload.subarray(0, 4).toString()).toBe('%PDF');
+    const spreadsheet = await app.inject({ method: 'GET', url: `/reports/export?report=VOIDED_RECEIPTS&${reportQuery}&format=XLSX`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(spreadsheet.statusCode, spreadsheet.body).toBe(200);
+    expect(spreadsheet.rawPayload.subarray(0, 2).toString()).toBe('PK');
   });
 
   it('posts bank transfer, cheque, and other with method-specific reference validation', async () => {

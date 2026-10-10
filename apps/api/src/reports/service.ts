@@ -82,6 +82,60 @@ export class ReportService {
       const name=text((owner.rows[0] as Row|undefined)?.subscriber); const account=text((owner.rows[0] as Row|undefined)?.account_number);
       return {...this.data(request,`Subscriber statement · ${name}`,rows,[{label:'Opening balance',value:money(openingBalance.toString())},{label:'Closing balance',value:money(balance.toString())}],[{key:'date',label:'Date'},{key:'reference',label:'Reference'},{key:'description',label:'Description'},{key:'debit',label:'Debit',align:'right'},{key:'credit',label:'Credit',align:'right'},{key:'balance',label:'Running balance',align:'right'}],generatedAt),subtitle:`${account} · ${request.from} to ${request.to}`};
     }
+    if (request.report === 'USER_ACTIVITY') {
+      const result = await this.database.pool.query(`select al.created_at,coalesce(u.display_name,u.username,'System') actor,al.action,al.entity_type,al.entity_id,al.reason,al.request_id
+        from audit_logs al left join users u on u.id=al.actor_user_id
+        where al.created_at >= $1::date and al.created_at < $2::date + interval '1 day'
+        order by al.created_at desc,al.id desc`, [request.from, request.to]);
+      const rows = result.rows.map((row: Row) => ({ timestamp: iso(row.created_at), actor: text(row.actor), action: text(row.action), entity: text(row.entity_type), entityId: text(row.entity_id), reason: text(row.reason), requestId: text(row.request_id) }));
+      return this.data(request, 'User activity and audit report', rows, [{ label: 'Activity records', value: String(rows.length) }], [
+        { key: 'timestamp', label: 'Date and time' }, { key: 'actor', label: 'User' }, { key: 'action', label: 'Action' },
+        { key: 'entity', label: 'Record type' }, { key: 'entityId', label: 'Record ID' }, { key: 'reason', label: 'Reason' }, { key: 'requestId', label: 'Request ID' },
+      ], generatedAt);
+    }
+    if (request.report === 'BILLING_ADJUSTMENTS') {
+      const result = await this.database.pool.query(`select a.created_at,a.id,a.amount_centavos::text amount,a.line_type::text line_type,a.reason,a.status::text status,
+          i.invoice_number,s.account_number,${displayNameSql} subscriber,requested.display_name requested_by,approved.display_name approved_by,a.approved_at
+        from adjustments a join invoices i on i.id=a.invoice_id join subscribers s on s.id=i.subscriber_id
+        left join users requested on requested.id=a.requested_by_user_id left join users approved on approved.id=a.approved_by_user_id
+        where a.created_at >= $1::date and a.created_at < $2::date + interval '1 day'
+        order by a.created_at desc,a.id desc`, [request.from, request.to]);
+      const rows = result.rows.map((row: Row) => ({ date: iso(row.created_at).slice(0, 10), invoice: text(row.invoice_number), account: text(row.account_number), subscriber: text(row.subscriber), type: text(row.line_type).replaceAll('_', ' '), amount: money(cents(row.amount)), status: text(row.status), reason: text(row.reason), requestedBy: text(row.requested_by), approvedBy: text(row.approved_by), approvedAt: row.approved_at ? iso(row.approved_at) : '' }));
+      const postedTotal = result.rows.reduce((sum: bigint, row: Row) => row.status === 'POSTED' ? sum + BigInt(cents(row.amount)) : sum, 0n);
+      return this.data(request, 'Billing adjustment report', rows, [{ label: 'Adjustment records', value: String(rows.length) }, { label: 'Posted adjustment total', value: money(postedTotal.toString()) }], [
+        { key: 'date', label: 'Requested' }, { key: 'invoice', label: 'Invoice' }, { key: 'account', label: 'Account' }, { key: 'subscriber', label: 'Subscriber' },
+        { key: 'type', label: 'Type' }, { key: 'amount', label: 'Amount', align: 'right' }, { key: 'status', label: 'Status' }, { key: 'reason', label: 'Reason' },
+        { key: 'requestedBy', label: 'Requested by' }, { key: 'approvedBy', label: 'Approved by' }, { key: 'approvedAt', label: 'Approved at' },
+      ], generatedAt);
+    }
+    if (request.report === 'PAYMENT_REVERSALS') {
+      const result = await this.database.pool.query(`select pr.reversed_at,pr.reason,pr.id,p.payment_date,p.method::text method,p.amount_centavos::text amount,
+          r.receipt_number,s.account_number,${displayNameSql} subscriber,u.display_name reversed_by
+        from payment_reversals pr join payments p on p.id=pr.payment_id join receipts r on r.payment_id=p.id
+        join subscribers s on s.id=p.subscriber_id join users u on u.id=pr.reversed_by_user_id
+        where pr.reversed_at >= $1::date and pr.reversed_at < $2::date + interval '1 day'
+        order by pr.reversed_at desc,pr.id desc`, [request.from, request.to]);
+      const rows = result.rows.map((row: Row) => ({ reversedAt: iso(row.reversed_at), receipt: text(row.receipt_number), account: text(row.account_number), subscriber: text(row.subscriber), paymentDate: iso(row.payment_date), method: text(row.method).replaceAll('_', ' '), amount: money(cents(row.amount)), reason: text(row.reason), reversedBy: text(row.reversed_by) }));
+      const total = result.rows.reduce((sum: bigint, row: Row) => sum + BigInt(cents(row.amount)), 0n);
+      return this.data(request, 'Payment reversal report', rows, [{ label: 'Reversals', value: String(rows.length) }, { label: 'Reversed value', value: money(total.toString()) }], [
+        { key: 'reversedAt', label: 'Reversed at' }, { key: 'receipt', label: 'Receipt' }, { key: 'account', label: 'Account' }, { key: 'subscriber', label: 'Subscriber' },
+        { key: 'paymentDate', label: 'Original payment' }, { key: 'method', label: 'Method' }, { key: 'amount', label: 'Amount', align: 'right' }, { key: 'reason', label: 'Reason' }, { key: 'reversedBy', label: 'Reversed by' },
+      ], generatedAt);
+    }
+    if (request.report === 'VOIDED_RECEIPTS') {
+      const result = await this.database.pool.query(`select r.voided_at,r.receipt_number,r.void_reason,p.method::text method,p.payment_date,p.amount_centavos::text amount,
+          s.account_number,${displayNameSql} subscriber,u.display_name voided_by
+        from receipts r join payments p on p.id=r.payment_id join subscribers s on s.id=p.subscriber_id
+        left join users u on u.id=r.voided_by_user_id
+        where r.status='VOID' and r.voided_at >= $1::date and r.voided_at < $2::date + interval '1 day'
+        order by r.voided_at desc,r.id desc`, [request.from, request.to]);
+      const rows = result.rows.map((row: Row) => ({ voidedAt: iso(row.voided_at), receipt: text(row.receipt_number), account: text(row.account_number), subscriber: text(row.subscriber), paymentDate: iso(row.payment_date), method: text(row.method).replaceAll('_', ' '), amount: money(cents(row.amount)), reason: text(row.void_reason), voidedBy: text(row.voided_by) }));
+      const total = result.rows.reduce((sum: bigint, row: Row) => sum + BigInt(cents(row.amount)), 0n);
+      return this.data(request, 'Voided receipt report', rows, [{ label: 'Voided receipts', value: String(rows.length) }, { label: 'Voided receipt value', value: money(total.toString()) }], [
+        { key: 'voidedAt', label: 'Voided at' }, { key: 'receipt', label: 'Receipt' }, { key: 'account', label: 'Account' }, { key: 'subscriber', label: 'Subscriber' },
+        { key: 'paymentDate', label: 'Original payment' }, { key: 'method', label: 'Method' }, { key: 'amount', label: 'Amount', align: 'right' }, { key: 'reason', label: 'Void reason' }, { key: 'voidedBy', label: 'Voided by' },
+      ], generatedAt);
+    }
     if (request.report === 'COLLECTOR_ASSIGNMENTS') {
       const values: unknown[] = [request.from, request.to];
       let collectorFilter = '';

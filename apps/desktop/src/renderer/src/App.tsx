@@ -125,7 +125,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />
     <Route path="/services/reconnections" element={<Allowed user={user} permissions={['service.reconnection.assign']}><ServiceControlPage mode="reconnections" user={user} /></Allowed>} />
     <Route path="/services/my-reconnections" element={<Allowed user={user} permissions={['service.reconnection.complete']}><ServiceControlPage mode="my-reconnections" user={user} /></Allowed>} />
-    <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage /></Allowed>} />
+    <Route path="/reports" element={<Allowed user={user} permissions={['report.view']}><ReportsPage canViewAudit={user.permissions.includes('audit.view')} /></Allowed>} />
     <Route path="/administration/users" element={<Allowed user={user} permissions={['user.manage']}><UsersPage /></Allowed>} />
     <Route path="/administration/audit" element={<Allowed user={user} permissions={['audit.view']}><AuditPage /></Allowed>} />
     <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><SettingsPage user={user} /></Allowed>} />
