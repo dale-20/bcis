@@ -29,6 +29,20 @@
       "when": 1791573214512,
       "tag": "0003_empty_gorgon",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791573999853,
+      "tag": "0004_lyrical_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791614337087,
+      "tag": "0005_ambiguous_epoch",
+      "breakpoints": true
     }
   ]
 }

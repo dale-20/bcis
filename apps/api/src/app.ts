@@ -9,6 +9,8 @@ import { AppError } from './errors.js';
 import { subscriberPlugin } from './subscribers/plugin.js';
 import { billingPlugin } from './billing/plugin.js';
 import { paymentPlugin } from './payments/plugin.js';
+import { collectionPlugin } from './collections/plugin.js';
+import { receivablePlugin } from './receivables/plugin.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -65,6 +67,8 @@ export async function buildApp(options: AppOptions) {
       await app.register(subscriberPlugin, { authService, database: options.database });
       await app.register(billingPlugin, { authService, database: options.database });
       await app.register(paymentPlugin, { authService, database: options.database });
+      await app.register(collectionPlugin, { authService, database: options.database });
+      await app.register(receivablePlugin, { authService, database: options.database });
     }
   }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);

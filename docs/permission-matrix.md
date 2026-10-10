@@ -45,6 +45,14 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /payments` | Valid session and `payment.create` | Posting or pending GCash submission is audited atomically |
 | `POST /payments/:id/gcash-verification` | Valid session and `payment.verify_gcash` | Verification/rejection records verifier, time, and audit evidence |
 | `POST /payments/:id/reverse` | Valid session and `payment.reverse` | Reversal reason, actor, restored value, receipt void, and audit are atomic |
+| `GET /collections/reference-data` | Valid session and `collection.view` | Read-only collectors and areas |
+| `POST /collection-batches` | Valid session and `collection.manage` | Route snapshot and expected receivable audited atomically |
+| `POST /collection-batches/:id/collections` | Valid session and `collection.manage` | Links one same-day posted payment to one route row |
+| `POST /collection-batches/:id/submit` | Valid session and `collection.manage` | Freezes collection recording and audits submission |
+| `POST /collection-batches/:id/remittance` | Valid session and `collection.reconcile` | Stores exact expected/remitted/noncash/difference values |
+| `POST /collection-batches/:id/reconcile` | Valid session and `collection.reconcile` | Records reconciler, time, and notes |
+| `POST /collection-batches/:id/close` | Valid session and `collection.close` | Nonzero variance requires an explicit acknowledgement note |
+| `GET /receivables/aging` | Valid session and `receivables.view` | Server-side aging, overdue filters, totals, and pagination |
 
 Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hashes. Sessions expire after 30 minutes idle or eight hours absolute time, and inactive users cannot authenticate. Passwords use salted scrypt with production parameters `N=131072`, `r=8`, `p=1`; hashes and tokens are excluded from audit payloads and response objects.
 

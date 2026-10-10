@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, date, index, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, check, date, index, pgEnum, pgSequence, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { collectionAreas, collectors } from './collection-base.js';
 import { payments } from './payments.js';
 import { serviceAccounts } from './services.js';
@@ -7,6 +7,7 @@ import { subscribers } from './subscribers.js';
 import { users } from './security.js';
 
 export const collectionBatchStatus = pgEnum('collection_batch_status', ['OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED']);
+export const collectionBatchNumberSequence = pgSequence('collection_batch_number_seq', { startWith: 1, increment: 1, minValue: 1 });
 
 export const collectorAssignments = pgTable('collector_assignments', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -34,14 +35,20 @@ export const collectionBatches = pgTable('collection_batches', {
   submittedAt: timestamp('submitted_at', { withTimezone: true }),
   reconciledAt: timestamp('reconciled_at', { withTimezone: true }),
   reconciledByUserId: uuid('reconciled_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  reconciliationNotes: varchar('reconciliation_notes', { length: 255 }),
   closedAt: timestamp('closed_at', { withTimezone: true }),
   closedByUserId: uuid('closed_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  closeNotes: varchar('close_notes', { length: 255 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('collection_batches_number_uq').on(table.batchNumber),
   index('collection_batches_collector_date_idx').on(table.collectorId, table.collectionDate),
   index('collection_batches_area_status_idx').on(table.collectionAreaId, table.status),
+  uniqueIndex('collection_batches_route_date_uq').on(table.collectorId, table.collectionAreaId, table.collectionDate),
   check('collection_batches_expected_nonnegative', sql`${table.expectedReceivableCentavos} >= 0`),
+  check('collection_batches_submission_consistent', sql`(${table.status} IN ('OPEN', 'IN_PROGRESS') AND ${table.submittedAt} IS NULL) OR (${table.status} IN ('SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED') AND ${table.submittedAt} IS NOT NULL)`),
+  check('collection_batches_reconciliation_consistent', sql`(${table.status} IN ('OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED') AND ${table.reconciledAt} IS NULL AND ${table.reconciledByUserId} IS NULL AND ${table.reconciliationNotes} IS NULL) OR (${table.status} IN ('RECONCILED', 'CLOSED') AND ${table.reconciledAt} IS NOT NULL AND ${table.reconciledByUserId} IS NOT NULL AND ${table.reconciliationNotes} IS NOT NULL)`),
+  check('collection_batches_closure_consistent', sql`(${table.status} <> 'CLOSED' AND ${table.closedAt} IS NULL AND ${table.closedByUserId} IS NULL AND ${table.closeNotes} IS NULL) OR (${table.status} = 'CLOSED' AND ${table.closedAt} IS NOT NULL AND ${table.closedByUserId} IS NOT NULL)`),
 ]);
 
 export const collectionBatchAccounts = pgTable('collection_batch_accounts', {
@@ -50,6 +57,8 @@ export const collectionBatchAccounts = pgTable('collection_batch_accounts', {
   subscriberId: uuid('subscriber_id').notNull().references(() => subscribers.id, { onDelete: 'restrict' }),
   serviceAccountId: uuid('service_account_id').notNull().references(() => serviceAccounts.id, { onDelete: 'restrict' }),
   amountDueCentavos: bigint('amount_due_centavos', { mode: 'bigint' }).notNull(),
+  currentBillCentavos: bigint('current_bill_centavos', { mode: 'bigint' }).notNull().default(sql`0`),
+  arrearsCentavos: bigint('arrears_centavos', { mode: 'bigint' }).notNull().default(sql`0`),
   paymentId: uuid('payment_id').references(() => payments.id, { onDelete: 'restrict' }),
   outcome: varchar('outcome', { length: 40 }),
   notes: varchar('notes', { length: 255 }),
@@ -58,6 +67,7 @@ export const collectionBatchAccounts = pgTable('collection_batch_accounts', {
   uniqueIndex('collection_batch_accounts_payment_uq').on(table.paymentId),
   index('collection_batch_accounts_subscriber_idx').on(table.subscriberId),
   check('collection_batch_accounts_due_nonnegative', sql`${table.amountDueCentavos} >= 0`),
+  check('collection_batch_accounts_breakdown_exact', sql`${table.currentBillCentavos} >= 0 AND ${table.arrearsCentavos} >= 0 AND ${table.amountDueCentavos} = ${table.currentBillCentavos} + ${table.arrearsCentavos}`),
 ]);
 
 export const collectorRemittances = pgTable('collector_remittances', {

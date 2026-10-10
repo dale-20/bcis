@@ -29,7 +29,7 @@ Shared output is built before dependents. Development watches shared output alon
 
 `GET /health`: HTTP 200, `{ service: "bcis-api", status: "ok", timestamp: ISO-8601 UTC }`. Liveness only; does not claim database readiness.
 
-`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 4. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
+`GET /health/ready`: HTTP 200 when database is reachable and `application_metadata` contains schema version 5. Otherwise HTTP 503. Payload `{ service: "bcis-api", status: "ready" | "degraded", database: "connected" | "unavailable" | "migration_required", timestamp }`. Neither endpoint discloses credentials, database names, SQL errors, or customer data. All responses disable caching.
 
 `POST /auth/login` exchanges a validated username/password for an opaque bearer token. `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout` require that token. `GET /admin/users` additionally requires `user.manage`. Permission hooks execute in Fastify before the handler and record denied attempts.
 
@@ -39,9 +39,11 @@ Shared output is built before dependents. Development watches shared output alon
 
 `POST /payments` posts Cash immediately and creates GCash as pending verification with immutable proof metadata. `POST /payments/:id/gcash-verification` verifies or rejects pending GCash evidence; only verification can post it. `POST /payments/:id/reverse` requires `payment.reverse` and adds a linked reversal, voids the original receipt, restores invoice balances, and posts a compensating ledger debit. Subscriber advisory locks serialize allocation, while request idempotency keys and database sequences prevent duplicate payments and receipt-number reuse.
 
+Collection routes create immutable route-sheet snapshots, link same-day posted payments, submit collector results, derive remittance totals, preserve shortage/overage, reconcile, and authorize closure through explicit permissions. Receivable aging computes full-result bucket totals with collector/area filters and bounded server pagination.
+
 PostgreSQL stores salted scrypt password hashes and SHA-256 session-token hashes. A session has a 30-minute sliding idle deadline and an eight-hour absolute deadline. Login uses the same public error for missing users, wrong passwords, inactive users, and locked accounts. Five failed attempts lock an account for 15 minutes. The documented role policy is in `permission-matrix.md`.
 
-The initial migration creates the singleton version sentinel. Migration 0001 creates the normalized domain model and append-only audit trigger. Migration 0002 adds invoice numbering, monthly-cycle constraints, and finalized-invoice immutability triggers. Migration 0003 adds idempotent payment keys, receipt numbering, immutable financial-history triggers, and advances the version to 4. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration execution is explicit; API startup never mutates the schema.
+The initial migration creates the singleton version sentinel. Migration 0001 creates the normalized model and append-only audit trigger. Migration 0002 adds billing integrity. Migration 0003 adds payment integrity and schema version 4. Migrations 0004–0005 add route snapshots, collection lifecycle constraints, immutable remittance history, and schema version 5. Future schema changes must update the version sentinel and shared compatibility constant deliberately. Migration execution is explicit; API startup never mutates the schema.
 
 ## IPC and desktop security
 
@@ -51,7 +53,7 @@ Renderer has no Node integration, DB connection, arbitrary fetch, shell, filesys
 
 ## Current limitations and future invariants
 
-- Authentication, RBAC, normalized storage, audit boundaries, subscriber operations, monthly billing, Cash/GCash posting, allocation, receipts, credit, and reversal are implemented. Subscriber editing/archival, payment UI, collection reconciliation, report generation, backup execution/restore, and installer remain future milestones.
+- Authentication, RBAC, normalized storage, audit boundaries, subscriber operations, monthly billing, payments, collection reconciliation, and receivable aging are implemented. Subscriber editing/archival, payment/collection desktop UI, report generation, backup execution/restore, and installer remain future milestones.
 - ExcelJS/pdfmake, Table and React Hook Form are dependencies for later milestones; they are not fake report/table/form implementations.
 - Money is represented by canonical integer-centavo strings at the transport boundary and PostgreSQL `bigint` internally. Payment conservation, oldest-first allocation, GCash verification, reversal, idempotency, atomic rollback, and immutable-history rules are covered by real-PostgreSQL integration tests.
 - Ten database pool connections support concurrent clients structurally. Integration tests verify three parallel clients, concurrent idempotent replay, distinct simultaneous payments serialized on one subscriber, and Cashier denial of reversal.

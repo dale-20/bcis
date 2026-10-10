@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 export const HEALTH_CHANNEL = 'bcis:connection:get';
 
 export const apiUrlSchema = z.url().pipe(z.string().refine((value) => {
@@ -38,3 +38,5 @@ export * from './subscribers.js';
 export * from './desktop.js';
 export * from './billing.js';
 export * from './payments.js';
+export * from './collections.js';
+export * from './receivables.js';

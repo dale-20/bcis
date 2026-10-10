@@ -60,15 +60,15 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 ## Milestone 6 — Collections (PDF §3.8)
 
 - [ ] Areas/routes, collector assignments, batches, batch accounts, remittances; printable account/address/current-bill/arrears/total route sheet.
-- [ ] OPEN, IN_PROGRESS, SUBMITTED, REMITTED, RECONCILED, CLOSED lifecycle.
-- [ ] Expected receivable, cash/non-cash collected, uncollected totals; separate cash reconciliation.
-- [ ] Visible expected cash, remitted cash, shortage/overage, non-cash, collected accounts and exceptions (AT-07–08).
-- [ ] Authorized confirmation to close; never silently treat shortage/overage as balanced.
+- [x] OPEN, IN_PROGRESS, SUBMITTED, REMITTED, RECONCILED, CLOSED lifecycle.
+- [x] Expected receivable, cash/non-cash collected, uncollected totals; separate cash reconciliation.
+- [x] Visible expected cash, remitted cash, shortage/overage, non-cash, collected accounts and exceptions (AT-07–08).
+- [x] Authorized confirmation to close; never silently treat shortage/overage as balanced.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 
 - [ ] Current/overdue receivable, overdue subscriber count, follow-up/suspension candidates.
-- [ ] AR aging: Current, 1–30, 31–60, 61–90, 90+; clarify boundary so day 90 is never counted twice.
+- [x] AR aging: Current, 1–30, 31–60, 61–90, 90+; clarify boundary so day 90 is never counted twice.
 - [ ] Overdue subscriber/service/area/collector, months unpaid, oldest invoice, last payment, arrears.
 - [ ] Filters: collector, area, plan, service type, delinquency age; aging must reconcile to outstanding balances.
 - [ ] Configurable grace/threshold; suspension reason/effective date/approver/notes.
