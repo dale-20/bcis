@@ -12,6 +12,7 @@ import { paymentPlugin } from './payments/plugin.js';
 import { collectionPlugin } from './collections/plugin.js';
 import { receivablePlugin } from './receivables/plugin.js';
 import { reportPlugin } from './reports/plugin.js';
+import { systemPlugin } from './system/plugin.js';
 
 interface AppOptions {
   probeDatabase: () => Promise<Readiness['database']>;
@@ -71,6 +72,7 @@ export async function buildApp(options: AppOptions) {
       await app.register(collectionPlugin, { authService, database: options.database });
       await app.register(receivablePlugin, { authService, database: options.database });
       await app.register(reportPlugin, { authService, database: options.database });
+      await app.register(systemPlugin, { authService, database: options.database });
     }
   }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);

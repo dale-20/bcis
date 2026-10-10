@@ -1,0 +1,27 @@
+appId: ph.com.bcis.billing
+productName: BCIS Subscription Billing and Collection
+copyright: Copyright © 2026 Bukidnon Cable and Internet Services
+directories:
+  output: release
+  buildResources: apps/desktop/src/renderer/src/assets
+files:
+  - apps/desktop/out/**/*
+  - packages/shared/dist/**/*
+  - package.json
+extraMetadata:
+  main: apps/desktop/out/main/index.js
+asar: true
+compression: maximum
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: apps/desktop/src/renderer/src/assets/bcis-mark.png
+  artifactName: BCIS-Setup-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: BCIS Billing and Collection
+  deleteAppDataOnUninstall: false

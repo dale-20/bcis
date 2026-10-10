@@ -25,6 +25,7 @@ const testHasher = new PasswordHasher({ cost: 16_384, blockSize: 8, parallelizat
 const accounts: readonly DemoAccount[] = [
   { username: 'admin.demo', displayName: 'Demo Administrator', role: 'ADMIN' },
   { username: 'cashier.demo', displayName: 'Demo Cashier', role: 'CASHIER' },
+  { username: 'viewer.demo', displayName: 'Demo Viewer', role: 'VIEWER' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, testHasher);
@@ -32,6 +33,7 @@ const app = await buildApp({ database, authService, probeDatabase: database.prob
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
 let adminToken = '';
 let cashierToken = '';
+let viewerToken = '';
 const subscriberIds: Record<'exact' | 'partial' | 'advance' | 'oldest' | 'gcash', string> = { exact: '', partial: '', advance: '', oldest: '', gcash: '' };
 let exactPaymentId = '';
 let exactInvoiceId = '';
@@ -72,6 +74,7 @@ beforeAll(async () => {
   await seedOperationalDemoData(database);
   adminToken = await activate('admin.demo');
   cashierToken = await activate('cashier.demo');
+  viewerToken = await activate('viewer.demo');
   subscriberIds.exact = await subscriberFor('SVC-00016-1', 99_900n);
   subscriberIds.partial = await subscriberFor('SVC-00018-1', 99_900n);
   subscriberIds.advance = await subscriberFor('SVC-00019-1', 100_000n);
@@ -204,6 +207,29 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     expect(results.reduce((sum, result) => sum + BigInt(result.unappliedCreditCentavos), 0n)).toBe(outstanding);
     const after = await database.db.select().from(invoices).where(eq(invoices.subscriberId, subscriberId));
     expect(after.every((invoice) => invoice.balanceCentavos === 0n && invoice.status === 'PAID')).toBe(true);
+  });
+
+  it('AT-09 isolates three concurrent sessions and preserves unique payment and receipt numbering', async () => {
+    const secondLogin = await app.inject({ method: 'POST', url: '/auth/login', payload: { username: 'cashier.demo', password: initialPassword } });
+    expect(secondLogin.statusCode).toBe(200);
+    const secondCashierSession = secondLogin.json<{ token: string }>().token;
+    const firstSubscriber = await subscriberFor('SVC-00025-1', 99_900n);
+    const secondSubscriber = await subscriberFor('SVC-00026-1', 99_900n);
+    const payment = (token: string, subscriberId: string) => app.inject({
+      method: 'POST', url: '/payments', headers: { authorization: `Bearer ${token}` },
+      payload: { subscriberId, amountCentavos: '10000', paymentDate: '2026-09-17T08:00:00.000Z', idempotencyKey: randomUUID(), method: 'CASH' },
+    });
+    const [first, second, denied] = await Promise.all([
+      payment(cashierToken, firstSubscriber), payment(secondCashierSession, secondSubscriber), payment(viewerToken, firstSubscriber),
+    ]);
+    expect([first.statusCode, second.statusCode, denied.statusCode]).toEqual([200, 200, 403]);
+    const posted = [first.json<PaymentResult>(), second.json<PaymentResult>()];
+    expect(new Set(posted.map((item) => item.paymentId)).size).toBe(2);
+    expect(new Set(posted.map((item) => item.receiptNumber)).size).toBe(2);
+    expect(posted.every((item) => item.status === 'POSTED' && item.allocatedCentavos === '10000')).toBe(true);
+    expect(denied.json()).toMatchObject({ error: 'FORBIDDEN' });
+    const stored = await database.db.select().from(payments).where(eq(payments.paymentDate, new Date('2026-09-17T08:00:00.000Z')));
+    expect(stored).toHaveLength(2);
   });
 
   it('rolls back payment, allocation, balance, receipt, ledger, credit, and audit when posting fails', async () => {

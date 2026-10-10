@@ -106,6 +106,11 @@ describe.sequential('authentication and server-side authorization', () => {
     const denied = await database.db.select().from(auditLogs).where(eq(auditLogs.action, 'authorization.denied'));
     expect(denied).toHaveLength(1);
     expect(denied[0]).toMatchObject({ entityId: 'user.manage', reason: 'MISSING_PERMISSION' });
+    const backupResponse = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(backupResponse.statusCode).toBe(403);
+    expect(backupResponse.json()).toMatchObject({ error: 'FORBIDDEN' });
+    const backupDenied = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, 'backup.create'));
+    expect(backupDenied).toHaveLength(1);
   });
 
   it('requires a valid bearer session for protected routes', async () => {

@@ -1,6 +1,6 @@
 # BCIS Subscription Billing & Collection
 
-Windows desktop and API for Bukidnon Cable and Internet Services. It includes secure password sessions, server-side RBAC, append-only audit records, subscriber operations, transactional monthly billing, immutable finalized invoices, and reproducible subscriber ledgers. Payment posting workflows are not implemented yet.
+Windows desktop and API for Bukidnon Cable and Internet Services. It includes secure password sessions, server-side RBAC, append-only audit records, subscriber operations, transactional billing/payments/reversals, collector reconciliation, receivable aging, dashboards, reports, verified restore testing, and Windows installer packaging.
 
 ## Requirements
 
@@ -24,7 +24,7 @@ npm run dev
 
 The seed creates seven synthetic identities listed in [the permission matrix](docs/permission-matrix.md), seven service plans, three collection areas, two collectors, 50 subscribers, and 65 service accounts. The identities share the configured seed password only for initial access. The API requires each account to replace that password before permission-protected operations. Re-running the seed intentionally resets the seven demo passwords and restores the password-change requirement; do not use it to manage real users.
 
-The Electron application provides secure login, forced replacement of the seed password, subscriber search/filter/sort/pagination, detailed subscriber profiles, and transactional subscriber creation. The System connection screen checks live API/database readiness. Disabled navigation names future financial modules; no financial results are fabricated.
+The Electron application provides secure login/password rotation, dashboard KPIs, subscriber search/filter/sort/pagination, detailed profiles and service history, subscriber creation, six live reports, PDF/XLSX export, print layouts, and connection diagnostics. Billing, payment, GCash, collection, reversal, user-administration and backup operator screens remain unfinished; their domain/API behavior is covered by PostgreSQL integration tests.
 
 Stop the foreground development processes with Ctrl+C, then stop the isolated database:
 
@@ -48,6 +48,8 @@ Create separate empty `bcis_dev` and `bcis_test` databases with your database ad
 | `npm run test:integration` | Reset the dedicated `_test` DB; test clean/repeat migrations, constraints, rollback, RBAC, subscribers, and simultaneous reads |
 | `npm run test:e2e` | Build and launch real Electron/API against `_test`; test login, subscribers, connection failures, security, and accessibility |
 | `npm run build` | Compile shared/API and production Electron bundles |
+| `npm run release:windows` | Build the NSIS x64 Windows installer under ignored `release/` |
+| `npm run verify:restore` | Owner-approved backup/hash/isolated restore/integrity verification of `_test` data |
 | `npm run start:api` / `npm run start:desktop` | Run built API/desktop on separate terminals |
 | `npm run db:generate` | Generate a reviewed migration after schema edits |
 | `npm run db:migrate` | Apply committed migrations explicitly |
@@ -62,7 +64,7 @@ Invoke-RestMethod http://127.0.0.1:3001/health
 Invoke-RestMethod http://127.0.0.1:3001/health/ready
 ```
 
-`/health` checks API liveness (200). `/health/ready` checks PostgreSQL and migration compatibility (200 ready, 503 degraded). The API remains alive during database failure so the desktop can explain the problem. Financial posting endpoints remain deferred.
+`/health` checks API liveness (200). `/health/ready` checks PostgreSQL and migration compatibility (200 ready, 503 degraded). The API remains alive during database failure so the desktop can explain the problem.
 
 Authentication endpoints are `POST /auth/login`, `GET /auth/me`, `POST /auth/change-password`, and `POST /auth/logout`. Send the login token as `Authorization: Bearer TOKEN`; the database stores only its hash. `GET /admin/users` is the first permission-protected route and requires `user.manage`. The Cashier role receives HTTP 403 when it calls that route directly, and the denial is audited.
 
@@ -76,9 +78,9 @@ Billing endpoints are `POST /billing/cycles/generate`, `GET /billing/cycles/:id`
 2. Keep PostgreSQL private to that server. Do not distribute `apps/api/.env` or database credentials to clients.
 3. Permit the API port (default 3001) through the server firewall only for the trusted private LAN. This repository does not change firewall rules.
 4. On each client, set `MAIN_VITE_API_URL=http://SERVER_PRIVATE_IP:3001` in `apps/desktop/.env` before development/build. For a built client, set `$env:BCIS_API_URL='http://SERVER_PRIVATE_IP:3001'` before `npm run start:desktop`.
-5. Verify `/health/ready` and the desktop indicator from all three PCs. Actual three-PC financial concurrency remains a later acceptance gate.
+5. Verify `/health/ready` and the desktop indicator from all three PCs. Automated three-session posting passes; physical three-PC validation remains a deployment-site gate.
 
-Before any customer-data deployment, add HTTPS at the LAN boundary, a restricted production database role, the remaining financial services, verified backup/restore, and installer packaging.
+Before customer-data deployment, add HTTPS at the LAN boundary, a restricted production database role, Authenticode signing, restricted proof-image storage, attachment backup, and physical three-PC/load validation.
 
 ## Troubleshooting
 

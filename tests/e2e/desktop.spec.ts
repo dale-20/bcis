@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { config } from 'dotenv';
 import pg from 'pg';
+import { SCHEMA_VERSION } from '@bcis/shared';
 
 const require = createRequire(import.meta.url);
 config({ path: 'apps/api/.env', quiet: true });
@@ -53,6 +54,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-e2e-password-2');
     await page.getByRole('button', { name: 'Update password' }).click();
 
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await page.screenshot({ path: 'test-results/dashboard.png' });
+    await page.getByRole('button', { name: 'Subscribers' }).click();
     await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
     await expect(page.getByText('50 subscribers', { exact: false })).toBeVisible();
     await page.getByRole('textbox', { name: 'Search subscribers' }).fill('BCIS-00001');
@@ -69,7 +73,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Back to subscribers' }).click();
 
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
-      bridge: ['changePassword', 'createSubscriber', 'getConnection', 'getReferenceData', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout'].sort(),
+      bridge: ['changePassword', 'createSubscriber', 'exportReport', 'getConnection', 'getDashboard', 'getReferenceData', 'getReport', 'getServiceHistory', 'getSession', 'getSubscriber', 'listSubscribers', 'login', 'logout'].sort(),
       node: false,
       process: false,
     });
@@ -90,12 +94,15 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.screenshot({ path: 'test-results/subscriber-minimum-size.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-    await page.getByRole('button', { name: 'System connection' }).click();
+    await page.getByRole('button', { name: 'Reports' }).click();
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    await page.screenshot({ path: 'test-results/reports.png' });
+    await page.getByRole('button', { name: 'Connection' }).click();
     await expect(page.getByRole('heading', { name: 'Connected to BCIS' })).toBeVisible();
     await database.query('UPDATE application_metadata SET schema_version = 99');
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByText('Migration required', { exact: true })).toBeVisible();
-    await database.query('UPDATE application_metadata SET schema_version = 3');
+    await database.query('UPDATE application_metadata SET schema_version = $1', [SCHEMA_VERSION]);
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByRole('heading', { name: 'Connected to BCIS' })).toBeVisible();
     server.kill();
@@ -104,7 +111,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Unable to reach BCIS' })).toBeVisible();
     expect(pageErrors).toEqual([]);
   } finally {
-    await database.query('UPDATE application_metadata SET schema_version = 3');
+    await database.query('UPDATE application_metadata SET schema_version = $1', [SCHEMA_VERSION]);
     await database.end();
     await desktop?.close();
     server.kill();

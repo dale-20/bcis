@@ -53,6 +53,7 @@ The canonical matrix is `roleDefinitions` in `apps/api/src/auth/permissions.ts`.
 | `POST /collection-batches/:id/reconcile` | Valid session and `collection.reconcile` | Records reconciler, time, and notes |
 | `POST /collection-batches/:id/close` | Valid session and `collection.close` | Nonzero variance requires an explicit acknowledgement note |
 | `GET /receivables/aging` | Valid session and `receivables.view` | Server-side aging, overdue filters, totals, and pagination |
+| `GET /system/backups` | Valid session and `backup.create` | Lists bounded backup history; missing permission is audited |
 
 Bearer values contain 256 random bits. PostgreSQL stores only their SHA-256 hashes. Sessions expire after 30 minutes idle or eight hours absolute time, and inactive users cannot authenticate. Passwords use salted scrypt with production parameters `N=131072`, `r=8`, `p=1`; hashes and tokens are excluded from audit payloads and response objects.
 
