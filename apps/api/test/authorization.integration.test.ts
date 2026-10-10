@@ -120,6 +120,10 @@ describe.sequential('authentication and server-side authorization', () => {
     expect(cannotCreateBackup.statusCode).toBe(403);
     const cannotDownloadBackup = await app.inject({ method: 'GET', url: '/system/backups/00000000-0000-4000-8000-000000000000/download', headers: { authorization: `Bearer ${cashierToken}` } });
     expect(cannotDownloadBackup.statusCode).toBe(403);
+    const cannotApproveRestore = await app.inject({ method: 'POST', url: '/system/restore/approval', headers: { authorization: `Bearer ${cashierToken}` }, payload: { backupId: '00000000-0000-4000-8000-000000000000', reason: 'Unauthorized restore attempt', confirmation: 'RESTORE' } });
+    expect(cannotApproveRestore.statusCode).toBe(403);
+    const adminCannotApproveRestore = await app.inject({ method: 'POST', url: '/system/restore/approval', headers: { authorization: `Bearer ${adminToken}` }, payload: { backupId: '00000000-0000-4000-8000-000000000000', reason: 'Administrator restore attempt', confirmation: 'RESTORE' } });
+    expect(adminCannotApproveRestore.statusCode).toBe(403);
     const backupDenied = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, 'backup.create'));
     expect(backupDenied).toHaveLength(3);
   });
@@ -202,6 +206,27 @@ describe.sequential('authentication and server-side authorization', () => {
     const logs = await database.db.select().from(auditLogs).where(eq(auditLogs.entityId, backup.id));
     expect(logs.map((entry) => entry.action)).toContain('backup.created');
   }, 60_000);
+
+  it('binds Owner recovery approval to the verified archive, gates clients, and permits audited cancellation', async () => {
+    const ownerLogin = await login('owner.demo', 'Synthetic-owner-password-2');
+    const history = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${ownerLogin.token}` } });
+    const backup = history.json<{ items: Array<{ id: string; status: string }> }>().items.find((item) => item.status === 'VERIFIED');
+    expect(backup).toBeDefined();
+    const approved = await app.inject({ method: 'POST', url: '/system/restore/approval', headers: { authorization: `Bearer ${ownerLogin.token}` }, payload: { backupId: backup?.id, reason: 'Recover after a verified database incident', confirmation: 'RESTORE' } });
+    expect(approved.statusCode).toBe(202);
+    expect(approved.json()).toMatchObject({ status: 'MAINTENANCE_REQUIRED', backupId: backup?.id });
+    const blocked = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${ownerLogin.token}` } });
+    expect(blocked.statusCode).toBe(503);
+    expect(blocked.json()).toMatchObject({ error: 'MAINTENANCE_MODE' });
+    const cancelled = await app.inject({ method: 'POST', url: '/system/restore/cancel', headers: { authorization: `Bearer ${ownerLogin.token}` }, payload: {} });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json()).toMatchObject({ status: 'CANCELLED' });
+    const available = await app.inject({ method: 'GET', url: '/system/backups', headers: { authorization: `Bearer ${ownerLogin.token}` } });
+    expect(available.statusCode).toBe(200);
+    const audit = await database.db.select().from(auditLogs).where(eq(auditLogs.action, 'backup.restore_approved'));
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ entityId: backup?.id, reason: 'Recover after a verified database incident' });
+  });
 
   it('requires a valid bearer session for protected routes', async () => {
     const response = await app.inject({ method: 'GET', url: '/admin/users' });

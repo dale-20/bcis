@@ -1,0 +1,28 @@
+{
+  "test": "AT-12-offline-cutover",
+  "status": "PASSED_ISOLATED_TEST",
+  "targetDatabase": "bcis_test",
+  "backupId": "f28b5f2c-b4e7-44b5-8b92-d0a46165eb2c",
+  "sha256": "2647a4605900577ed7306f83a8bbfd59001c3f4ccd56da2290b2dd482c09a178",
+  "approvedBy": "owner.demo",
+  "proofCount": 1,
+  "proofHashesVerified": true,
+  "maintenanceGateCleared": true,
+  "restoreAuditWritten": true,
+  "rollbackDatabasePreservedUntilAssertions": true,
+  "rollbackDatabaseRemovedAfterTest": true,
+  "before": {
+    "subscribers": 50,
+    "invoices": 0,
+    "payments": 0,
+    "ledger_entries": 0
+  },
+  "restored": {
+    "subscribers": 50,
+    "invoices": 0,
+    "payments": 0,
+    "ledger_entries": 0
+  },
+  "productionRecoveryTested": false,
+  "verifiedAt": "2026-10-10T21:38:26.785Z"
+}

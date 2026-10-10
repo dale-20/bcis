@@ -129,7 +129,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
     <Route path="/administration/users" element={<Allowed user={user} permissions={['user.manage']}><UsersPage /></Allowed>} />
     <Route path="/administration/audit" element={<Allowed user={user} permissions={['audit.view']}><AuditPage /></Allowed>} />
     <Route path="/administration/settings" element={<Allowed user={user} permissions={['settings.manage']}><SettingsPage user={user} /></Allowed>} />
-    <Route path="/administration/backups" element={<Allowed user={user} permissions={['backup.create', 'backup.restore']}><BackupsPage mayCreate={user.permissions.includes('backup.create')} title={modulePages.backups.title} description={modulePages.backups.description} /></Allowed>} />
+    <Route path="/administration/backups" element={<Allowed user={user} permissions={['backup.create', 'backup.restore']}><BackupsPage mayCreate={user.permissions.includes('backup.create')} mayRestore={user.permissions.includes('backup.restore')} title={modulePages.backups.title} description={modulePages.backups.description} /></Allowed>} />
     <Route path="/connection" element={<SystemConnection />} />
     <Route path="*" element={<Navigate to={fallback} replace />} />
   </Routes>;

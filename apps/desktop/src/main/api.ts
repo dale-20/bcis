@@ -6,7 +6,7 @@ import {
   auditSearchSchema, auditSearchResultSchema, managedUserCreateSchema, managedUserListSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   organizationSettingsSchema, type OrganizationSettings,
-  backupCreatedSchema, backupListSchema, type BackupCreated, type BackupList,
+  backupCreatedSchema, backupListSchema, restoreApprovalInputSchema, restoreApprovalSchema, type BackupCreated, type BackupList,
   receivableAccountQuerySchema as serviceReceivableAccountQuerySchema,
   reconnectionListResponseSchema, suspensionListResponseSchema, serviceTechnicianListSchema,
   collectionReferenceCatalogSchema,
@@ -337,6 +337,12 @@ export class DesktopApiClient {
       const filename = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? `bcis-backup-${id}.tar.gz`;
       return { ok: true, data: { buffer: new Uint8Array(await response.arrayBuffer()), filename } };
     } catch { return { ok: false, error: { code: 'CONNECTION_ERROR', message: 'Unable to download the backup' } }; }
+  }
+  approveBackupRestore(input: z.infer<typeof restoreApprovalInputSchema>): Promise<DesktopResult<z.infer<typeof restoreApprovalSchema>>> {
+    return this.call('/system/restore/approval', { method: 'POST', body: JSON.stringify(restoreApprovalInputSchema.parse(input)) }, restoreApprovalSchema, true);
+  }
+  cancelBackupRestore(): Promise<DesktopResult<{ status: 'CANCELLED' }>> {
+    return this.call('/system/restore/cancel', { method: 'POST', body: '{}' }, z.object({ status: z.literal('CANCELLED') }), true);
   }
 
   listBillingCycles(): Promise<DesktopResult<BillingCycleList>> {

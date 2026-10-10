@@ -146,7 +146,7 @@ Delivered: the preview serializes against posting for the selected subscriber an
 
 ## Increment 8 - Administration, audit, settings, and recovery
 
-**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, suspension/reconnection policy, and verified database-plus-proof backup creation/download now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL coverage. AT-12 restores into a disposable clone and verifies proof hashes. Admin cannot view audit, mutate Owner identities, or grant/reset Owner. Owner-approved live replacement with a distributed maintenance gate and API stop/restart remains open; do not mark this increment complete yet.
+**Status: IN PROGRESS (2026-10-11).** User create/role/status/password-reset, searchable audit, company/report details, new-service billing defaults, suspension/reconnection policy, verified database-plus-proof backups, and Owner-approved recovery now have protected API routes, typed preload calls, desktop screens, and real PostgreSQL coverage. Recovery uses a shared maintenance gate, controlled API drain/stop, offline staged restore, integrity checks, rollback database/proof retention, restore audit, and an operator restart. The entire cutover is tested against isolated `_test`; production service-manager restart remains deployment-specific. Admin cannot view audit, restore backups, mutate Owner identities, or grant/reset Owner. Required activity, adjustment, reversal, and voided-receipt reports remain open.
 
 **Goal:** Complete Owner/Admin control and auditability.
 
@@ -155,10 +155,10 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - Add application settings UI for billing, due dates, grace periods, suspension, numbering display, and company/report information.
 - [x] Add backup history, guided backup creation, verification status, checksum, and downloadable evidence.
 - [x] Include `PAYMENT_PROOF_DIR` attachments in verified backup/restore artifacts and compare restored files with database SHA-256 values during isolated AT-12 restoration.
-- [ ] Add Owner-only live restore with explicit approval, distributed maintenance checks, controlled API stop/restart, and test restore/integrity verification; display the destructive-impact warning.
+- [x] Add Owner-only restore approval bound to a verified archive, enforced maintenance checks, controlled API drain/stop, offline operator restore command, staged integrity verification, rollback retention, and destructive-impact warning; exercise the full cutover against isolated `_test`.
 - Add user activity, adjustment, reversal, and voided-receipt reports.
 
-**Gate:** AT-10 and isolated AT-12 verification pass. Live restore portion remains open: Owner approval and maintenance-controlled live recovery must be tested before increment completion.
+**Gate:** AT-10 and isolated AT-12 verification pass. Increment 8 remains open for the activity, adjustment, reversal, and voided-receipt reports listed above.
 
 ## Increment 9 - Reporting, printing, and dashboard completion
 

@@ -56,7 +56,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 - [x] Only verified GCash can post. Uploaded screenshot alone never marks an account paid.
 - [x] Validate proof file type, size, safe generated keys; restricted attachment access and 24-hour cleanup of abandoned uploads.
 - [x] Include `PAYMENT_PROOF_DIR` attachments in verified archives and prove restored file hashes on a separate PostgreSQL test restore (Increment 8 / AT-12).
-- [ ] Owner-approved live database replacement with an enforced maintenance gate and API stop/restart remains unimplemented; see `docs/backup-restore.md`.
+- [x] Owner-only recovery approval is bound to a verified archive checksum and reason; the API enforces a shared maintenance gate and drains/stops before offline restore. The operator command stages and verifies the replacement, preserves rollback database/proofs, audits recovery, and requires the exact target database name. Rehearsed end to end only against the isolated `_test` database; production service-manager restart remains operator-specific.
 - [x] Cashier flow: search, balance, amount/method, allocation preview, atomic post, receipt, and GCash evidence submission held for review.
 - [x] All financial posting, numbering, credit, allocations and audit commit/rollback together; concurrent retry/idempotency tests.
 
@@ -72,7 +72,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 **Increment 7 verification (2026-10-11):** `npm run check` passed (97 tests), `npm run test:integration` passed (63 PostgreSQL tests), and `npm run test:e2e` passed (1 built Electron test). The desktop E2E generated overdue invoices, changed service policy, requested and approved a suspension, settled the subscriber balance through Cash posting, assigned the new reconnection to the Technician, and completed it through the Technician session. Reconnection and payment records were verified in PostgreSQL.
 
-**Increment 8 recovery verification (2026-10-11):** `npm run test:integration -- apps/api/test/backup.integration.test.ts` passed after backing up a synthetic JPEG proof, extracting the `.tar.gz`, checking its manifest and attachment SHA-256/size, restoring its database dump to a derived `_restore_at12` database, and comparing expected records. The desktop uses the protected API to create archives and save verified downloads. Automated live replacement remains unchecked until Owner approval and maintenance controls are implemented.
+**Increment 8 recovery verification (2026-10-11):** `npm run check` passed (97 tests); `npm run test:integration` passed (7 files, 69 PostgreSQL tests); `npm run test:e2e` passed (1 built Electron test). The recovery integration creates a synthetic proof backup, restores the dump and attachment into a staged database, checks SHA-256/size and database integrity, switches the isolated `_test` database, confirms gate clearance and restore audit, and removes the rollback test database. Authorization tests deny Cashier/Admin restore approval and prove Owner maintenance-gate/cancel behavior. Production service-manager restart and recovery on a production deployment remain untested.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 

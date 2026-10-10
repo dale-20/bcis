@@ -44,7 +44,7 @@ import {
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
   ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
   ORGANIZATION_SETTINGS_GET_CHANNEL, ORGANIZATION_SETTINGS_UPDATE_CHANNEL,
-  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL,
+  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL, BACKUP_RESTORE_APPROVE_CHANNEL, BACKUP_RESTORE_CANCEL_CHANNEL,
 } from '@bcis/shared';
 
 // No ipcRenderer, generic channel, URL, or arbitrary arguments cross this boundary.
@@ -130,5 +130,7 @@ const bridge: DesktopBridge = Object.freeze({
   listBackups: () => ipcRenderer.invoke(BACKUPS_LIST_CHANNEL),
   createBackup: () => ipcRenderer.invoke(BACKUP_CREATE_CHANNEL),
   downloadBackup: (id: string) => ipcRenderer.invoke(BACKUP_DOWNLOAD_CHANNEL, id),
+  approveBackupRestore: (input: Parameters<DesktopBridge['approveBackupRestore']>[0]) => ipcRenderer.invoke(BACKUP_RESTORE_APPROVE_CHANNEL, input),
+  cancelBackupRestore: () => ipcRenderer.invoke(BACKUP_RESTORE_CANCEL_CHANNEL),
 });
 contextBridge.exposeInMainWorld('bcis', bridge);

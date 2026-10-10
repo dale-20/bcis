@@ -50,7 +50,7 @@ import {
   RECONNECTION_ASSIGN_CHANNEL, RECONNECTION_COMPLETE_CHANNEL,
   ADMIN_USERS_LIST_CHANNEL, ADMIN_USER_CREATE_CHANNEL, ADMIN_USER_UPDATE_CHANNEL, ADMIN_USER_PASSWORD_RESET_CHANNEL, AUDIT_SEARCH_CHANNEL,
   ORGANIZATION_SETTINGS_GET_CHANNEL, ORGANIZATION_SETTINGS_UPDATE_CHANNEL,
-  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL,
+  BACKUPS_LIST_CHANNEL, BACKUP_CREATE_CHANNEL, BACKUP_DOWNLOAD_CHANNEL, BACKUP_RESTORE_APPROVE_CHANNEL, BACKUP_RESTORE_CANCEL_CHANNEL,
 } from '@bcis/shared';
 import { checkConnection } from './connection.js';
 import { isTrustedFrame } from './security.js';
@@ -193,6 +193,8 @@ void app.whenReady().then(() => {
     await writeFile(chosen.filePath, downloaded.data.buffer);
     return { ok: true, data: { saved: true, filename: chosen.filePath } };
   });
+  ipcMain.handle(BACKUP_RESTORE_APPROVE_CHANNEL, (event, input: unknown) => { assertTrustedSender(event); return api.approveBackupRestore(desktopRequestSchemas.restoreApproval.parse(input)); });
+  ipcMain.handle(BACKUP_RESTORE_CANCEL_CHANNEL, (event) => { assertTrustedSender(event); return api.cancelBackupRestore(); });
   ipcMain.handle(REPORT_EXPORT_CHANNEL, async (event, input: unknown) => {
     assertTrustedSender(event);
     const command = desktopRequestSchemas.reportExport.parse(input);

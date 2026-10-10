@@ -8,7 +8,7 @@ import {
   managedUserListDesktopResultSchema, adminMutationDesktopResultSchema, managedUserPatchSchema,
   type AuditSearchQuery, type ManagedUserCreate, type ManagedUserPatch,
   organizationSettingsDesktopResultSchema, organizationSettingsSchema, type OrganizationSettings,
-  backupListSchema, backupCreatedSchema,
+  backupListSchema, backupCreatedSchema, restoreApprovalInputSchema, restoreApprovalSchema,
   collectionBatchDesktopResultSchema, collectionBatchListDesktopResultSchema, eligibleCollectionPaymentsDesktopResultSchema,
   collectionBatchListQuerySchema, createCollectionBatchInputSchema, recordCollectionInputSchema,
   remittanceInputSchema, reconciliationInputSchema, closeBatchInputSchema,
@@ -425,6 +425,16 @@ export async function createBackup() {
 }
 export async function downloadBackup(id: string) {
   const result = await bridge().downloadBackup(id);
+  if (!result.ok) throw new Error(result.error.message);
+  return result.data;
+}
+export async function approveBackupRestore(input: unknown) {
+  const result = await bridge().approveBackupRestore(restoreApprovalInputSchema.parse(input));
+  if (!result.ok) throw new Error(result.error.message);
+  return restoreApprovalSchema.parse(result.data);
+}
+export async function cancelBackupRestore() {
+  const result = await bridge().cancelBackupRestore();
   if (!result.ok) throw new Error(result.error.message);
   return result.data;
 }

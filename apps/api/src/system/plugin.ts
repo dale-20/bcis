@@ -8,8 +8,9 @@ import { applicationSettings } from '../db/schema.js';
 import { defaultOrganizationSettings, organizationSettingsSchema } from '@bcis/shared';
 import { AppError } from '../errors.js';
 import type { BackupService } from './backup-service.js';
+import { restoreApprovalInputSchema } from '@bcis/shared';
 
-interface Options { database: Database; authService: AuthService; backupService?: BackupService }
+interface Options { database: Database; authService: AuthService; backupService?: BackupService; scheduleShutdown?: () => void }
 const response = { type: 'object', additionalProperties: true } as const;
 const error = { type: 'object', additionalProperties: true } as const;
 
@@ -94,6 +95,51 @@ export const systemPlugin: FastifyPluginAsync<Options> = async (app, options) =>
   });
 
   const backupService = options.backupService;
+  app.post('/system/restore/approval', {
+    preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'backup.restore')],
+    schema: {
+      body: { type: 'object', required: ['backupId', 'reason', 'confirmation'], additionalProperties: false,
+        properties: { backupId: { type: 'string', format: 'uuid' }, reason: { type: 'string', minLength: 10, maxLength: 255 }, confirmation: { type: 'string', enum: ['RESTORE'] } } },
+      response: { 202: response, 400: error, 401: error, 403: error, 404: error, 409: error },
+    },
+  }, async (request, reply) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const input = restoreApprovalInputSchema.parse(request.body);
+    const [backup] = await options.database.db.select({ id: backupHistory.id, sha256: backupHistory.sha256, status: backupHistory.status })
+      .from(backupHistory).where(eq(backupHistory.id, input.backupId)).limit(1);
+    if (!backup || backup.status !== 'VERIFIED' || !backup.sha256) throw new AppError(404, 'VERIFIED_BACKUP_NOT_FOUND', 'Select a verified backup before requesting recovery');
+    const approvedAt = new Date();
+    const approval = { active: true, backupId: backup.id, sha256: backup.sha256, actorId: context.userId, actorUsername: context.username, reason: input.reason, approvedAt: approvedAt.toISOString(), requestId: request.id };
+    await options.database.db.transaction(async (transaction) => {
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('bcis:maintenance-mode', 0))`);
+      const [existing] = await transaction.select({ value: applicationSettings.value }).from(applicationSettings).where(eq(applicationSettings.key, 'maintenance_mode')).limit(1).for('update');
+      if (existing) throw new AppError(409, 'RESTORE_ALREADY_APPROVED', 'A recovery window is already active');
+      await transaction.insert(applicationSettings).values({ key: 'maintenance_mode', value: approval, description: 'Owner-approved database recovery maintenance gate', updatedByUserId: context.userId, updatedAt: approvedAt });
+      await transaction.insert(auditLogs).values({ actorUserId: context.userId, sessionId: context.sessionId, action: 'backup.restore_approved', entityType: 'backup', entityId: backup.id, reason: input.reason, newValues: { sha256: backup.sha256, maintenanceGate: 'ACTIVE' }, requestId: request.id, ipAddress: request.ip, createdAt: approvedAt });
+    });
+    reply.code(202);
+    if (options.scheduleShutdown) setTimeout(options.scheduleShutdown, 500);
+    return { status: 'MAINTENANCE_REQUIRED', backupId: backup.id, sha256: backup.sha256, approvedBy: context.username, approvedAt: approvedAt.toISOString(), instructions: 'All API clients are now blocked. The API will stop shortly. Run the approved offline restore command on the server, then start the API.' };
+  });
+
+  app.post('/system/restore/cancel', {
+    preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'backup.restore')],
+    schema: { response: { 200: response, 401: error, 403: error, 404: error } },
+  }, async (request) => {
+    const context = request.authContext;
+    if (!context) throw new AppError(401, 'SESSION_INVALID', 'Authentication required');
+    const now = new Date();
+    await options.database.db.transaction(async (transaction) => {
+      await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended('bcis:maintenance-mode', 0))`);
+      const [existing] = await transaction.select({ value: applicationSettings.value }).from(applicationSettings).where(eq(applicationSettings.key, 'maintenance_mode')).limit(1).for('update');
+      if (!existing) throw new AppError(404, 'RESTORE_APPROVAL_NOT_FOUND', 'There is no active recovery approval to cancel');
+      await transaction.delete(applicationSettings).where(eq(applicationSettings.key, 'maintenance_mode'));
+      await transaction.insert(auditLogs).values({ actorUserId: context.userId, sessionId: context.sessionId, action: 'backup.restore_cancelled', entityType: 'backup', reason: 'Owner cancelled recovery before offline restore', oldValues: existing.value as Record<string, unknown>, newValues: { maintenanceGate: 'CLEARED' }, requestId: request.id, ipAddress: request.ip, createdAt: now });
+    });
+    return { status: 'CANCELLED' };
+  });
+
   if (backupService) {
     app.post('/system/backups', {
       preHandler: [authenticateWith(options.authService), requirePermission(options.authService, 'backup.create')],

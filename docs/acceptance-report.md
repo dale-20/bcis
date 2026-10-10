@@ -19,7 +19,7 @@ Data: synthetic only
 | AT-09 | PARTIAL | `payments.integration.test.ts` | Three simultaneous sessions passed: two postings, unique receipts, Viewer denied. Three physical PCs remain untested |
 | AT-10 | PASSED | `authorization.integration.test.ts` | Cashier receives HTTP 403 for direct user, backup list/create/download calls; all denials audited |
 | AT-11 | PASSED | `billing.integration.test.ts` | Concurrent duplicate billing returns one created run and one skipped run; no duplicate invoices |
-| AT-12 | PARTIAL | `backup.integration.test.ts`, `tests/evidence/at12-backup-restore.json` | Approved disposable-clone restore passed; PostgreSQL integrity and counts verified; 1 synthetic proof restored with matching SHA-256 and size. Live Owner-approved restore is not automated or tested. |
+| AT-12 | PARTIAL | `backup.integration.test.ts`, `tests/evidence/at12-backup-restore.json`, `tests/evidence/at12-offline-cutover.json` | Approved disposable-clone restore and the full offline staged cutover workflow pass against `_test`; database integrity, expected counts, 1 synthetic proof SHA-256/size, maintenance-gate clearing, restore audit, and rollback retention are verified. Production recovery and deployment-specific API restart remain untested. |
 
 No acceptance test remains failed after corrections. AT-09 is not marked fully passed because physical LAN workstations were unavailable.
 
@@ -57,4 +57,4 @@ Final E2E rerun: **PASSED** (1/1). It exercised the built Electron application a
 
 ## Functional requirements still incomplete
 
-Remaining requirements include fuller dashboard/report coverage and Owner-approved live database replacement with maintenance/shutdown controls. AT-12's isolated approved restore and attachment integrity pass; production live recovery remains untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.
+Remaining requirements include fuller dashboard/report coverage and a production deployment recovery rehearsal. AT-12's isolated approved restore, cutover and attachment integrity pass; production recovery and service-manager restart remain untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.

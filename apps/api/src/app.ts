@@ -3,6 +3,8 @@ import helmet from '@fastify/helmet';
 import { healthSchema, readinessSchema, type Readiness } from '@bcis/shared';
 import { ZodError } from 'zod';
 import type { Database } from './db/client.js';
+import { applicationSettings } from './db/schema.js';
+import { eq } from 'drizzle-orm';
 import { AuthService } from './auth/service.js';
 import { authPlugin } from './auth/plugin.js';
 import { AppError } from './errors.js';
@@ -26,6 +28,7 @@ interface AppOptions {
   authService?: AuthService;
   proofStorage?: GcashProofStorage;
   backupService?: BackupService;
+  scheduleShutdown?: () => void;
 }
 
 export async function buildApp(options: AppOptions) {
@@ -45,6 +48,17 @@ export async function buildApp(options: AppOptions) {
   app.addHook('onRequest', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
   });
+  if (options.database) {
+    const database = options.database;
+    app.addHook('preHandler', async (request, reply) => {
+      if (request.url.startsWith('/health') || request.url.startsWith('/system/restore/cancel')) return;
+      const [setting] = await database.db.select({ value: applicationSettings.value })
+        .from(applicationSettings).where(eq(applicationSettings.key, 'maintenance_mode')).limit(1);
+      if (setting?.value && typeof setting.value === 'object' && 'active' in setting.value && setting.value.active === true) {
+        return reply.code(503).send({ error: 'MAINTENANCE_MODE', message: 'BCIS is in an approved recovery window. Contact the system Owner.', requestId: request.id });
+      }
+    });
+  }
   app.get('/health', async () => healthSchema.parse({
     service: 'bcis-api', status: 'ok', timestamp: new Date().toISOString(),
   }));
@@ -82,7 +96,7 @@ export async function buildApp(options: AppOptions) {
       await app.register(receivablePlugin, { authService, database: options.database });
       await app.register(serviceControlPlugin, { authService, database: options.database });
       await app.register(reportPlugin, { authService, database: options.database });
-      await app.register(systemPlugin, { authService, database: options.database, ...(options.backupService ? { backupService: options.backupService } : {}) });
+      await app.register(systemPlugin, { authService, database: options.database, ...(options.backupService ? { backupService: options.backupService } : {}), ...(options.scheduleShutdown ? { scheduleShutdown: options.scheduleShutdown } : {}) });
     }
   }
   if (options.closeDatabase) app.addHook('onClose', options.closeDatabase);

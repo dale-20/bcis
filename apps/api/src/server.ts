@@ -9,6 +9,7 @@ async function start() {
   const environment = loadEnvironment();
   const database = createDatabase(environment);
   const proofStorage = new GcashProofStorage(resolve(dirname(apiEnvPath), environment.PAYMENT_PROOF_DIR));
+  let shutdown = () => {};
   const app = await buildApp({
     probeDatabase: database.probe, closeDatabase: database.close, logLevel: environment.LOG_LEVEL, database,
     proofStorage,
@@ -20,7 +21,9 @@ async function start() {
       ...(environment.PG_BIN ? { pgBin: environment.PG_BIN } : {}),
       ...(environment.TAR_BIN ? { tarBin: environment.TAR_BIN } : {}),
     }),
+    scheduleShutdown: () => shutdown(),
   });
+  shutdown = () => { void app.close().catch(() => { process.exitCode = 1; }); };
   database.pool.on('error', () => app.log.error('Idle database connection failed'));
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => { void app.close().catch(() => { process.exitCode = 1; }); });
