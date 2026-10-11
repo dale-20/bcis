@@ -86,9 +86,14 @@ export function mascotDimensions(size: MascotPreferences['size']): { width: numb
 
 export function clampMascotPosition(position: MascotPosition, viewportWidth: number, viewportHeight: number, mascotWidth: number, mascotHeight: number): MascotPosition {
   const margin = 12;
+  const safeLaneWidth = Math.min(viewportWidth - margin * 2, Math.max(170, mascotWidth + margin * 2));
+  const minimumX = Math.max(margin, viewportWidth - safeLaneWidth);
+  const maximumX = Math.max(minimumX, viewportWidth - mascotWidth - margin);
+  const maximumY = Math.max(margin, viewportHeight - mascotHeight - margin);
+  const minimumY = Math.min(76, maximumY);
   return {
-    x: Math.max(margin, Math.min(position.x, Math.max(margin, viewportWidth - mascotWidth - margin))),
-    y: Math.max(margin, Math.min(position.y, Math.max(margin, viewportHeight - mascotHeight - margin))),
+    x: Math.max(minimumX, Math.min(position.x, maximumX)),
+    y: Math.max(minimumY, Math.min(position.y, maximumY)),
   };
 }
 

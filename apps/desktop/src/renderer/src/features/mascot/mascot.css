@@ -267,14 +267,15 @@
   --buddy-width: 116px;
   --buddy-art-width: 100px;
   --buddy-art-height: 122px;
+  --buddy-safe-lane: 170px;
   --buddy-surface: var(--color-surface);
   --buddy-text: var(--color-navy);
   width: var(--buddy-width);
   gap: 2px;
   isolation: isolate;
 }
-.bcis-mascot.size-medium { --buddy-width: 184px; --buddy-art-width: 160px; --buddy-art-height: 192px; }
-.bcis-mascot.size-large { --buddy-width: 216px; --buddy-art-width: 190px; --buddy-art-height: 228px; }
+.bcis-mascot.size-medium { --buddy-width: 184px; --buddy-art-width: 160px; --buddy-art-height: 192px; --buddy-safe-lane: 208px; }
+.bcis-mascot.size-large { --buddy-width: 216px; --buddy-art-width: 190px; --buddy-art-height: 228px; --buddy-safe-lane: 240px; }
 .bcis-mascot .mascot-art { width: var(--buddy-art-width); height: var(--buddy-art-height); }
 .bcis-mascot .mascot-bubble {
   max-width: min(216px, calc(100vw - 24px));
@@ -327,8 +328,11 @@
 .mascot-dock { border-color: var(--color-border); background: var(--buddy-surface, var(--color-surface)); }
 
 /* Reserve a quiet lane so default placement stays clear of operational content. */
-.app-shell:has(> .bcis-mascot) .main-shell main { padding-right: 170px; }
-.app-shell:has(.mascot-preferences) .main-shell main { padding-right: 290px; }
+.app-shell:has(> .bcis-mascot) { --buddy-safe-lane: 170px; }
+.app-shell:has(> .bcis-mascot.size-medium) { --buddy-safe-lane: 208px; }
+.app-shell:has(> .bcis-mascot.size-large) { --buddy-safe-lane: 240px; }
+.app-shell:has(> .bcis-mascot) .main-shell main { padding-right: var(--buddy-safe-lane); }
+.app-shell:has(.mascot-preferences) .main-shell main { padding-right: max(290px, var(--buddy-safe-lane, 170px)); }
 
 .dark .bcis-mascot,
 [data-theme="dark"] .bcis-mascot {
@@ -350,7 +354,9 @@
 }
 @media (max-width: 520px), (max-height: 420px) {
   .bcis-mascot.size-medium,
-  .bcis-mascot.size-large { --buddy-width: 116px; --buddy-art-width: 100px; --buddy-art-height: 122px; }
+  .bcis-mascot.size-large { --buddy-width: 116px; --buddy-art-width: 100px; --buddy-art-height: 122px; --buddy-safe-lane: 170px; }
+  .app-shell:has(> .bcis-mascot.size-medium),
+  .app-shell:has(> .bcis-mascot.size-large) { --buddy-safe-lane: 170px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

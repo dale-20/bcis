@@ -76,8 +76,22 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByLabel('Animations')).toBeChecked();
     await expect(page.getByLabel('Mascot size')).toHaveValue('small');
     await expect(page.getByLabel('Personality')).toHaveValue('balanced');
+    await expect(page.locator('.mascot-art')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const mascotCountAtLogin = await page.locator('.bcis-mascot').count();
+    expect(mascotCountAtLogin).toBe(1);
     await page.screenshot({ path: 'test-results/mascot-dashboard.png' });
     await page.keyboard.press('Escape');
+    await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1.25));
+    await expect.poll(() => page.evaluate(() => window.devicePixelRatio)).toBeGreaterThan(1);
+    const zoomedMascotBounds = await page.locator('.bcis-mascot').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight };
+    });
+    expect(zoomedMascotBounds.left).toBeGreaterThanOrEqual(0);
+    expect(zoomedMascotBounds.top).toBeGreaterThanOrEqual(0);
+    expect(zoomedMascotBounds.right).toBeLessThanOrEqual(zoomedMascotBounds.viewportWidth);
+    expect(zoomedMascotBounds.bottom).toBeLessThanOrEqual(zoomedMascotBounds.viewportHeight);
+    await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(1));
     await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Payments', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
@@ -226,6 +240,14 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
     await page.screenshot({ path: 'test-results/subscriber-minimum-size.png' });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const resizedMascotBounds = await page.locator('.bcis-mascot').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight };
+    });
+    expect(resizedMascotBounds.left).toBeGreaterThanOrEqual(0);
+    expect(resizedMascotBounds.top).toBeGreaterThanOrEqual(0);
+    expect(resizedMascotBounds.right).toBeLessThanOrEqual(resizedMascotBounds.viewportWidth);
+    expect(resizedMascotBounds.bottom).toBeLessThanOrEqual(resizedMascotBounds.viewportHeight);
 
     await page.getByRole('link', { name: 'Receivables', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Outstanding receivables' })).toBeVisible();

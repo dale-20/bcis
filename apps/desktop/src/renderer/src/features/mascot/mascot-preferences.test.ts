@@ -22,7 +22,12 @@ describe('mascot preferences', () => {
 
   it('clamps restored and dragged positions inside the active viewport', () => {
     expect(initialMascotPosition({ ...defaultMascotPreferences, x: 9000, y: 9000 }, 960, 640)).toEqual({ x: 832, y: 450 });
-    expect(clampMascotPosition({ x: -500, y: 8000 }, 960, 640, 184, 276)).toEqual({ x: 12, y: 352 });
+    expect(clampMascotPosition({ x: -500, y: 8000 }, 960, 640, 184, 276)).toEqual({ x: 752, y: 352 });
+  });
+
+  it('keeps Buddy in the reserved right lane and clear of the top app bar', () => {
+    expect(clampMascotPosition({ x: 0, y: 0 }, 1366, 768, 116, 178)).toEqual({ x: 1196, y: 76 });
+    expect(clampMascotPosition({ x: 0, y: 0 }, 1366, 768, 216, 322)).toEqual({ x: 1126, y: 76 });
   });
 
   it('uses compact-by-default sizing and retains configurable size dimensions', () => {
