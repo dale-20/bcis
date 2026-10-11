@@ -1,12 +1,22 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BCISMascot } from './BCISMascot';
 import { MascotCharacter } from './MascotCharacter';
 import { announceMascotEvent } from './mascot-events';
+import { defaultMascotPreferences } from './mascot-preferences';
 
-afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
+class TestPointerEvent extends MouseEvent {
+  readonly pointerId: number;
+  constructor(type: string, init: PointerEventInit = {}) {
+    super(type, init);
+    this.pointerId = init.pointerId ?? 1;
+  }
+}
+
+beforeEach(() => vi.stubGlobal('PointerEvent', TestPointerEvent));
+afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('BCIS Buddy', () => {
   it('uses event-specific poses and restrained messages', () => {
@@ -50,11 +60,40 @@ describe('BCIS Buddy', () => {
     expect(screen.getByRole('group', { name: 'BCIS Buddy controls' })).toBeInTheDocument();
   });
 
+  it('keeps one mascot mounted while shared-layout pages change', () => {
+    const SharedWorkspace = ({ page }: { page: string }) => <><main>{page}</main><BCISMascot /></>;
+    const { rerender } = render(<SharedWorkspace page="Dashboard" />);
+    rerender(<SharedWorkspace page="Subscribers" />);
+    expect(screen.getByText('Subscribers')).toBeInTheDocument();
+    expect(document.querySelectorAll('.bcis-mascot')).toHaveLength(1);
+  });
+
   it('opens accessible preferences with optional sound disabled initially', () => {
     render(<BCISMascot />);
     fireEvent.click(screen.getByRole('button', { name: 'Mascot preferences' }));
     expect(screen.getByRole('region', { name: 'BCIS Buddy preferences' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enable sound feedback' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('Buddy enabled')).toBeChecked();
+    expect(screen.getByLabelText('Animations')).toBeChecked();
+    expect(screen.getByLabelText('Mascot size')).toHaveValue('small');
+    expect(screen.getByLabelText('Personality')).toHaveValue('balanced');
+  });
+
+  it('persists display settings and leaves a restore control when hidden', () => {
+    const { unmount } = render(<BCISMascot />);
+    fireEvent.click(screen.getByRole('button', { name: 'Mascot preferences' }));
+    fireEvent.click(screen.getByLabelText('Animations'));
+    fireEvent.change(screen.getByLabelText('Mascot size'), { target: { value: 'large' } });
+    fireEvent.change(screen.getByLabelText('Personality'), { target: { value: 'professional' } });
+    fireEvent.click(screen.getByLabelText('Buddy enabled'));
+    expect(screen.getByRole('button', { name: 'Enable and show BCIS Buddy' })).toBeInTheDocument();
+    const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v3') ?? '{}') as { enabled?: boolean; animationsEnabled?: boolean; size?: string; personality?: string };
+    expect(stored).toMatchObject({ enabled: false, animationsEnabled: false, size: 'large', personality: 'professional' });
+    unmount();
+    render(<BCISMascot />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enable and show BCIS Buddy' }));
+    expect(screen.getByRole('group', { name: 'BCIS Buddy controls' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mascot preferences' })).toBeInTheDocument();
   });
 
   it('offers an opt-in explanation in the thinking pose', () => {
@@ -70,17 +109,52 @@ describe('BCIS Buddy', () => {
     fireEvent.pointerDown(dragHandle, { pointerId: 7, clientX: 800, clientY: 600 });
     fireEvent.pointerMove(dragHandle, { pointerId: 7, clientX: 5000, clientY: 5000, movementX: 4200, movementY: 4400 });
     fireEvent.pointerUp(dragHandle, { pointerId: 7, clientX: 5000, clientY: 5000 });
-    const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v2') ?? '{}') as { x?: number; y?: number };
-    expect(stored.x).toBeLessThanOrEqual(window.innerWidth - 184 - 12);
-    expect(stored.y).toBeLessThanOrEqual(window.innerHeight - 276 - 12);
+    const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v3') ?? '{}') as { x?: number; y?: number };
+    expect(stored.x).toBeLessThanOrEqual(window.innerWidth - 116 - 12);
+    expect(stored.y).toBeLessThanOrEqual(window.innerHeight - 178 - 12);
+  });
+
+  it('reclamps a persisted position after the application viewport shrinks', () => {
+    localStorage.setItem('bcis.mascot.preferences.v3', JSON.stringify({ ...defaultMascotPreferences, x: 700, y: 500 }));
+    const width = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+    const height = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 960 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 720 });
+    try {
+      render(<BCISMascot />);
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 340 });
+      fireEvent.resize(window);
+      const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v3') ?? '{}') as { x?: number; y?: number };
+      expect(stored.x).toBeLessThanOrEqual(360 - 116 - 12);
+      expect(stored.y).toBeLessThanOrEqual(340 - 178 - 12);
+    } finally {
+      if (width) Object.defineProperty(window, 'innerWidth', width);
+      if (height) Object.defineProperty(window, 'innerHeight', height);
+    }
   });
 
   it('supports keyboard repositioning as an alternative to dragging', () => {
     render(<BCISMascot />);
     fireEvent.keyDown(screen.getByRole('button', { name: 'Move BCIS Buddy' }), { key: 'ArrowLeft' });
-    const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v2') ?? '{}') as { x?: number };
+    const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v3') ?? '{}') as { x?: number };
     expect(stored.x).toBeGreaterThan(0);
-    expect(stored.x).toBeLessThanOrEqual(window.innerWidth - 184 - 12);
+    expect(stored.x).toBeLessThanOrEqual(window.innerWidth - 116 - 12);
+  });
+
+  it('keeps artwork click-through while exposing keyboard-operable controls', () => {
+    render(<BCISMascot />);
+    expect(document.querySelector('.bcis-mascot')).toHaveStyle({ pointerEvents: 'none' });
+    expect(screen.getByRole('button', { name: 'Move BCIS Buddy' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Move BCIS Buddy' }), { key: 'ArrowRight' });
+    expect(JSON.parse(localStorage.getItem('bcis.mascot.preferences.v3') ?? '{}')).toMatchObject({ x: expect.any(Number) });
+  });
+
+  it('removes mascot event listeners when unmounted', () => {
+    const removeListener = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(<BCISMascot />);
+    unmount();
+    expect(removeListener).toHaveBeenCalledWith('bcis:mascot-event', expect.any(Function));
   });
 
   it.each(['neutral', 'happy', 'thinking', 'surprised', 'concerned', 'sleepy', 'celebrating'] as const)('renders the %s expression', (mood) => {

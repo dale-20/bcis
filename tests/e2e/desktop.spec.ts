@@ -68,7 +68,16 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-e2e-password-2');
     await page.getByRole('button', { name: 'Update password' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.bcis-mascot')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Mascot preferences' })).toBeVisible();
+    await page.getByRole('button', { name: 'Mascot preferences' }).click();
+    await expect(page.getByLabel('Buddy enabled')).toBeChecked();
+    await expect(page.getByLabel('Animations')).toBeChecked();
+    await expect(page.getByLabel('Mascot size')).toHaveValue('small');
+    await expect(page.getByLabel('Personality')).toHaveValue('balanced');
+    await page.screenshot({ path: 'test-results/mascot-dashboard.png' });
+    await page.keyboard.press('Escape');
     await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Payments', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
@@ -77,6 +86,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.screenshot({ path: 'test-results/dashboard.png' });
     await page.getByRole('link', { name: 'Subscribers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
+    await expect(page.locator('.bcis-mascot')).toHaveCount(1);
     await expect(page.getByText(/of \d+ subscribers/)).toBeVisible();
     await page.getByRole('textbox', { name: 'Search subscribers' }).fill('BCIS-00001');
     await expect(page.getByRole('row', { name: 'Open Amihan Abad' })).toBeVisible();

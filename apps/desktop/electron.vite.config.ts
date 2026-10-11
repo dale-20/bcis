@@ -6,7 +6,9 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ command }) => ({
   main: { plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })] },
   preload: {
-    plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared'] })],
+    // Sandboxed preloads cannot resolve Node packages at runtime; bundle the
+    // shared validators and their Zod dependency into the preload script.
+    plugins: [externalizeDepsPlugin({ exclude: ['@bcis/shared', 'zod'] })],
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {

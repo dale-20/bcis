@@ -15,7 +15,7 @@ export const mascotReactions = {
   login: { animation: 'greeting', mood: 'hello', message: 'Hello! Ready to manage BCIS today?', priority: 3, durationMs: 3_800 },
   'subscriber-created': { animation: 'happy', mood: 'happy', message: 'Subscriber profile saved.', priority: 3, durationMs: 3_200 },
   'billing-start': { animation: 'processing', mood: 'processing', message: 'Preparing this billing run…', priority: 2, durationMs: 60_000 },
-  'billing-success': { animation: 'success', mood: 'celebrating', message: 'Billing run completed.', priority: 5, durationMs: 2_800 },
+  'billing-success': { animation: 'success', mood: 'celebrating', message: 'Your billing cycle is ready to review.', priority: 5, durationMs: 2_800 },
   'billing-error': { animation: 'error', mood: 'concerned', message: 'Billing needs attention. Check the result.', priority: 7, durationMs: 1_800 },
   'payment-posted': { animation: 'success', mood: 'celebrating', message: 'Payment posted successfully.', priority: 5, durationMs: 2_800 },
   'payment-error': { animation: 'error', mood: 'concerned', message: 'Payment could not be confirmed. Check payment history before retrying.', priority: 7, durationMs: 1_800 },
