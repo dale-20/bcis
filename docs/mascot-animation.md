@@ -1,6 +1,6 @@
 # BCIS Buddy animation engine
 
-Phase 3 uses the Phase 2 authored SVG layers and CSS keyframes, as selected in `mascot-implementation-plan.md`. It adds no animation package, remote assets, or runtime AI calls.
+The mascot uses a hand-authored SVG rig and CSS keyframes, as selected in `mascot-implementation-plan.md`. It adds no animation package, remote assets, or runtime AI calls.
 
 ## Animation states
 
@@ -12,9 +12,9 @@ The motion is implemented in `mascot.css` with transform and opacity keyframes o
 
 ## Artwork layers and transform ownership
 
-`MascotCharacter.tsx` draws a local vector illustration with separate groups for the head, ambient head turn, head pose, face, eyes, eyelids, torso, ambient torso movement, ambient shoulder pose, event arm pose, mirrored arm art, and each leg. The principal hinges are specified in SVG coordinates: head at `(90, 139)`, shoulders at `(69, 153)` and `(111, 153)`, torso at `(90, 178)`, and boot tops at `(78, 177)` and `(101, 177)`. The chin-touch hand, typing pad, wave hand, thumbs-up, and success mark are authored as intentional pose/details.
+`MascotCharacter.tsx` draws a local vector illustration under a body root. The torso and neck/head pivot are children of that root. Arms use shoulder -> upper arm -> elbow/forearm -> wrist/hand nesting; legs use hip/thigh -> knee/lower leg -> ankle -> foot nesting. Head-turn, face, eyes, eyelids, eyebrows, mouth, cap, and headphones are separately grouped. Pivots use SVG viewBox coordinates: body root and torso at `(90, 178)`, head at `(90, 139)`, shoulders at `(69, 153)` and `(111, 153)`, left/right elbow in their mirrored art coordinates at `(59, 166)`, wrists at `(53, 177)`, hips at `(78, 177)` and `(101, 177)`, knees at `(78, 185)` and `(101, 185)`, and ankles at `(78, 193)` and `(101, 193)`. The chin-touch hand/sleeve, typing pad, wave hand, thumbs-up, and success mark are authored as intentional poses/details.
 
-Each transform is assigned to one nested layer. Event keyframes animate the inner pose group while idle look/stretch/wave behavior animates a wrapper, so those independent behaviors compose. Mood styling uses opacity or expression paths for lids and brows. SVG transitions are not relied on to recover a base transform after a one-shot animation; one-shots use explicit fill behavior where a pose needs to remain visible. Reduced motion removes keyframes and transitions while preserving the chosen static expression. This is an articulated 2D pose rig, not mesh deformation or independent finger/elbow bending.
+Each transform is assigned to one nested layer. Event keyframes animate the inner pose group while idle look/stretch/wave behavior animates a wrapper, so those independent behaviors compose. Walk alternates hip/shoulder swing and foot lift under a small body-root bob. Wave raises at the shoulder, bends the elbow, rotates at the wrist, and tilts the head. Happy and success poses anticipate, bounce, and settle; sleep lowers the lids and relaxes the body while breathing slowly; thinking glances upward as the chin hand reaches position; warning uses a restrained shoulder/elbow gesture. Mood styling crossfades between open eyes, smile arcs, lids, and brow poses. Transform transitions bridge the removal of event animations when a pose returns to idle. Reduced motion removes keyframes and transitions while retaining each state's static pose. This is an articulated 2D pose rig, not mesh deformation or independent finger bending.
 
 The pre-redesign findings are preserved in `docs/mascot-redesign-diagnosis.md` to distinguish the original transform and artwork limitations from the current design.
 
@@ -26,7 +26,7 @@ Phase 6 adds deterministic, injectable clock/random behavior profiles. Professio
 
 ## Playground and verification
 
-Run `npm run dev -w @bcis/desktop`, then open the renderer hash route `#/mascot-preview`. Trigger each state using the labeled buttons. The playground also has a reduced-motion toggle and reports when temporary poses return to idle. The preview renders without login or API access.
+Run the renderer dev server with `npm run dev -w @bcis/desktop`, then open `/mascot-preview`. Trigger each state using the labeled buttons. The playground also has a reduced-motion toggle and reports when temporary poses return to idle. The preview renders without login or API access.
 
 The state-machine tests cover priority, interruption, stale completion, and reset. Hook tests cover automatic idle return, callback delivery, hidden-window pause/resume, looping completion, and timer/callback cleanup. Preview tests cover every named animation and the reduced-motion class. Run `npm run check` and `npm run build -w @bcis/desktop` after animation or rig changes.
 

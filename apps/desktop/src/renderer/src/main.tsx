@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { HashRouter, useLocation } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import '@fontsource/inter/latin-400.css';
 import '@fontsource/inter/latin-500.css';
 import '@fontsource/inter/latin-600.css';
@@ -23,8 +23,7 @@ const root = document.getElementById('root');
 if (!root) throw new Error('Root element missing');
 
 function AppEntry() {
-  const location = useLocation();
-  if (import.meta.env.DEV && location.pathname === '/mascot-preview') return <MascotPreview />;
+  if (import.meta.env.DEV && window.location.pathname === '/mascot-preview') return <MascotPreview />;
   return <App />;
 }
 

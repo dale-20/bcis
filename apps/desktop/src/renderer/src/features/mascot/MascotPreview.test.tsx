@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MascotPreview } from './MascotPreview';
 import { MascotAssetBoundary } from './MascotRenderer';
+import { MascotCharacter } from './MascotCharacter';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -30,6 +31,31 @@ describe('mascot character studio', () => {
     render(<MascotPreview />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reduced motion' }));
     expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toHaveClass('is-reduced-motion');
+  });
+
+  it('nests shoulders, elbows, wrists, hips, knees, ankles, and feet under body and head pivots', () => {
+    const { container } = render(<MascotCharacter mood="neutral" animation="idle" />);
+    const bodyRoot = container.querySelector('.buddy-body-root');
+    const headPivot = bodyRoot?.querySelector('.buddy-head-pivot');
+    const leftShoulder = bodyRoot?.querySelector('.buddy-shoulder-left');
+    const rightShoulder = bodyRoot?.querySelector('.buddy-shoulder-right');
+    const leftHip = bodyRoot?.querySelector('.buddy-hip-left');
+    const rightHip = bodyRoot?.querySelector('.buddy-hip-right');
+
+    expect(bodyRoot).toBeInTheDocument();
+    expect(headPivot?.querySelector('.buddy-head-turn .buddy-face .buddy-eyes')).toBeInTheDocument();
+    expect(leftShoulder?.querySelector('.buddy-elbow-left .buddy-wrist-left .buddy-hand-base')).toBeInTheDocument();
+    expect(rightShoulder?.querySelector('.buddy-elbow-right .buddy-wrist-right .buddy-hand-base')).toBeInTheDocument();
+    expect(leftHip?.querySelector('.buddy-knee-left .buddy-ankle-left .buddy-foot-left')).toBeInTheDocument();
+    expect(rightHip?.querySelector('.buddy-knee-right .buddy-ankle-right .buddy-foot-right')).toBeInTheDocument();
+  });
+
+  it('uses distinct happy eye marks and gradual sleep eyelid layers', () => {
+    const { container, rerender } = render(<MascotCharacter mood="happy" animation="happy" />);
+    expect(container.querySelectorAll('.buddy-happy-eyes path')).toHaveLength(2);
+    rerender(<MascotCharacter mood="sleepy" animation="sleep" />);
+    expect(container.querySelectorAll('.buddy-lid')).toHaveLength(2);
+    expect(container.querySelector('.buddy-lid')?.getAttribute('d')).toContain('v16');
   });
 
   it('shows bundled vector fallback if character artwork throws while rendering', () => {
