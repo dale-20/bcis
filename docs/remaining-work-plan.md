@@ -42,6 +42,8 @@ The desktop E2E KPI assertion was updated to match the current dashboard label, 
 - Reuse existing query patterns and table components where they fit. Keep authorization and filtering on the API; do not fetch full production tables into the renderer.
 - Check sticky headers, tabular financial values, responsive behavior, and accessible focus on the actual screens. The shared palette and typography already exist, so this is a screen-completeness and consistency pass rather than a new theme project.
 
+**Audit result (2026-10-11):** The source/API-contract matrix is recorded in `docs/operational-table-audit.md`. Collection batches are the confirmed P0 functional gap; invoice, payment, and overdue-account sorting/export remain follow-up candidates. Sticky-header and responsive behavior still need live UI verification. Next: implement bounded server-side collection-batch search/filter/sort, then add API/integration coverage before desktop controls.
+
 **Exit criteria**
 
 - The matrix has evidence for every requirement-relevant table behavior.
