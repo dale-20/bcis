@@ -173,6 +173,10 @@ export class DesktopApiClient {
 
   listCollectionBatches(query: CollectionBatchListQuery): Promise<DesktopResult<CollectionBatchList>> {
     const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) });
+    for (const key of ['query', 'status', 'from', 'to', 'collectorId', 'collectionAreaId', 'sort', 'direction'] as const) {
+      const value = query[key];
+      if (value !== undefined && value !== '') params.set(key, String(value));
+    }
     if (query.exceptionsOnly) params.set('exceptionsOnly', 'true');
     return this.call(`/collection-batches?${params}`, { method: 'GET' }, collectionBatchListSchema);
   }

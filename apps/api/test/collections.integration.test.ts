@@ -484,6 +484,10 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(annualXlsx.statusCode, annualXlsx.body).toBe(200);
     expect(annualXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
     expect(annualXlsx.headers['content-disposition']).toContain('bcis-annual-collections-2026-12-31.xlsx');
+    const batchXlsx = await app.inject({ method: 'GET', url: '/reports/export?report=COLLECTION_BATCH_LIST&from=2026-01-01&to=2026-12-31&batchStatus=CLOSED&batchSort=date&batchDirection=asc&format=XLSX', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(batchXlsx.statusCode, batchXlsx.body).toBe(200);
+    expect(batchXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    expect(batchXlsx.headers['content-disposition']).toContain('bcis-collection-batch-list-2026-12-31.xlsx');
 
     const actor = await database.pool.query<{ id: string }>("select id from users where username='admin.demo'");
     const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
@@ -495,6 +499,6 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(history.statusCode, history.body).toBe(200);
     expect(history.json<ServiceHistory>().events.map((event) => event.type)).toEqual(['RECONNECTION', 'SUSPENSION']);
     const exports = await database.pool.query("select count(*)::int count from audit_logs where action='report.exported'");
-    expect(exports.rows[0]?.count).toBe(4);
+    expect(exports.rows[0]?.count).toBe(5);
   });
 });

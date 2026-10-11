@@ -50,5 +50,21 @@ describe('DesktopApiClient', () => {
     expect((request.mock.calls[2]?.[0] as URL).pathname).toBe(`/subscribers/${id}/status`);
     expect((request.mock.calls[2]?.[1] as RequestInit).method).toBe('POST');
   });
+
+  it('forwards collection batch filters and ordering to the API', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'private-token', expiresAt: new Date().toISOString(), user }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [], page: 2, pageSize: 20, total: 0, pageCount: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const api = new DesktopApiClient('http://127.0.0.1:3001', request as unknown as typeof fetch);
+    await api.login({ username: 'admin.demo', password: 'synthetic-password' });
+    await api.listCollectionBatches({ query: 'north', status: 'CLOSED', from: '2026-01-01', to: '2026-12-31', collectorId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d0', collectionAreaId: '018f70ea-7c89-7b61-bef2-4dfb1aaf33d0', sort: 'amount', direction: 'asc', page: 2, pageSize: 20, exceptionsOnly: false });
+    const url = new URL(request.mock.calls[1]?.[0] as URL);
+    expect(url.searchParams.get('query')).toBe('north');
+    expect(url.searchParams.get('status')).toBe('CLOSED');
+    expect(url.searchParams.get('collectionAreaId')).toBe('018f70ea-7c89-7b61-bef2-4dfb1aaf33d0');
+    expect(url.searchParams.get('sort')).toBe('amount');
+    expect(url.searchParams.get('direction')).toBe('asc');
+    expect(url.searchParams.get('page')).toBe('2');
+  });
 });
 

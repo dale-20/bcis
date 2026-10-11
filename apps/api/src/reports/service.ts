@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import type { Dashboard, DashboardQuery, ReportData, ReportRequest, ServiceHistory } from '@bcis/shared';
 import type { Database } from '../db/client.js';
+import { AppError } from '../errors.js';
 
 type Row = Record<string, unknown>;
 const text = (value: unknown) => value === null || value === undefined ? '' : String(value);
@@ -80,6 +81,32 @@ export class ReportService {
 
   async report(request: ReportRequest): Promise<ReportData> {
     const generatedAt = new Date().toISOString();
+    if (request.report === 'COLLECTION_BATCH_LIST') {
+      const values: unknown[] = [request.from, request.to];
+      const filters: string[] = ['cb.collection_date between $1::date and $2::date'];
+      const addFilter = (sql: (position: number) => string, value: unknown) => { values.push(value); filters.push(sql(values.length)); };
+      if (request.batchQuery) addFilter((position) => `(cb.batch_number ilike $${position} or c.name ilike $${position} or ca.name ilike $${position})`, `%${request.batchQuery}%`);
+      if (request.batchStatus) addFilter((position) => `cb.status=$${position}`, request.batchStatus);
+      if (request.collectorId) addFilter((position) => `cb.collector_id=$${position}`, request.collectorId);
+      if (request.collectionAreaId) addFilter((position) => `cb.collection_area_id=$${position}`, request.collectionAreaId);
+      const sortColumn = { date: 'cb.collection_date', batch: 'cb.batch_number', collector: 'c.name', area: 'ca.name', status: 'cb.status', amount: 'cb.expected_receivable_centavos' }[request.batchSort ?? 'date'];
+      const direction = request.batchDirection === 'asc' ? 'asc' : 'desc';
+      const result = await this.database.pool.query<Row>(`select cb.batch_number,cb.collection_date::text,c.name collector,ca.name area,cb.status,
+        cb.expected_receivable_centavos::text expected,coalesce(rollup.accounts,0)::int accounts,coalesce(rollup.recorded,0)::int recorded,
+        cr.expected_cash_centavos::text expected_cash,cr.remitted_cash_centavos::text remitted_cash,cr.difference_centavos::text difference
+        from collection_batches cb join collectors c on c.id=cb.collector_id join collection_areas ca on ca.id=cb.collection_area_id
+        left join collector_remittances cr on cr.batch_id=cb.id
+        left join lateral (select count(*)::int accounts,count(*) filter(where payment_id is not null)::int recorded from collection_batch_accounts where batch_id=cb.id) rollup on true
+        where ${filters.join(' and ')} order by ${sortColumn} ${direction},cb.id ${direction} limit 10001`, values);
+      if (result.rows.length > 10000) throw new AppError(413, 'EXPORT_TOO_LARGE', 'More than 10,000 batches match. Narrow the date range or filters and try again.');
+      const rows = result.rows.map((row) => ({ batch: text(row.batch_number), date: text(row.collection_date), collector: text(row.collector), area: text(row.area), status: text(row.status), routeReceivable: money(cents(row.expected)), accounts: text(row.accounts), recorded: text(row.recorded), expectedCash: row.expected_cash === null ? '' : money(cents(row.expected_cash)), remittedCash: row.remitted_cash === null ? '' : money(cents(row.remitted_cash)), variance: row.difference === null ? '' : money(cents(row.difference)) }));
+      return this.data(request, 'Collection batch list', rows, [{ label: 'Matching batches', value: String(rows.length) }], [
+        { key: 'batch', label: 'Batch' }, { key: 'date', label: 'Route date' }, { key: 'collector', label: 'Collector' }, { key: 'area', label: 'Area' },
+        { key: 'status', label: 'Status' }, { key: 'routeReceivable', label: 'Route receivable', align: 'right' }, { key: 'accounts', label: 'Accounts', align: 'right' },
+        { key: 'recorded', label: 'Recorded', align: 'right' }, { key: 'expectedCash', label: 'Expected cash', align: 'right' },
+        { key: 'remittedCash', label: 'Remitted cash', align: 'right' }, { key: 'variance', label: 'Variance', align: 'right' },
+      ], generatedAt);
+    }
     if (request.report === 'DAILY_COLLECTIONS' || request.report === 'WEEKLY_COLLECTIONS' || request.report === 'MONTHLY_COLLECTIONS' || request.report === 'ANNUAL_COLLECTIONS') {
       const collectionPeriods = {
         DAILY_COLLECTIONS: { trunc: 'day', format: 'YYYY-MM-DD', title: 'Daily collections', label: 'Date' },

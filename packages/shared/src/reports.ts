@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { centavosSchema, signedCentavosSchema } from './money.js';
 
-export const reportKindSchema = z.enum(['DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS', 'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA', 'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS']);
+export const reportKindSchema = z.enum(['DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS', 'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA', 'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS', 'COLLECTION_BATCH_LIST']);
 export const reportFormatSchema = z.enum(['PDF', 'XLSX']);
 export const reportRequestSchema = z.object({
   report: reportKindSchema,
@@ -9,9 +9,15 @@ export const reportRequestSchema = z.object({
   to: z.iso.date(),
   subscriberId: z.uuid().optional(),
   collectorId: z.uuid().optional(),
+  batchQuery: z.string().trim().max(100).optional(),
+  batchStatus: z.enum(['OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED']).optional(),
+  collectionAreaId: z.uuid().optional(),
+  batchSort: z.enum(['date', 'batch', 'collector', 'area', 'status', 'amount']).optional(),
+  batchDirection: z.enum(['asc', 'desc']).optional(),
 }).strict().superRefine((value, context) => {
   if (value.from > value.to) context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after start date' });
   if (value.report === 'SUBSCRIBER_STATEMENT' && !value.subscriberId) context.addIssue({ code: 'custom', path: ['subscriberId'], message: 'Subscriber is required' });
+  if (value.report !== 'COLLECTION_BATCH_LIST' && (value.batchQuery !== undefined || value.batchStatus !== undefined || value.collectionAreaId !== undefined || value.batchSort !== undefined || value.batchDirection !== undefined)) context.addIssue({ code: 'custom', path: ['report'], message: 'Batch filters only apply to collection batch exports' });
 });
 export type ReportRequest = z.infer<typeof reportRequestSchema>;
 export type ReportKind = z.infer<typeof reportKindSchema>;

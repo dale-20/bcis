@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, Printer, Route as RouteIcon, Search } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Printer, Route as RouteIcon, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AuthenticatedUser, CollectionBatch, CollectionBatchListQuery } from '@bcis/shared';
 import { PageError, PageLoading } from '../../components/PageFeedback';
 import { Button } from '../../components/ui/button';
-import { closeCollectionBatch, createCollectionBatch, getCollectionBatch, getCollectionReferences, getEligibleCollectionPayments, listCollectionBatches, recordCollection, reconcileCollectionBatch, remitCollectionBatch, submitCollectionBatch } from '../../services/api';
+import { closeCollectionBatch, createCollectionBatch, exportReport, getCollectionBatch, getCollectionReferences, getEligibleCollectionPayments, listCollectionBatches, recordCollection, reconcileCollectionBatch, remitCollectionBatch, submitCollectionBatch } from '../../services/api';
 
 const money = (value: string) => {
   const cents = BigInt(value);
@@ -136,6 +136,12 @@ export function CollectionBatchesPage({ user, batchId }: { user: AuthenticatedUs
     exceptionsOnly: false,
   };
   const batches = useQuery({ queryKey: ['collection-batches', filters], queryFn: () => listCollectionBatches(filters), enabled: !batchId, placeholderData: keepPreviousData });
+  const exportBatches = useMutation({ mutationFn: () => exportReport({
+    report: 'COLLECTION_BATCH_LIST', from: from || '0001-01-01', to: to || '9999-12-31',
+    ...(debouncedSearch ? { batchQuery: debouncedSearch } : {}), ...(status ? { batchStatus: status } : {}),
+    ...(collectorId ? { collectorId } : {}), ...(collectionAreaId ? { collectionAreaId } : {}),
+    batchSort: sort, batchDirection: direction, format: 'XLSX',
+  }) });
   const resetPage = () => setPage(1);
   const handleSort = (field: BatchSort) => {
     if (sort === field) setDirection((value) => value === 'asc' ? 'desc' : 'asc');
@@ -152,7 +158,8 @@ export function CollectionBatchesPage({ user, batchId }: { user: AuthenticatedUs
     <header className="page-heading"><div><h1>Collection batches</h1><p>Prepare route snapshots, track field results, and reconcile remittance variances.</p></div></header>
     <BatchCreate user={user} onCreated={(id) => { void client.invalidateQueries({ queryKey: ['collection-batches'] }); navigate(`/collections/batches/${id}`); }} />
     <section className="list-surface">
-      <div className="section-heading"><div><h2>Recent route batches</h2><p>{batches.data.total} total · showing page {batches.data.page} of {Math.max(1, batches.data.pageCount)}{batches.isFetching ? ' · Updating…' : ''}</p></div></div>
+      <div className="section-heading"><div><h2>Recent route batches</h2><p>{batches.data.total} total · showing page {batches.data.page} of {Math.max(1, batches.data.pageCount)}{batches.isFetching ? ' · Updating…' : ''}</p></div>{user.permissions.includes('report.export') && <Button variant="outline" disabled={exportBatches.isPending} onClick={() => exportBatches.mutate()}><Download />{exportBatches.isPending ? 'Preparing…' : 'Export filtered XLSX'}</Button>}</div>
+      {exportBatches.isSuccess && <p className="export-notice" role="status">{exportBatches.data.saved ? `Saved to ${exportBatches.data.filename}` : 'Export canceled. No file was saved.'}</p>}{exportBatches.isError && <p className="form-alert" role="alert">{exportBatches.error.message}</p>}
       <div className="list-toolbar collection-batch-filters">
         <label className="search-field"><Search aria-hidden="true" /><span className="sr-only">Search batches</span><input value={search} onChange={(event) => updateFilters(setSearch, event.target.value)} placeholder="Search batch, collector, or area…" /></label>
         <label className="filter-field"><span>Status</span><select value={status} onChange={(event) => { setStatus(event.target.value as CollectionBatchListQuery['status'] | ''); resetPage(); }}><option value="">All statuses</option>{['OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED'].map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
