@@ -134,7 +134,7 @@ export async function getSubscriber(id: string): Promise<SubscriberDetail> {
 export async function createSubscriber(input: SubscriberCreate): Promise<SubscriberDetail> {
   const command = subscriberCreateSchema.parse(input);
   const subscriber = unwrap(subscriberDetailResultSchema.parse(await bridge().createSubscriber(command)));
-  announceMascotEvent('subscriber-created');
+  announceMascotEvent('subscriber-created', subscriber.id);
   return subscriber;
 }
 
@@ -229,9 +229,10 @@ export async function getDashboard(input: DashboardQuery): Promise<Dashboard> {
 }
 
 export async function getReport(input: ReportRequest): Promise<ReportData> {
+  const command = reportRequestSchema.parse(input);
   announceMascotEvent('report-start');
   try {
-    const result = await bridge().getReport(reportRequestSchema.parse(input));
+    const result = await bridge().getReport(command);
     if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
     const report = reportDataSchema.parse(result.data);
     announceMascotEvent('report-finish');
@@ -272,13 +273,14 @@ export async function previewBilling(input: GenerateBillingCycleInput): Promise<
 }
 
 export async function generateBilling(input: GenerateBillingCycleInput): Promise<BillingGenerationResult> {
-  announceMascotEvent('billing-start');
+  const command = generateBillingCycleInputSchema.parse(input);
+  announceMascotEvent('billing-start', command.period);
   try {
-    const result = unwrap(billingGenerationResultDesktopSchema.parse(await bridge().generateBilling(generateBillingCycleInputSchema.parse(input))));
-    announceMascotEvent('billing-success');
+    const result = unwrap(billingGenerationResultDesktopSchema.parse(await bridge().generateBilling(command)));
+    announceMascotEvent('billing-success', result.cycleId);
     return result;
   } catch (error) {
-    announceMascotEvent('billing-error');
+    announceMascotEvent('billing-error', command.period);
     throw error;
   }
 }
@@ -333,10 +335,10 @@ export async function postPayment(input: PostPaymentInput): Promise<PaymentResul
   const command = postPaymentInputSchema.parse(input);
   try {
     const payment = unwrap(paymentResultDesktopResultSchema.parse(await bridge().postPayment(command)));
-    if (payment.status === 'POSTED') announceMascotEvent('payment-posted');
+    if (payment.status === 'POSTED') announceMascotEvent('payment-posted', payment.paymentId);
     return payment;
   } catch (error) {
-    announceMascotEvent('payment-error');
+    announceMascotEvent('payment-error', command.idempotencyKey);
     throw error;
   }
 }
@@ -363,7 +365,7 @@ export async function getGcashProof(paymentId: string) {
 export async function verifyGcashPayment(paymentId: string, input: VerifyGcashInput): Promise<PaymentResult> {
   const command = verifyGcashInputSchema.parse(input);
   const payment = unwrap(paymentResultDesktopResultSchema.parse(await bridge().verifyGcashPayment(paymentId, command)));
-  if (command.decision === 'VERIFIED' && payment.status === 'POSTED') announceMascotEvent('gcash-approved');
+  if (command.decision === 'VERIFIED' && payment.status === 'POSTED') announceMascotEvent('gcash-approved', payment.paymentId);
   return payment;
 }
 

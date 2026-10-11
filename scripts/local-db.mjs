@@ -9,7 +9,13 @@ import pg from 'pg';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const local = path.join(root, '.local');
 const data = path.join(local, 'postgres');
-const port = 55432;
+const defaultPort = 55432;
+const requestedPort = process.env.BCIS_LOCAL_PG_PORT;
+function resolvePort(value) {
+  const port = value === undefined || value === '' ? defaultPort : Number(value);
+  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error('BCIS_LOCAL_PG_PORT must be an integer between 1024 and 65535.');
+  return port;
+}
 const bin = process.env.PG_BIN ?? (process.platform === 'win32' ? 'C:\\Program Files\\PostgreSQL\\18\\bin' : '');
 const executable = (name) => bin ? path.join(bin, `${name}${process.platform === 'win32' ? '.exe' : ''}`) : name;
 function run(name, args) {
@@ -23,6 +29,7 @@ async function credentials() {
 const action = process.argv[2];
 try {
   if (action === 'init') {
+    const port = resolvePort(requestedPort);
     await mkdir(local, { recursive: true });
     if (existsSync(path.join(data, 'PG_VERSION'))) {
       console.log('Project cluster already initialized; data and configuration preserved.');
@@ -47,7 +54,8 @@ try {
       console.log('Isolated project cluster initialized. Existing PostgreSQL service unchanged.');
     }
   } else if (action === 'start') {
-    const { password } = await credentials();
+    const { password, port: storedPort } = await credentials();
+    const port = resolvePort(requestedPort ?? String(storedPort));
     const status = spawnSync(executable('pg_ctl'), ['-D', data, 'status'], { stdio: 'ignore', windowsHide: true });
     if (status.status !== 0) {
       // pg_ctl detaches PostgreSQL; windowsHide avoids a visible helper console.

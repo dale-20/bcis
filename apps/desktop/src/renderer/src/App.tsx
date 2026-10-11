@@ -65,15 +65,25 @@ const navigationIcons: Record<NavigationItemId, typeof LayoutDashboard> = {
 
 function SystemConnection() {
   const query = useQuery({ queryKey: ['connection'], queryFn: getConnection, refetchInterval: 15_000 });
+  return <div className="content-enter"><div className="page-heading"><h1>System connection</h1><p>Check this workstation's connection to the office server.</p></div><ConnectionPanel result={query.data} pending={query.isPending} refreshing={query.isFetching} error={query.isError} onRetry={() => void query.refetch()} /></div>;
+}
+
+function MascotConnectionMonitor() {
+  const query = useQuery({ queryKey: ['connection'], queryFn: getConnection, refetchInterval: 15_000 });
   const previousConnection = useRef<boolean | null>(null);
   useEffect(() => {
-    if (!query.data) return;
-    const ready = query.data.ok && query.data.health.status === 'ready';
-    if (previousConnection.current === ready) return;
-    previousConnection.current = ready;
-    announceMascotEvent(ready ? 'connection-restored' : 'connection-lost');
-  }, [query.data]);
-  return <div className="content-enter"><div className="page-heading"><h1>System connection</h1><p>Check this workstation's connection to the office server.</p></div><ConnectionPanel result={query.data} pending={query.isPending} refreshing={query.isFetching} error={query.isError} onRetry={() => void query.refetch()} /></div>;
+    if (!query.isError && !query.data) return;
+    const connected = !query.isError && query.data?.ok === true && query.data.health.status === 'ready';
+    const previous = previousConnection.current;
+    previousConnection.current = connected;
+    if (previous === null) {
+      if (!connected) announceMascotEvent('connection-lost', 'connection-lost');
+      return;
+    }
+    if (previous === connected) return;
+    announceMascotEvent(connected ? 'connection-restored' : 'connection-lost', connected ? 'connection-restored' : 'connection-lost');
+  }, [query.data, query.isError]);
+  return null;
 }
 
 function Allowed({ user, permissions, children }: { user: AuthenticatedUser; permissions: readonly string[]; children: ReactNode }) {
@@ -154,6 +164,7 @@ function Workspace({ user, onEndSession }: { user: AuthenticatedUser; onEndSessi
   useEffect(() => { if (!welcomed.current) { welcomed.current = true; announceMascotEvent('login'); } }, []);
 
   return <div className="app-shell">
+    <MascotConnectionMonitor />
     <aside className="sidebar">
       <NavLink className="brand" to={defaultPath(user.permissions)}><img src={logo} alt="" /><span>BCIS<small>Billing &amp; Collection</small></span></NavLink>
       <nav aria-label="Main navigation">

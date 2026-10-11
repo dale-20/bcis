@@ -70,6 +70,13 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Update password' }).click();
 
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.bcis-mascot')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Mascot preferences' }).click();
+    await expect(page.getByLabel('Buddy enabled')).toBeChecked();
+    await expect(page.getByLabel('Animations')).toBeChecked();
+    await expect(page.getByLabel('Mascot size')).toHaveValue('small');
+    await expect(page.getByLabel('Personality')).toHaveValue('balanced');
+    await page.getByRole('button', { name: 'Close preferences' }).click();
     await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Payments', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();

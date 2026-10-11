@@ -2,8 +2,8 @@
   "test": "AT-12-offline-cutover",
   "status": "PASSED_ISOLATED_TEST",
   "targetDatabase": "bcis_test",
-  "backupId": "2ec99775-42c2-4c75-a5ed-86e6215b2308",
-  "sha256": "54f676a3ea03e1914782174ba108bf49b24d5646d155e937279ccd380f2da6b0",
+  "backupId": "83d6c912-61c8-480a-ac7f-eef6ab68d1e4",
+  "sha256": "d5a4e01084159269bbc613981041131db9bd9506b9bf899553f39e06324da306",
   "approvedBy": "owner.demo",
   "proofCount": 1,
   "proofHashesVerified": true,
@@ -24,5 +24,5 @@
     "ledger_entries": 0
   },
   "productionRecoveryTested": false,
-  "verifiedAt": "2026-10-11T04:04:43.519Z"
+  "verifiedAt": "2026-10-11T06:57:15.855Z"
 }

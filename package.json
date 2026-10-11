@@ -62,5 +62,8 @@
     "db:seed:demo": "npm run db:seed:demo -w @bcis/api",
     "start:api": "npm run start -w @bcis/api",
     "start:desktop": "npm run start -w @bcis/desktop"
+  },
+  "allowScripts": {
+    "electron@44.7.0": true
   }
 }
