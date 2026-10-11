@@ -29,7 +29,7 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 | --- | --- |
 | `npm run check` | Passed: typecheck, lint, 15 unit/API/component/script files, 107 tests. |
 | `npm run test:integration` | Passed: 7 PostgreSQL integration files, 69 tests. |
-| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. It posts and reverses a Cash payment with an audit reason, generates four recent billing periods, and verifies overdue services appear in all four AR-aging buckets. |
+| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. It posts and reverses a Cash payment with an audit reason, generates billing from the synthetic services' July 2026 start through the current month, and verifies nonzero desktop totals in all four overdue AR-aging buckets at month end, including 90+ days. |
 | `npm run reports:samples` | Passed: 8 integration tests; six synthetic PDF/XLSX pairs generated and data-checked. |
 | `npm run perf:scale` | Passed: isolated synthetic scale of 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries. Seven measured runs per API repository path; median final subscriber page 74.26 ms, AR aging page 423.99 ms. `EXPLAIN (ANALYZE, BUFFERS)` used `subscribers_account_number_uq` and `invoices_open_receivable_due_idx`; detailed JSON is in `tests/evidence/scale-query-benchmark.json`. Temporary database was dropped. |
 | `npm run db:migrate -w @bcis/api` | Passed on the configured isolated `bcis_dev`; additive index migration applied, and the already-running API readiness endpoint returned `database: connected`. |
@@ -39,13 +39,13 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 | `npm audit --omit=dev --offline` | Passed: 0 reported production vulnerabilities from the local npm audit data. Offline mode limits freshness. |
 | `git diff --check` | Passed. |
 
-The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, billing, Cash and GCash posting, Cash reversal with audit reason, four populated AR-aging buckets, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. The complete acceptance sequence has not been rehearsed end to end by an operator. This automated run uses an isolated test database and synthetic records.
+The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, billing, Cash and GCash posting, Cash reversal with audit reason, generated billing periods from the synthetic service activation date, all four populated AR-aging buckets in the desktop view, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. Six synthetic desktop captures are in `docs/screenshots/`; a reconciled batch-detail capture is still absent. The complete acceptance sequence has not been rehearsed end to end by an operator. This automated run uses an isolated test database and synthetic records.
 
 ## Release artifact
 
 - Installer: `release/BCIS-Setup-0.1.0-x64.exe`
-- Size: 112,223,672 bytes
-- SHA-256: `6CC2C774B1859A74D93FD0D6E885780E8D971AF9F99B52D44BFC0ACDABB2C656`
+- Size: 112,223,729 bytes
+- SHA-256: `7F50CD30F4092ABE368F8CB3192DEA85D3E6E3A7574A8E404FB4BD94E0D0B7E3`
 - Authenticode: `NotSigned`; Windows may show an unknown-publisher warning.
 - Build warnings: Zod annotation comments are removed by Rollup; renderer JavaScript chunk is 794.58 kB and exceeds the 500 kB advisory threshold.
 
@@ -64,6 +64,7 @@ Still untested: external penetration test, production HTTPS/certificate and fire
 | E2E expected Subscribers after login | Dashboard is the authorized default. | Assert dashboard and navigate through the accessible sidebar. | Built Electron E2E passes. |
 | Electron exited when started by IDE terminal | The IDE inherited `ELECTRON_RUN_AS_NODE=1`; Electron entered Node mode. | Route desktop dev/preview scripts through `scripts/run-electron-vite.mjs`, which removes only that variable. | Regression test passes; `npm run dev:desktop` process launch completed. |
 | AR aging query timed out at target volume | Its outstanding-balance predicate and due-date ordering had no partial index that covered the paginated invoice fields. | Add the reviewed `invoices_open_receivable_due_idx` partial index and benchmark it with the real repository method under the configured 2-second statement timeout. | At 500,375 invoices, API repository path median 423.99 ms; PostgreSQL chose an index-only scan. |
+| Aging UI rendered the 90+ bucket as `90–PLUS` | A generic underscore replacement formatted the `90_PLUS` domain key incorrectly. | Use one explicit shared label map for aging buckets on the dashboard, aging totals, and invoice rows. | Built Electron E2E checks nonzero labels/totals for all four buckets, including 90+, and the corrected Windows installer was rebuilt. |
 
 The full `npm run dev` command could not bind its API because a pre-existing development server already owned port 3001. That service was left untouched; the desktop-only command was used against its healthy API.
 

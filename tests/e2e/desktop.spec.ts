@@ -25,6 +25,7 @@ function pesosFromCentavos(value: string): string {
 }
 
 test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a narrow bridge', async () => {
+  test.setTimeout(120_000);
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (!databaseUrl || !new URL(databaseUrl).pathname.endsWith('_test') || databaseUrl === process.env.DATABASE_URL) {
     throw new Error('A separate migrated TEST_DATABASE_URL ending in _test is required. Run integration tests first.');
@@ -68,7 +69,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-e2e-password-2');
     await page.getByRole('button', { name: 'Update password' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole('link', { name: 'Billing', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Payments', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
@@ -131,7 +132,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Generate billing' })).toBeVisible();
     await page.getByLabel('Period').fill('2099-12');
-    await expect(page.getByText('Eligible services')).toBeVisible();
+    await expect(page.getByText('Eligible services', { exact: true })).toBeVisible();
     const generateButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
     if (await generateButton.isEnabled().catch(() => false)) {
       await generateButton.click();
@@ -169,6 +170,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Confirm and post' }).click();
     await expect(page.getByRole('heading', { name: /Receipt OR-/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Print receipt' })).toBeEnabled();
+    await page.screenshot({ path: 'test-results/payment-receipt.png' });
     await page.getByRole('link', { name: 'Payment History' }).click();
     await page.locator('.payment-history-table tbody tr').first().click();
     await expect(page.getByRole('button', { name: 'Reverse payment and void receipt' })).toBeVisible();
@@ -195,6 +197,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'GCash verification' })).toBeVisible();
     await page.locator('.gcash-queue-list button').filter({ hasText: 'BCIS-00001' }).first().click();
     await expect(page.locator('.gcash-proof-preview img')).toBeVisible();
+    await page.screenshot({ path: 'test-results/gcash-review.png' });
     await page.getByLabel('Review decision').selectOption('VERIFIED');
     await page.getByRole('button', { name: 'Verify and post payment' }).click();
     await expect(page.locator('.gcash-queue-list button').filter({ hasText: 'BCIS-00001' })).toHaveCount(0);
@@ -286,10 +289,14 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();
     const overdueCycleButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
     const today = new Date();
-    const agingPeriods = Array.from({ length: 4 }, (_, index) => {
-      const period = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 3 + index, 1));
-      return `${period.getUTCFullYear()}-${String(period.getUTCMonth() + 1).padStart(2, '0')}`;
-    });
+    const agingPeriods: string[] = [];
+    const periodCursor = new Date(Date.UTC(2026, 6, 1));
+    const currentPeriod = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+    while (periodCursor <= currentPeriod) {
+      agingPeriods.push(`${periodCursor.getUTCFullYear()}-${String(periodCursor.getUTCMonth() + 1).padStart(2, '0')}`);
+      periodCursor.setUTCMonth(periodCursor.getUTCMonth() + 1);
+    }
+    const agingAsOf = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
     for (const period of agingPeriods) {
       await page.getByLabel('Period').fill(period);
       await expect(page.getByText('To create', { exact: true })).toBeVisible();
@@ -301,12 +308,12 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     const agingCoverage = await database.query<{
       overdue_accounts: number; age_1_30: number; age_31_60: number; age_61_90: number; age_90_plus: number;
     }>(`SELECT
-      count(DISTINCT service_account_id) FILTER (WHERE due_date < current_date)::int AS overdue_accounts,
-      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 1 AND 30)::int AS age_1_30,
-      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 31 AND 60)::int AS age_31_60,
-      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 61 AND 90)::int AS age_61_90,
-      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date > 90)::int AS age_90_plus
-      FROM invoices WHERE balance_centavos > 0 AND status IN ('UNPAID','PARTIALLY_PAID','OVERDUE')`);
+      count(DISTINCT service_account_id) FILTER (WHERE due_date < $1::date)::int AS overdue_accounts,
+      count(DISTINCT service_account_id) FILTER (WHERE $1::date - due_date BETWEEN 1 AND 30)::int AS age_1_30,
+      count(DISTINCT service_account_id) FILTER (WHERE $1::date - due_date BETWEEN 31 AND 60)::int AS age_31_60,
+      count(DISTINCT service_account_id) FILTER (WHERE $1::date - due_date BETWEEN 61 AND 90)::int AS age_61_90,
+      count(DISTINCT service_account_id) FILTER (WHERE $1::date - due_date > 90)::int AS age_90_plus
+      FROM invoices WHERE balance_centavos > 0 AND status IN ('UNPAID','PARTIALLY_PAID','OVERDUE')`, [agingAsOf]);
     const coverage = agingCoverage.rows[0];
     if (!coverage) throw new Error('Synthetic aging coverage query returned no row');
     expect(coverage.overdue_accounts).toBeGreaterThanOrEqual(10);
@@ -314,6 +321,20 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     expect(coverage.age_31_60).toBeGreaterThan(0);
     expect(coverage.age_61_90).toBeGreaterThan(0);
     expect(coverage.age_90_plus).toBeGreaterThan(0);
+    await page.getByRole('link', { name: 'Receivables', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Outstanding receivables' })).toBeVisible();
+    await page.getByRole('link', { name: 'Aging', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Accounts receivable aging' })).toBeVisible();
+    await page.getByLabel('As of').fill(agingAsOf);
+    await expect(page.locator('.receivable-table tbody tr').first()).toBeVisible();
+    const agingTotals = page.getByRole('region', { name: 'Aging totals' });
+    for (const bucket of ['1\u201330', '31\u201360', '61\u201390', '90+']) {
+      const total = agingTotals.locator('.receivable-total').filter({ hasText: bucket });
+      await expect(total).toBeVisible();
+      const amountDigits = (await total.locator('strong').innerText()).replace(/\D/g, '');
+      expect(Number(amountDigits)).toBeGreaterThan(0);
+    }
+    await page.screenshot({ path: 'test-results/receivables-aging-populated.png' });
 
     const syntheticSubscriber = await database.query<{ id: string; account_number: string }>("select id, account_number from subscribers where account_number='BCIS-00001'");
     const subscriber = syntheticSubscriber.rows[0];

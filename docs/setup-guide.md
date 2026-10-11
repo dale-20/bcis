@@ -41,7 +41,7 @@ Integration and E2E tests reset only the configured database ending in `_test`. 
 
 ## Desktop installation
 
-The x64 installer is `release/BCIS-Setup-0.1.0-x64.exe`. Current SHA-256: `6CC2C774B1859A74D93FD0D6E885780E8D971AF9F99B52D44BFC0ACDABB2C656`. A temporary install/launch/uninstall smoke passed on the development workstation; clean-workstation install is untested. The laboratory build is not Authenticode-signed and may show an unknown-publisher warning. See `docs/acceptance-report.md` for release details.
+The x64 installer is `release/BCIS-Setup-0.1.0-x64.exe`. Current SHA-256: `7F50CD30F4092ABE368F8CB3192DEA85D3E6E3A7574A8E404FB4BD94E0D0B7E3`. A temporary install/launch/uninstall smoke passed on the development workstation using a clean Electron environment; clean-workstation install is untested. The laboratory build is not Authenticode-signed and may show an unknown-publisher warning. See `docs/acceptance-report.md` for release details.
 
 Before starting a client, configure its API origin through the deployment environment:
 

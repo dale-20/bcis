@@ -1,4 +1,4 @@
-# Milestone 1 defect and correction log
+# BCIS defect and correction log
 
 | Defect | Root cause | Correction | Regression evidence |
 | --- | --- | --- | --- |
@@ -10,5 +10,6 @@
 | Built Electron opened without the typed bridge | The sandboxed CommonJS preload externalized the shared ESM workspace package | Bundled `@bcis/shared` into the preload while retaining the narrow bridge | Built Electron login/subscriber E2E and exact bridge-key assertion |
 | Subscriber list omitted contacts, addresses, and service counts | Correlated computed columns did not resolve the related rows in the list query | Replaced them with explicit primary-record joins and distinct service aggregates | PostgreSQL list assertion plus built Electron directory workflow |
 | Billing migration initially referenced a nonexistent metadata timestamp column | The version sentinel contains `created_at` but no mutable timestamp | Updated only `schema_version`, then reran clean and repeat migrations | Four PostgreSQL integration files and 30 tests passed |
+| Aging UI rendered the 90+ bucket as `90–PLUS` | A generic underscore replacement formatted the `90_PLUS` key incorrectly | Replaced string manipulation with the shared explicit bucket-label map on dashboard and aging screens | Built Electron E2E checks every populated bucket label and total |
 
-Financial acceptance defects will be tracked when those workflows exist. These foundation checks do not prove allocation, receipts, reversals, or financial concurrency.
+Financial and release findings are also recorded in `docs/acceptance-report.md`, including their regression evidence and the untested physical deployment limits.

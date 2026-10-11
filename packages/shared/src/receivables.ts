@@ -2,6 +2,17 @@ import { z } from 'zod';
 import { centavosSchema } from './money.js';
 
 export const agingBucketSchema = z.enum(['CURRENT', '1_30', '31_60', '61_90', '90_PLUS']);
+export type AgingBucket = z.infer<typeof agingBucketSchema>;
+const agingBucketLabels: Record<AgingBucket, string> = {
+  CURRENT: 'Current',
+  '1_30': '1–30',
+  '31_60': '31–60',
+  '61_90': '61–90',
+  '90_PLUS': '90+',
+};
+export function receivableAgingBucketLabel(bucket: AgingBucket): string {
+  return agingBucketLabels[bucket];
+}
 export const receivableAgingQuerySchema = z.object({
   asOf: z.iso.date(), overdueOnly: z.boolean().default(false), collectorId: z.uuid().optional(), collectionAreaId: z.uuid().optional(),
   page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(25),
