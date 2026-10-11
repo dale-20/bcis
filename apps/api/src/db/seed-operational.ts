@@ -3,6 +3,7 @@ import type { Database } from './client.js';
 import {
   auditLogs,
   collectionAreas,
+  collectorAssignments,
   collectors,
   serviceAccounts,
   serviceEvents,
@@ -79,6 +80,8 @@ export async function seedOperationalDemoData(database: Database): Promise<void>
 
     const [collectionUser] = await transaction.select({ id: users.id }).from(users)
       .where(eq(users.normalizedUsername, 'collections.demo')).limit(1);
+    const [adminUser] = await transaction.select({ id: users.id }).from(users)
+      .where(eq(users.normalizedUsername, 'admin.demo')).limit(1);
     const collectorSeed = [
       { collectorNumber: 'COL-001', name: 'Lira Santos', userId: collectionUser?.id },
       { collectorNumber: 'COL-002', name: 'Noel Villanueva', userId: undefined },
@@ -166,6 +169,24 @@ export async function seedOperationalDemoData(database: Database): Promise<void>
         if (!service) throw new Error('Synthetic service insert failed');
         servicesCreated += 1;
         await transaction.insert(serviceEvents).values({ serviceAccountId: service.id, eventType: 'SYNTHETIC_SERVICE_CREATED', details: { seed: true } });
+      }
+    }
+
+    const assignmentActorId = collectionUser?.id ?? adminUser?.id;
+    if (assignmentActorId) {
+      const assignedServices = await transaction.select({
+        id: serviceAccounts.id,
+        collectorId: serviceAccounts.assignedCollectorId,
+        effectiveFrom: serviceAccounts.activationDate,
+      }).from(serviceAccounts);
+      for (const service of assignedServices) {
+        if (!service.collectorId) continue;
+        await transaction.insert(collectorAssignments).values({
+          collectorId: service.collectorId,
+          serviceAccountId: service.id,
+          effectiveFrom: service.effectiveFrom ?? '2026-07-01',
+          assignedByUserId: assignmentActorId,
+        }).onConflictDoNothing();
       }
     }
 
