@@ -26,6 +26,27 @@
   pointer-events: none;
 }
 
+.mascot-bubble-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-secondary);
+  font: inherit;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mascot-bubble-dismiss:hover { background: var(--color-info-muted); }
+.mascot-bubble-dismiss:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 1px; }
+
 .mascot-art {
   display: block;
   width: 170px;

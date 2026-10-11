@@ -22,14 +22,14 @@ describe('BCIS Buddy', () => {
   it('uses event-specific poses and restrained messages', () => {
     render(<BCISMascot />);
     act(() => announceMascotEvent('payment-posted'));
-    expect(screen.getByText('Payment posted successfully.')).toBeInTheDocument();
+    expect(screen.getByText('Payment recorded successfully!')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
   });
 
   it('announces connection loss without claiming financial success', () => {
     render(<BCISMascot />);
     act(() => announceMascotEvent('connection-lost'));
-    expect(screen.getByRole('img', { name: 'BCIS Buddy, surprised' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, concerned' })).toBeInTheDocument();
     expect(screen.getByText('Connection to the office server was lost.')).toBeInTheDocument();
     expect(screen.queryByText('Payment posted successfully.')).toBeNull();
   });
@@ -42,7 +42,7 @@ describe('BCIS Buddy', () => {
     });
 
     expect(screen.getByText('Connection to the office server was lost.')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'BCIS Buddy, surprised' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, concerned' })).toBeInTheDocument();
   });
 
   it('does not expose event payloads in character copy', () => {
@@ -51,6 +51,39 @@ describe('BCIS Buddy', () => {
 
     expect(screen.getByText('Need help? I’m here.')).toBeInTheDocument();
     expect(screen.queryByText(/Alice|500/)).toBeNull();
+  });
+
+  it('dismisses contextual dialogue without interrupting the reaction', () => {
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('payment-posted'));
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss BCIS Buddy message' }));
+    expect(screen.queryByText('Payment recorded successfully!')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
+  });
+
+  it('automatically dismisses contextual dialogue', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('report-finish'));
+    expect(screen.getByText('Your report is ready.')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.queryByText('Your report is ready.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Need help? I’m here.')).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
+  it('suppresses speech while a user is entering sensitive form data', () => {
+    const input = document.createElement('input');
+    document.body.append(input);
+    input.focus();
+    try {
+      render(<BCISMascot />);
+      act(() => announceMascotEvent('payment-posted'));
+      expect(screen.queryByText('Payment recorded successfully!')).not.toBeInTheDocument();
+      expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
+    } finally {
+      input.remove();
+    }
   });
 
   it('keeps the dock affordance available when minimized and restores the mascot', () => {
