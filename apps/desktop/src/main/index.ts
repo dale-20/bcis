@@ -70,7 +70,7 @@ function assertTrustedSender(event: Electron.IpcMainInvokeEvent): void {
 }
 
 function createWindow() {
-  window = new BrowserWindow({
+  const mainWindow = new BrowserWindow({
     title: 'BCIS · Subscription Billing & Collection', width: 1440, height: 900,
     minWidth: 960, minHeight: 640, show: false, backgroundColor: '#F6F8FB', autoHideMenuBar: true,
     webPreferences: {
@@ -78,15 +78,28 @@ function createWindow() {
       nodeIntegration: false, sandbox: true, webSecurity: true,
     },
   });
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  window.webContents.on('will-navigate', (event) => event.preventDefault());
-  window.webContents.on('will-attach-webview', (event) => event.preventDefault());
-  window.once('ready-to-show', () => window?.show());
-  window.on('closed', () => { window = null; });
-  void window.loadURL(rendererUrl);
+  window = mainWindow;
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  mainWindow.once('ready-to-show', () => { console.info('BCIS renderer ready to show.'); mainWindow.show(); });
+  mainWindow.webContents.once('did-finish-load', () => { console.info('BCIS renderer finished loading.'); mainWindow.show(); });
+  mainWindow.webContents.on('did-fail-load', (_event, code, description) => console.error(`BCIS renderer load failed (${code}): ${description}`));
+  mainWindow.webContents.on('render-process-gone', (_event, details) => console.error(`BCIS renderer process exited: ${details.reason}.`));
+  mainWindow.on('closed', () => { window = null; });
+  console.info('BCIS desktop is loading its renderer.');
+  void mainWindow.loadURL(rendererUrl).catch(reportStartupFailure);
+}
+
+function reportStartupFailure(error: unknown): void {
+  const detail = error instanceof Error ? error.message : 'Unexpected desktop startup failure.';
+  console.error('BCIS desktop startup failed:', error);
+  dialog.showErrorBox('BCIS could not start', detail);
+  app.quit();
 }
 
 void app.whenReady().then(() => {
+  console.info('BCIS desktop main process is ready.');
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   ipcMain.handle(HEALTH_CHANNEL, async (event) => {
@@ -207,5 +220,5 @@ void app.whenReady().then(() => {
   });
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-});
+}).catch(reportStartupFailure);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
