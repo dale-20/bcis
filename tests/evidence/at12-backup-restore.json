@@ -2,26 +2,26 @@
   "test": "AT-12",
   "status": "PASSED",
   "approvedBy": "owner.demo",
-  "backupId": "b9f167be-fa81-4f89-84ba-a48a671bd33e",
-  "sha256": "66beee66e1fb8d64fe75d4ba848d1b1a4a56e9fa7bab9a141b2444b27217d47a",
-  "sizeBytes": 169037,
-  "proofCount": 3,
+  "backupId": "80f2545a-48f4-44ec-a01f-670023bf6485",
+  "sha256": "3ec259a577beee52468da66a776c68ca3ab1923362deb8a1353be4ab5963635b",
+  "sizeBytes": 44180,
+  "proofCount": 1,
   "proofHashesVerified": true,
   "baseline": {
     "subscribers": 50,
-    "invoices": 504,
-    "payments": 18,
-    "ledger_entries": 526
+    "invoices": 0,
+    "payments": 0,
+    "ledger_entries": 0
   },
   "restored": {
     "subscribers": 50,
-    "invoices": 504,
-    "payments": 18,
-    "ledger_entries": 526,
+    "invoices": 0,
+    "payments": 0,
+    "ledger_entries": 0,
     "mutation_markers": 0,
     "foreign_keys": 69
   },
   "mutationAbsentAfterRestore": true,
   "pgAmcheck": true,
-  "verifiedAt": "2026-10-11T09:29:34.782Z"
+  "verifiedAt": "2026-10-11T11:29:26.656Z"
 }
