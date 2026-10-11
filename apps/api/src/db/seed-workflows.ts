@@ -11,7 +11,7 @@ import {
   invoices, payments as paymentTable, serviceAccounts, subscribers, users,
 } from './schema.js';
 
-const demoSeedKey = 'demo_workflow_seed';
+const demoSeedKey = 'demo_workflow_seed_v2';
 const demoPaymentKeys = {
   exact: '00000000-0000-4000-8000-000000000101',
   partial: '00000000-0000-4000-8000-000000000102',
@@ -30,18 +30,24 @@ function required<T>(value: T | undefined, name: string): T {
 }
 
 function currentBusinessDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
 }
 
 function completeBillingPeriods(): string[] {
   const current = new Date();
   const month = new Date(Date.UTC(current.getUTCFullYear(), current.getUTCMonth(), 1));
-  const firstSeedMonth = new Date(Date.UTC(2026, 6, 1));
+  const firstSeedMonth = new Date(Date.UTC(2026, 3, 1));
   const periods: string[] = [];
   for (let cursor = firstSeedMonth; cursor < month; cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))) {
     periods.push(`${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`);
   }
   return periods;
+}
+
+function currentBillingPeriod(): string {
+  return currentBusinessDate().slice(0, 7);
 }
 
 async function actors(database: Database): Promise<ActorIds> {
@@ -113,6 +119,31 @@ async function seedCashScenario(
   const amount = amountFor(invoicesForSubscriber);
   if (amount <= 0n) return;
   await postCash(paymentService, subscriber.id, amount, idempotencyKey, actorsByRole.cashier, notes);
+}
+
+function monthlyCollectionKey(period: string): string {
+  return `00000000-0000-4000-8000-${period.replace('-', '')}000000`;
+}
+
+async function seedMonthlyCollections(
+  database: Database,
+  paymentService: PaymentService,
+  periods: readonly string[],
+  actorsByRole: ActorIds,
+) {
+  for (const [index, period] of periods.slice(-6).entries()) {
+    const key = monthlyCollectionKey(period);
+    if (await paymentExists(database, key)) continue;
+    const accountNumber = `BCIS-${String(index + 10).padStart(5, '0')}`;
+    const subscriber = await findSubscriber(database, accountNumber);
+    if (!subscriber) continue;
+    const [invoice] = await openInvoices(database, subscriber.id);
+    if (!invoice) continue;
+    const amount = invoice.balanceCentavos < 5_000n ? invoice.balanceCentavos : 5_000n;
+    const result = await postCash(paymentService, subscriber.id, amount, key, actorsByRole.cashier,
+      `Synthetic monthly dashboard collection for ${period}.`, `${period}-28T09:00:00.000Z`);
+    if (result.status !== 'POSTED') throw new Error(`Synthetic monthly payment failed for ${period}`);
+  }
 }
 
 async function seedGcashScenario(
@@ -249,16 +280,19 @@ async function seedServiceControlWorkflow(
   serviceControl: ServiceControlService,
   paymentService: PaymentService,
   actorsByRole: ActorIds,
+  serviceAccountNumber: string,
+  settlementKey: string,
 ) {
   const [policy] = await database.db.select({ key: applicationSettings.key }).from(applicationSettings)
     .where(eq(applicationSettings.key, 'service_control_policy')).limit(1);
   if (!policy) await serviceControl.savePolicy({ gracePeriodDays: 1, suspensionThresholdDays: 30, reconnectionFeeCentavos: '30000' }, actorsByRole.admin, 'seed:service-control-policy');
 
   const [service] = await database.db.select({ id: serviceAccounts.id, subscriberId: serviceAccounts.subscriberId, status: serviceAccounts.status })
-    .from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, 'SVC-00050-1')).limit(1);
+    .from(serviceAccounts).where(eq(serviceAccounts.serviceAccountNumber, serviceAccountNumber)).limit(1);
   if (!service || service.status !== 'ACTIVE') return;
   const existingSuspensions = await serviceControl.suspensions(1, 100);
   const existing = existingSuspensions.items.find((record) => record.serviceAccountId === service.id && record.status === 'ACTIVE');
+  if (existingSuspensions.items.some((record) => record.serviceAccountId === service.id && record.status === 'LIFTED')) return;
   if (!existing) {
     try {
       const suspensionId = await serviceControl.createSuspension({
@@ -280,7 +314,7 @@ async function seedServiceControlWorkflow(
   const outstanding = await openInvoices(database, service.subscriberId);
   const amount = totalOutstanding(outstanding);
   if (amount > 0n) {
-    await postCash(paymentService, service.subscriberId, amount, '00000000-0000-4000-8000-000000000150',
+    await postCash(paymentService, service.subscriberId, amount, settlementKey,
       actorsByRole.cashier, 'Synthetic arrears settlement before demo reconnection.');
   }
   const reconnections = await serviceControl.allReconnections(1, 100);
@@ -307,24 +341,29 @@ export async function seedDemoWorkflowData(database: Database, proofDirectory: s
   const payment = new PaymentService(database, new GcashProofStorage(proofDirectory));
   const collection = new CollectionService(database);
   const serviceControl = new ServiceControlService(database);
-  for (const period of completeBillingPeriods()) await billing.generate(period, actorIds.admin, `seed:billing:${period}`);
+  const periods = completeBillingPeriods();
+  const activePeriod = currentBillingPeriod();
+  for (const period of periods) await billing.generate(period, actorIds.admin, `seed:billing:${period}`);
+  await billing.generate(activePeriod, actorIds.admin, `seed:billing:${activePeriod}`);
   await billing.processOverdue(currentBusinessDate(), actorIds.admin, 'seed:overdue');
 
   await seedCashScenario(database, payment, 'BCIS-00001', (rows) => rows[0]?.balanceCentavos ?? 0n, demoPaymentKeys.exact, actorIds, 'Synthetic exact payment demonstration.');
   await seedCashScenario(database, payment, 'BCIS-00002', (rows) => totalOutstanding(rows) / 2n, demoPaymentKeys.partial, actorIds, 'Synthetic partial payment demonstration.');
   await seedCashScenario(database, payment, 'BCIS-00003', (rows) => totalOutstanding(rows) + 50_000n, demoPaymentKeys.advance, actorIds, 'Synthetic advance payment with customer credit.');
+  await seedMonthlyCollections(database, payment, periods, actorIds);
   await seedReversedPayment(database, payment, actorIds);
   await seedGcashScenario(database, payment, 'BCIS-00005', demoPaymentKeys.gcashPending, actorIds, false);
   await seedGcashScenario(database, payment, 'BCIS-00006', demoPaymentKeys.gcashVerified, actorIds, true);
   await seedAdjustment(database, billing, actorIds);
   await seedOrganizationSettings(database, actorIds.admin);
   await seedCollectionWorkflow(database, collection, payment, actorIds);
-  await seedServiceControlWorkflow(database, serviceControl, payment, actorIds);
+  await seedServiceControlWorkflow(database, serviceControl, payment, actorIds, 'SVC-00050-1', '00000000-0000-4000-8000-000000000150');
+  await seedServiceControlWorkflow(database, serviceControl, payment, actorIds, 'SVC-00049-1', '00000000-0000-4000-8000-000000000151');
 
   await database.db.transaction(async (transaction) => {
     await transaction.insert(applicationSettings).values({
       key: demoSeedKey,
-      value: { completedAt: new Date().toISOString(), synthetic: true, generatedPeriods: completeBillingPeriods() },
+      value: { completedAt: new Date().toISOString(), synthetic: true, generatedPeriods: [...periods, activePeriod] },
       description: 'Completion marker for rerunnable synthetic financial and operational demo workflows',
       updatedByUserId: actorIds.admin,
     }).onConflictDoNothing({ target: applicationSettings.key });
@@ -333,7 +372,7 @@ export async function seedDemoWorkflowData(database: Database, proofDirectory: s
       action: 'demo.workflow_seed.applied',
       entityType: 'synthetic_dataset',
       reason: 'SYNTHETIC_DEMO_DATA',
-      newValues: { generatedPeriods: completeBillingPeriods(), accountScenarios: ['exact', 'partial', 'advance', 'reversed', 'gcash-pending', 'gcash-verified'], collectionBatch: true, serviceControlHistory: true },
+      newValues: { generatedPeriods: [...periods, activePeriod], accountScenarios: ['exact', 'partial', 'advance', 'reversed', 'gcash-pending', 'gcash-verified'], monthlyCollections: true, collectionBatch: true, serviceControlHistory: true },
       requestId: 'seed:workflow-demo',
     });
   });

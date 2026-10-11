@@ -11,6 +11,10 @@ export interface DemoAccount {
   role: RoleCode;
 }
 
+export interface SeedAuthorizationOptions {
+  mustChangePassword?: boolean;
+}
+
 export const demoAccounts: readonly DemoAccount[] = [
   { username: 'owner.demo', displayName: 'Demo Owner', role: 'OWNER' },
   { username: 'admin.demo', displayName: 'Demo Administrator', role: 'ADMIN' },
@@ -26,10 +30,12 @@ export async function seedAuthorization(
   password: string,
   passwordHasher = new PasswordHasher(),
   accounts: readonly DemoAccount[] = demoAccounts,
+  options: SeedAuthorizationOptions = {},
 ): Promise<void> {
   demoPasswordSchema.parse(password);
   for (const account of accounts) usernameSchema.parse(account.username);
   const passwordHashes = new Map<string, string>();
+  const mustChangePassword = options.mustChangePassword ?? true;
   for (const account of accounts) passwordHashes.set(account.username, await passwordHasher.hash(password));
 
   await database.db.transaction(async (transaction) => {
@@ -73,10 +79,10 @@ export async function seedAuthorization(
         displayName: account.displayName,
         passwordHash,
         isActive: true,
-        mustChangePassword: true,
+        mustChangePassword,
       }).onConflictDoUpdate({
         target: users.normalizedUsername,
-        set: { username: account.username, displayName: account.displayName, passwordHash, isActive: true, mustChangePassword: true, failedLoginCount: 0, lockedUntil: null, updatedAt: new Date() },
+        set: { username: account.username, displayName: account.displayName, passwordHash, isActive: true, mustChangePassword, failedLoginCount: 0, lockedUntil: null, updatedAt: new Date() },
       }).returning({ id: users.id });
       if (!user) throw new Error(`Seeded user missing: ${account.username}`);
       seededUserIds.push(user.id);
@@ -90,7 +96,7 @@ export async function seedAuthorization(
       action: 'security.demo_seed.applied',
       entityType: 'user',
       reason: 'SYNTHETIC_DEMO_ACCOUNTS',
-      newValues: { userIds: seededUserIds, usernames: accounts.map((account) => account.username) },
+      newValues: { userIds: seededUserIds, usernames: accounts.map((account) => account.username), mustChangePassword },
       requestId: 'seed:demo',
     });
   });

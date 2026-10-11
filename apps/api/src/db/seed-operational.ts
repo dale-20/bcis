@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, like } from 'drizzle-orm';
 import type { Database } from './client.js';
 import {
   auditLogs,
@@ -159,8 +159,8 @@ export async function seedOperationalDemoData(database: Database): Promise<void>
           installationAddressId: serviceIndex === 0 ? primaryAddress.id : secondaryAddressId,
           collectionAreaId: area.id,
           assignedCollectorId: collector.id,
-          activationDate: '2026-07-01',
-          billingStartDate: '2026-07-01',
+          activationDate: '2026-04-01',
+          billingStartDate: '2026-04-01',
           billingDay: subscriber.billingDay,
           dueDay: subscriber.dueDay,
           currentRateCentavos: plan.price,
@@ -170,6 +170,26 @@ export async function seedOperationalDemoData(database: Database): Promise<void>
         servicesCreated += 1;
         await transaction.insert(serviceEvents).values({ serviceAccountId: service.id, eventType: 'SYNTHETIC_SERVICE_CREATED', details: { seed: true } });
       }
+    }
+
+    const backfilledServices = await transaction.update(serviceAccounts).set({
+      activationDate: '2026-04-01',
+      billingStartDate: '2026-04-01',
+    }).where(and(
+      eq(serviceAccounts.activationDate, '2026-07-01'),
+      eq(serviceAccounts.billingStartDate, '2026-07-01'),
+      inArray(serviceAccounts.subscriberId, transaction.select({ id: subscribers.id }).from(subscribers)
+        .where(like(subscribers.accountNumber, 'BCIS-%'))),
+    )).returning({ id: serviceAccounts.id });
+    if (backfilledServices.length > 0) {
+      await transaction.insert(serviceEvents).values(backfilledServices.map((service) => ({
+        serviceAccountId: service.id,
+        eventType: 'SYNTHETIC_DEMO_BILLING_HISTORY_EXPANDED',
+        occurredAt: new Date('2026-04-01T00:00:00.000Z'),
+        actorUserId: collectionUser?.id ?? adminUser?.id,
+        reason: 'Synthetic report and receivables demonstration history',
+        details: { previousBillingStartDate: '2026-07-01', billingStartDate: '2026-04-01' },
+      })));
     }
 
     const assignmentActorId = collectionUser?.id ?? adminUser?.id;
@@ -184,7 +204,7 @@ export async function seedOperationalDemoData(database: Database): Promise<void>
         await transaction.insert(collectorAssignments).values({
           collectorId: service.collectorId,
           serviceAccountId: service.id,
-          effectiveFrom: service.effectiveFrom ?? '2026-07-01',
+          effectiveFrom: service.effectiveFrom ?? '2026-04-01',
           assignedByUserId: assignmentActorId,
         }).onConflictDoNothing();
       }

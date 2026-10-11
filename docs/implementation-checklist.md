@@ -114,7 +114,7 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 - [ ] Mandatory acceptance suite below; automated financial/API output and E2E/manual workflow evidence.
 - [ ] Bug log with defect, root cause, fix and regression evidence. Screenshots/reports show expected balances.
-- [ ] Synthetic demo data: 5 users spanning roles; 3 Internet, 2 Cable, 2 Combo plans; 50 subscribers; 60+ services; 2 collectors; 3 areas; 3 months of invoices; mixed payment cases; 10+ overdue accounts across aging; one approved reversal/void; two suspension/reconnection scenarios.
+- [x] Synthetic demo data: 7 users spanning roles; 3 Internet, 2 Cable, 2 Combo plans; 50 subscribers; 60+ services; 2 collectors; 3 areas; six closed billing months plus the current cycle; mixed payment cases; 10+ overdue accounts across all aging buckets; one reversal/void; two suspension/reconnection scenarios. PostgreSQL seed integration verifies nonzero dashboard metrics and rows for all report types.
 - [x] Scale-query evidence: synthetic isolated database reached 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries; subscriber and aging page queries passed with analyzed query plans (`tests/evidence/scale-query-benchmark.json`). Sustained/concurrent throughput remains untested.
 - [ ] D1 source, meaningful Git history, environments, migrations, seeds.
 - [ ] D2 run-ready desktop release and documented server/database setup.

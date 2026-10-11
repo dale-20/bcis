@@ -12,13 +12,14 @@ import type { DemoAccount } from '../src/auth/seed.js';
 import { createDatabase } from '../src/db/client.js';
 import { seedOperationalDemoData } from '../src/db/seed-operational.js';
 import { seedDemoWorkflowData } from '../src/db/seed-workflows.js';
+import { ReportService } from '../src/reports/service.js';
 import {
   adjustments, applicationSettings, auditLogs, billingCycles, collectionBatchAccounts,
   collectionBatches, collectorAssignments, collectorRemittances, collectors,
   invoiceItems, invoices, ledgerEntries, paymentAllocations, paymentProofs, paymentReversals,
   payments, receipts, reconnectionRecords, serviceAccounts, serviceEvents, servicePlans,
   serviceTypes, subscriberAddresses, subscriberContacts, subscriberCredits, subscribers,
-  suspensionRecords,
+  suspensionRecords, users,
 } from '../src/db/schema.js';
 
 config({ path: fileURLToPath(new URL('../.env', import.meta.url)), quiet: true });
@@ -47,7 +48,7 @@ beforeAll(async () => {
   await database.pool.query('CREATE SCHEMA public');
   await database.pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
   await migrate(database.db, { migrationsFolder });
-  await seedAuthorization(database, 'password', hasher, accounts);
+  await seedAuthorization(database, 'password', hasher, accounts, { mustChangePassword: false });
   await seedOperationalDemoData(database);
 });
 
@@ -94,12 +95,51 @@ describe.sequential('synthetic demo workflow seed', () => {
       expect(count?.value).toBeGreaterThan(0);
     }
     expect(adjustmentCount?.value).toBeGreaterThan(0);
-    expect(suspensionCount?.value).toBeGreaterThan(0);
-    expect(reconnectionCount?.value).toBeGreaterThan(0);
+    expect(suspensionCount?.value).toBeGreaterThanOrEqual(2);
+    expect(reconnectionCount?.value).toBeGreaterThanOrEqual(2);
 
     const [beforePayments] = await database.db.select({ value: sql<number>`count(*)::int` }).from(payments);
     expect(await seedDemoWorkflowData(database, proofDirectory)).toBe(false);
     const [afterPayments] = await database.db.select({ value: sql<number>`count(*)::int` }).from(payments);
     expect(afterPayments?.value).toBe(beforePayments?.value);
+  });
+
+  it('provides visible dashboard metrics and rows for every report type', async () => {
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const reports = new ReportService(database);
+    const dashboard = await reports.dashboard({ from: '2026-01-01', to: currentDate });
+    expect(BigInt(dashboard.billedCentavos)).toBeGreaterThan(0n);
+    expect(BigInt(dashboard.collectedCentavos)).toBeGreaterThan(0n);
+    expect(dashboard.postedPaymentCount).toBeGreaterThan(0);
+    expect(dashboard.overdueSubscriberCount).toBeGreaterThanOrEqual(10);
+    expect(dashboard.monthlyCollections.length).toBeGreaterThanOrEqual(6);
+    expect(dashboard.paymentMethods.map((item) => item.method)).toEqual(expect.arrayContaining(['CASH', 'GCASH']));
+    for (const [bucket, amount] of Object.entries(dashboard.aging)) {
+      expect(BigInt(amount), `${bucket} aging balance should be visible`).toBeGreaterThan(0n);
+    }
+    expect(dashboard.collectorPerformance.some((item) => item.assignedAccounts > 0)).toBe(true);
+    expect(dashboard.recentPayments.length).toBeGreaterThan(0);
+
+    const [subscriber] = await database.db.select({ id: subscribers.id }).from(subscribers)
+      .where(sql`${subscribers.accountNumber} = 'BCIS-00001'`).limit(1);
+    if (!subscriber) throw new Error('Synthetic statement subscriber missing');
+    const reportKinds = [
+      'DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS',
+      'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA',
+      'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING',
+      'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY',
+      'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS',
+    ] as const;
+    for (const report of reportKinds) {
+      const request = report === 'SUBSCRIBER_STATEMENT'
+        ? { report, from: '2026-01-01', to: '2026-12-31', subscriberId: subscriber.id }
+        : { report, from: '2026-01-01', to: '2026-12-31' };
+      const result = await reports.report(request);
+      expect(result.rows.length, `${report} should have seeded rows`).toBeGreaterThan(0);
+    }
+
+    const [seededUsers] = await database.db.select({ value: sql<number>`count(*)::int` }).from(users)
+      .where(sql`${users.normalizedUsername} like '%.demo' and ${users.mustChangePassword} = false`);
+    expect(seededUsers?.value).toBe(7);
   });
 });

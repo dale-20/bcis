@@ -16,7 +16,7 @@ const environment = loadEnvironment();
 const database = createDatabase(environment);
 
 try {
-  await seedAuthorization(database, seedEnvironment.DEMO_ACCOUNT_PASSWORD);
+  await seedAuthorization(database, seedEnvironment.DEMO_ACCOUNT_PASSWORD, undefined, undefined, { mustChangePassword: false });
   await seedOperationalDemoData(database);
   const workflowSeeded = await seedDemoWorkflowData(database, resolve(dirname(apiEnvPath), environment.PAYMENT_PROOF_DIR));
   console.log(workflowSeeded
