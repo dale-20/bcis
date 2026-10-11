@@ -4,7 +4,7 @@
 
 1. Start the BCIS desktop client while the API and PostgreSQL server are running.
 2. Enter the assigned username and password.
-3. Demo accounts must replace the seed password before using protected features.
+3. Use the password provided by your administrator. The synthetic demo seed does not force a password change; replace demo passwords before deploying with real data.
 4. Use **Sign out** in the sidebar account card when leaving the workstation.
 
 Five failed attempts temporarily lock the account. Ask an administrator to investigate rather than repeatedly retrying.
@@ -26,6 +26,42 @@ Open **Reports**, choose a report and date range, then supply a subscriber or co
 - **Print** opens the clean print layout without navigation.
 - **PDF** and **XLSX** ask where to save an audited server-generated export.
 - Monetary totals are calculated by the API from posted records.
+
+## Billing and account ledger
+
+1. Open **Billing → Generate Billing**, choose a month, and review the eligible service count and total before generating.
+2. If the preview reports zero eligible invoices, that service/period is already billed or is not eligible. Do not create a second invoice manually.
+3. Open **Billing → Invoices** to search and inspect finalized invoice lines, due dates, balances, adjustments, and ledger references.
+4. Open the subscriber profile's **Ledger** or **Statement** view to review opening, running, and closing balances. Use print/PDF/XLSX from Reports for a dated statement.
+5. Authorized staff can post a debit/credit adjustment or void an untouched invoice with a reason. Finalized invoice values and history remain preserved.
+
+## Payments and receipts
+
+1. Open **Payments → Receive Payment**, find the subscriber, review the outstanding invoices and enter the amount and method.
+2. Review the allocation preview. BCIS applies money to the oldest unpaid invoices first; any excess remains customer credit.
+3. Confirm once. Wait for the server result and receipt number before starting another payment. Print the issued receipt from the receipt preview or payment detail.
+4. For GCash, submit the reference, sender details, and proof. The payment remains pending until a user with verification permission reviews and explicitly verifies it.
+5. Open **Payments → Payment History** for the permanent payment record. Authorized reversals require a reason, retain the original receipt as void, and create compensating entries.
+
+## Collection route and remittance
+
+1. Open **Collections → Collection Batches** and prepare a batch by collector, area, and collection date. The server snapshots the assigned route and current balances.
+2. For each field collection, link an existing same-day posted receipt. Submit the route when the field work is complete.
+3. Record the cash remitted. Compare expected and remitted cash; a shortage or overage remains visible and is never silently balanced.
+4. A user with reconciliation permission records the reconciliation. An authorized closer confirms any remaining variance before closing. Print the route sheet from batch detail.
+
+## Receivables and service control
+
+Open **Receivables → Outstanding**, **Overdue**, or **Aging** and filter by route, plan, service type, or age. Day 90 belongs to the 61–90 bucket; older balances are 90+.
+
+Request suspension from the qualifying service's row with an effective date and reason. An authorized approver confirms it. When the qualifying balance is paid, BCIS creates a reconnection request. Assign a technician and schedule the visit under **Services → Reconnection requests**; the technician completes assigned work in **My reconnection work**. Service history is retained.
+
+## Administration
+
+- **Users**: create staff with only the role they need, disable access, or reset a password. Server-side permissions remain authoritative.
+- **Audit**: search by actor, action, time, or entity when your role has `audit.view`. Audit history is append-only.
+- **Settings**: update billing and service-control policy; changes are audited and affect future operations according to their effective rules.
+- **Backup & Restore**: create a verified database-plus-proof backup and save the archive to controlled storage. Owner restore approval is supported; production service stop/restart must follow the deployment runbook and has not been rehearsed on a live server.
 
 ## Connection diagnostics
 

@@ -112,17 +112,18 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 10 — QA and submission (PDF §§7–14, 16)
 
-- [ ] Mandatory acceptance suite below; automated financial/API output and E2E/manual workflow evidence.
-- [ ] Bug log with defect, root cause, fix and regression evidence. Screenshots/reports show expected balances.
+- [ ] Mandatory acceptance suite below: AT-01–08, AT-10–11 pass; AT-09 partial (physical LAN clients untested); AT-12 partial (production service restart untested). Full operator rehearsal remains pending.
+- [x] Bug log with defect, root cause, fix and regression evidence. Screenshots/reports show expected balances.
 - [x] Synthetic demo data: 7 users spanning roles; 3 Internet, 2 Cable, 2 Combo plans; 50 subscribers; 60+ services; 2 collectors; 3 areas; six closed billing months plus the current cycle; mixed payment cases; 10+ overdue accounts across all aging buckets; one reversal/void; two suspension/reconnection scenarios. PostgreSQL seed integration verifies nonzero dashboard metrics and rows for all report types.
 - [x] Scale-query evidence: synthetic isolated database reached 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries; subscriber and aging page queries passed with analyzed query plans (`tests/evidence/scale-query-benchmark.json`). Sustained/concurrent throughput remains untested.
-- [ ] D1 source, meaningful Git history, environments, migrations, seeds.
-- [ ] D2 run-ready desktop release and documented server/database setup.
-- [ ] D3 requirements, architecture/modules, ERD/data dictionary, API/IPC, security, deployment, backup/restore documentation.
-- [ ] D4 user manual for all workflows and troubleshooting.
-- [ ] D5 test plan/results/acceptance/defect package; D6 sample PDF/XLSX collection, AR, SOA, remittance/performance reports.
-- [ ] D7 screenshots of dashboard/profile/payment/GCash/reconciliation/aging/reports; D8 presentation and defense. Six synthetic E2E captures now cover dashboard, profile, Cash receipt, pending GCash review, aging and reports in `docs/screenshots/`; reconciled batch-detail screenshot and presentation/defense materials remain outstanding.
-- [ ] Submission folders: source, database/migrations+seeds, docs, tests/screenshots, reports-samples, release, README.
+- [x] D1 source, meaningful Git history, environments, migrations, seeds.
+- [x] D2 packaged Windows release and documented server/database setup. Installer build/hash passed 2026-10-11; Windows Application Control blocked install smoke, and clean-workstation verification remains pending.
+- [x] D3 requirements, architecture/modules, ERD/data dictionary, API/IPC, security, deployment, backup/restore documentation.
+- [x] D4 user manual for all workflows and troubleshooting.
+- [x] D5 test plan/results/acceptance/defect package; D6 sample PDF/XLSX collection, AR, SOA, remittance/performance reports.
+- [x] D7 screenshots of dashboard/profile/payment/GCash/reconciliation/aging/reports, plus reconciled batch detail in `docs/screenshots/`.
+- [ ] D8 presentation and defense. Presentation authoring runtime is unavailable in this environment.
+- [x] Submission folders: source, database/migrations+seeds, docs, tests/screenshots, reports-samples, release, README.
 - [ ] Live demo: login; subscriber/service; invoice/ledger; cash/receipt; verified GCash/duplicates; SOA; overdue; collector/remittance; reversal/audit; exports; permissions; tested restore; simultaneous clients.
 - [ ] Developer can explain all code, financial rules, API boundaries, concurrency, rollback and restore. AI use does not replace accountability.
 

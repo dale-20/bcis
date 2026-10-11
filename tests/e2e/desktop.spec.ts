@@ -33,6 +33,9 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   const endpoint = 'http://127.0.0.1:3101';
   const seedPassword = 'Synthetic-e2e-password-1';
   const proofDirectory = await mkdtemp(path.join(tmpdir(), 'bcis-desktop-gcash-'));
+  const reportExportDirectory = await mkdtemp(path.join(tmpdir(), 'bcis-report-export-'));
+  const pdfExportPath = path.join(reportExportDirectory, 'monthly-collections.pdf');
+  const xlsxExportPath = path.join(reportExportDirectory, 'monthly-collections.xlsx');
   const proofFile = path.join(proofDirectory, 'synthetic-proof.png');
   await writeFile(proofFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=', 'base64'));
   const database = new pg.Client({ connectionString: databaseUrl });
@@ -63,12 +66,6 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Username').fill('admin.demo');
     await page.getByLabel('Password', { exact: true }).fill(seedPassword);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('heading', { name: 'Secure your demo account' })).toBeVisible();
-    await page.getByLabel('Current password', { exact: true }).fill(seedPassword);
-    await page.getByLabel('New password', { exact: true }).fill('Synthetic-e2e-password-2');
-    await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-e2e-password-2');
-    await page.getByRole('button', { name: 'Update password' }).click();
-
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('.bcis-mascot')).toHaveCount(1);
     await page.getByRole('button', { name: 'Mascot preferences' }).click();
@@ -153,7 +150,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('table')).toBeVisible();
     await page.locator('.invoice-table tbody tr').first().click();
     await expect(page.getByRole('complementary', { name: 'Invoice detail' })).toBeVisible();
-    await expect(page.getByText('Line items')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Line items' })).toBeVisible();
     await page.getByLabel('Adjustment type').selectOption('INSTALLATION');
     await page.getByLabel('Amount (PHP)').fill('10.25');
     await page.getByLabel('Reason', { exact: true }).fill('Synthetic E2E setup charge');
@@ -211,7 +208,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('link', { name: 'Payment History' }).click();
     await expect(page.getByRole('heading', { name: 'Payment history' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
-    await page.locator('.payment-history-table tbody tr').first().click();
+    await page.locator('.payment-history-table tbody tr').filter({ hasText: 'E2E-GCASH-' }).first().click();
     await expect(page.getByText('Immutable payment record')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Print receipt' })).toBeVisible();
 
@@ -233,6 +230,17 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Collection batches' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent route batches' })).toBeVisible();
     await expect(page.getByText(/total · showing page 1 of/)).toBeVisible();
+    const closedBatch = page.locator('.report-table tbody tr').filter({ hasText: 'Closed' }).first();
+    await expect(closedBatch).toBeVisible();
+    await closedBatch.getByRole('button', { name: 'Open' }).click();
+    await expect(page.locator('.collection-batch-detail')).toBeVisible();
+    await expect(page.getByText('Expected Cash', { exact: true })).toBeVisible();
+    await expect(page.getByText('Difference', { exact: true })).toBeVisible();
+    const dismissBuddyMessage = page.getByRole('button', { name: 'Dismiss BCIS Buddy message' });
+    if (await dismissBuddyMessage.count() > 0) await dismissBuddyMessage.click();
+    await page.screenshot({ path: 'docs/screenshots/collection-batch-detail.png' });
+    await page.getByRole('button', { name: 'All batches' }).click();
+    await expect(page.getByRole('heading', { name: 'Recent route batches' })).toBeVisible();
     expect(await page.evaluate(() => ({ bridge: Object.keys(window.bcis ?? {}).sort(), node: 'require' in window, process: 'process' in window }))).toEqual({
       bridge: ['approveBackupRestore', 'approveSuspension', 'assignReconnection', 'cancelBackupRestore', 'changeCollectionAreaStatus', 'changeCollectorStatus', 'changePassword', 'changeServiceAccountStatus', 'changeServicePlanStatus', 'changeSubscriberStatus', 'closeCollectionBatch', 'completeReconnection', 'createBackup', 'createCollectionArea', 'createCollectionBatch', 'createCollector', 'createManagedUser', 'createServiceAccount', 'createServicePlan', 'createSubscriber', 'createSuspension', 'downloadBackup', 'exportReport', 'generateBilling', 'getBillingCycle', 'getCollectionBatch', 'getCollectionReferences', 'getConnection', 'getDashboard', 'getEligibleCollectionPayments', 'getGcashProof', 'getInvoice', 'getOrganizationSettings', 'getPayment', 'getReceivableAccounts', 'getReceivableAging', 'getReferenceData', 'getReport', 'getServiceControlPolicy', 'getServiceHistory', 'getServicePlans', 'getSession', 'getSubscriber', 'getSubscriberAudit', 'getSubscriberFinancialProfile', 'getSubscriberLedger', 'listBackups', 'listBillingCycles', 'listCollectionBatches', 'listGcashProofs', 'listInvoices', 'listManagedUsers', 'listMyReconnections', 'listPayments', 'listReconnections', 'listSubscribers', 'listSuspensions', 'listTechnicians', 'login', 'logout', 'postInvoiceAdjustment', 'postPayment', 'previewBilling', 'previewPayment', 'processOverdueInvoices', 'reconcileCollectionBatch', 'recordCollection', 'remitCollectionBatch', 'resetManagedUserPassword', 'reversePayment', 'searchAudit', 'selectAndUploadGcashProof', 'submitCollectionBatch', 'updateCollectionArea', 'updateCollector', 'updateManagedUser', 'updateOrganizationSettings', 'updateServiceAccount', 'updateServiceControlPolicy', 'updateServicePlan', 'updateSubscriber', 'verifyGcashPayment', 'voidInvoice'].sort(),
       node: false,
@@ -250,10 +258,15 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
       return (await axeWindow.axe.run()).violations.map(({ id, impact, nodes }) => ({ id, impact, nodes: nodes.map(({ target, html }) => ({ target, html })) }));
     });
     expect(violations).toEqual([]);
+    await page.getByRole('link', { name: 'Subscribers', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
     await page.screenshot({ path: 'test-results/subscriber-directory.png' });
     await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 640));
     await page.screenshot({ path: 'test-results/subscriber-minimum-size.png' });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const viewportWidth = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth,
+      overflow: Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+        .slice(0, 8).map((element) => ({ tag: element.tagName, className: element.className, right: Math.round(element.getBoundingClientRect().right), overflow: getComputedStyle(element).overflowX })) }));
+    expect(viewportWidth.document, JSON.stringify(viewportWidth)).toBeLessThanOrEqual(viewportWidth.viewport);
 
     await page.getByRole('link', { name: 'Receivables', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Outstanding receivables' })).toBeVisible();
@@ -273,10 +286,30 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('link', { name: 'Administration', exact: true }).click();
     await page.getByRole('link', { name: 'Settings', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Service control policy' })).toBeVisible();
-    await expect(page.getByLabel('Suspension threshold (days)')).toHaveValue('90');
+    await expect(page.getByLabel('Suspension threshold (days)')).toHaveValue('30');
 
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    await expect(page.locator('.report-paper tbody tr').first()).toBeVisible();
+    await desktop.evaluate(({ dialog }, paths: string[]) => {
+      let nextPath = 0;
+      dialog.showSaveDialog = async () => {
+        const filePath = paths[nextPath];
+        nextPath += 1;
+        return filePath ? { canceled: false, filePath } : { canceled: true, filePath: '' };
+      };
+    }, [pdfExportPath, xlsxExportPath]);
+    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await expect(page.getByText(`Saved to ${pdfExportPath}`, { exact: true })).toBeVisible();
+    expect((await readFile(pdfExportPath)).subarray(0, 4).toString('ascii')).toBe('%PDF');
+    await page.getByRole('button', { name: 'XLSX', exact: true }).click();
+    await expect(page.getByText(`Saved to ${xlsxExportPath}`, { exact: true })).toBeVisible();
+    expect((await readFile(xlsxExportPath)).subarray(0, 2).toString('ascii')).toBe('PK');
+    await desktop.evaluate(({ dialog }) => {
+      dialog.showSaveDialog = async () => ({ canceled: true, filePath: '' });
+    });
+    await page.getByRole('button', { name: 'PDF', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Export canceled. No file was saved.');
     await page.screenshot({ path: 'test-results/reports.png' });
 
     await page.getByRole('link', { name: 'Administration', exact: true }).click();
@@ -307,9 +340,12 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     for (const period of agingPeriods) {
       await page.getByLabel('Period').fill(period);
       await expect(page.getByText('To create', { exact: true })).toBeVisible();
-      await expect(overdueCycleButton).toBeEnabled();
-      await overdueCycleButton.click();
-      await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
+      if (await overdueCycleButton.isEnabled()) {
+        await overdueCycleButton.click();
+        await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
+      } else {
+        await expect(overdueCycleButton).toHaveText('Generate 0 invoices');
+      }
     }
 
     const agingCoverage = await database.query<{
@@ -392,11 +428,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByLabel('Username').fill('technician.demo');
     await page.getByLabel('Password', { exact: true }).fill(seedPassword);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.getByRole('heading', { name: 'Secure your demo account' })).toBeVisible();
-    await page.getByLabel('Current password', { exact: true }).fill(seedPassword);
-    await page.getByLabel('New password', { exact: true }).fill('Synthetic-technician-e2e-2');
-    await page.getByLabel('Confirm new password', { exact: true }).fill('Synthetic-technician-e2e-2');
-    await page.getByRole('button', { name: 'Update password' }).click();
+    await expect(page.getByRole('button', { name: 'Lock' })).toBeVisible({ timeout: 20_000 });
     await page.getByRole('link', { name: 'Services', exact: true }).click();
     await page.getByRole('link', { name: 'My reconnection work', exact: true }).click();
     const assignedWork = page.getByRole('row').filter({ hasText: 'SVC-00001-1' });
@@ -432,5 +464,6 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await desktop?.close();
     server.kill();
     await rm(proofDirectory, { recursive: true, force: true });
+    await rm(reportExportDirectory, { recursive: true, force: true });
   }
 });

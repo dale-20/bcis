@@ -27,27 +27,27 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 
 | Command | Result |
 | --- | --- |
-| `npm run check` | Passed: typecheck, lint, 15 unit/API/component/script files, 107 tests. |
+| `npm run check` | Passed: strict typecheck, lint, 21 unit/API/component/script files, 177 tests. |
 | `npm run test:integration` | Passed: 7 PostgreSQL integration files, 69 tests. |
-| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. It posts and reverses a Cash payment with an audit reason, generates billing from the synthetic services' July 2026 start through the current month, and verifies nonzero desktop totals in all four overdue AR-aging buckets at month end, including 90+ days. |
+| `npm run test:e2e` | Passed: 2 built-Electron workflows. The desktop flow runs against real API/PostgreSQL, exercises dashboard, subscriber, billing, payments, collections, aging, reports, and recovery; it exports PDF and XLSX through the typed preload and main-process save path into isolated files, checks `%PDF` and ZIP `PK` signatures, and verifies that canceling the save dialog reports that no file was saved. Buddy feedback and reduced-motion behavior pass in the second workflow. |
 | `npm run reports:samples` | Passed: 8 integration tests; six synthetic PDF/XLSX pairs generated and data-checked. |
 | `npm run perf:scale` | Passed: isolated synthetic scale of 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries. Seven measured runs per API repository path; median final subscriber page 74.26 ms, AR aging page 423.99 ms. `EXPLAIN (ANALYZE, BUFFERS)` used `subscribers_account_number_uq` and `invoices_open_receivable_due_idx`; detailed JSON is in `tests/evidence/scale-query-benchmark.json`. Temporary database was dropped. |
 | `npm run db:migrate -w @bcis/api` | Passed on the configured isolated `bcis_dev`; additive index migration applied, and the already-running API readiness endpoint returned `database: connected`. |
-| `npm run release:windows` | Passed: x64 NSIS installer rebuilt from current source. |
-| Temporary installer smoke | Passed on this development workstation: silent install to a unique TEMP directory, executable stayed open after launch, then uninstall and temporary-directory cleanup succeeded. This is not a clean-machine test. |
-| `npm run dev:desktop` launcher smoke | Electron processes stayed alive with inherited `ELECTRON_RUN_AS_NODE=1`; API readiness returned HTTP 200 from the existing local API. The native window was not visually confirmed in this session. |
+| `npm run release:windows` | Passed: x64 NSIS installer rebuilt from current source on 2026-10-11. |
+| Temporary installer smoke | Blocked: Windows Application Control policy refused to launch the rebuilt NSIS installer (`An Application Control policy has blocked this file`). Packaging and SHA-256 verification passed; install/launch/uninstall and clean-machine checks remain untested. |
+| `npm run dev:desktop` launcher smoke | Electron processes stayed alive with inherited `ELECTRON_RUN_AS_NODE=1`; API readiness returned HTTP 200 from the existing local API. The desktop E2E separately confirms built windows and workflows. |
 | `npm audit --omit=dev --offline` | Passed: 0 reported production vulnerabilities from the local npm audit data. Offline mode limits freshness. |
-| `git diff --check` | Passed. |
+| `git diff --check` | Passed before the current report-export and screenshot evidence increment; rerun before commit. |
 
-The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, billing, Cash and GCash posting, Cash reversal with audit reason, generated billing periods from the synthetic service activation date, all four populated AR-aging buckets in the desktop view, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. Six synthetic desktop captures are in `docs/screenshots/`; a reconciled batch-detail capture is still absent. The complete acceptance sequence has not been rehearsed end to end by an operator. This automated run uses an isolated test database and synthetic records.
+The E2E workflow covers seeded login, dashboard, subscriber search/profile and maintenance, billing, Cash and GCash posting, Cash reversal with audit reason, seeded billing-period handling, all four populated AR-aging buckets in the desktop view, report data/print media, saved PDF/XLSX output and export cancellation, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. Seven synthetic desktop captures are indexed in `docs/screenshots/`, including the reconciled batch detail. The save-dialog choices are automated to fixed temporary paths; a manual native-dialog and operator demo rehearsal remain untested. This automated run uses an isolated test database and synthetic records.
 
 ## Release artifact
 
 - Installer: `release/BCIS-Setup-0.1.0-x64.exe`
-- Size: 112,223,729 bytes
-- SHA-256: `7F50CD30F4092ABE368F8CB3192DEA85D3E6E3A7574A8E404FB4BD94E0D0B7E3`
+- Size: 112,232,864 bytes
+- SHA-256: `73F21A0F6BCD58EBEDD47A6EED4C758B858C94C08CAC765239CE0075E1F6DF23`
 - Authenticode: `NotSigned`; Windows may show an unknown-publisher warning.
-- Build warnings: Zod annotation comments are removed by Rollup; renderer JavaScript chunk is 794.58 kB and exceeds the 500 kB advisory threshold.
+- Build warnings: Zod annotation comments are removed by Rollup; renderer JavaScript chunk is 813.88 kB and exceeds the 500 kB advisory threshold.
 
 ## Security and operational status
 
