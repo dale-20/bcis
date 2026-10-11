@@ -79,7 +79,17 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Receivables', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible();
-    await expect(page.getByText('Billed YTD')).toBeVisible();
+    await expect(page.getByText('Billed · period', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Billing and collections' })).toBeVisible();
+    await expect(page.getByLabel('Reporting period')).toHaveValue('ytd');
+    await page.getByLabel('Reporting period').selectOption('90d');
+    await page.getByText('View exact monthly totals').click();
+    await expect(page.locator('.trend-data-table tbody tr').first()).toBeVisible();
+    await page.getByLabel('Reporting period').selectOption('ytd');
+    await expect(page.getByRole('heading', { name: 'Operational attention' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Overdue accounts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'GCash verification' })).toBeVisible();
+    await expect(page.getByText(/Unverified proofs? awaiting review/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Collector performance' })).toBeVisible();
     await page.screenshot({ path: 'test-results/dashboard.png' });
     await page.getByRole('link', { name: 'Reports', exact: true }).click();

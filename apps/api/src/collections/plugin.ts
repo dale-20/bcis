@@ -25,10 +25,10 @@ export const collectionPlugin: FastifyPluginAsync<CollectionPluginOptions> = asy
 
   app.get('/collections/reference-data', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: { response: { 200: permissiveResponse, 401: errorResponse, 403: errorResponse } } }, async () => collectionReferencesSchema.parse(await service.references()));
   app.get('/collection-batches', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: {
-    querystring: { type: 'object', additionalProperties: false, properties: { page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 } } },
+    querystring: { type: 'object', additionalProperties: false, properties: { page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 }, exceptionsOnly: { type: 'boolean' } } },
     response: { 200: permissiveResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse },
   } }, async (request) => collectionBatchListSchema.parse(await service.list(collectionBatchListQuerySchema.parse({
-    ...(request.query as { page?: number; pageSize?: number }),
+    ...(request.query as { page?: number; pageSize?: number; exceptionsOnly?: boolean }),
   }))));
   app.post('/collection-batches', {
     preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],

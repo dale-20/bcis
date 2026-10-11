@@ -91,7 +91,7 @@ export function CollectionBatchesPage({ user, batchId }: { user: AuthenticatedUs
   const navigate = useNavigate();
   const client = useQueryClient();
   const [page, setPage] = useState(1);
-  const batches = useQuery({ queryKey: ['collection-batches', page], queryFn: () => listCollectionBatches({ page, pageSize: 20 }), enabled: !batchId });
+  const batches = useQuery({ queryKey: ['collection-batches', page], queryFn: () => listCollectionBatches({ page, pageSize: 20, exceptionsOnly: false }), enabled: !batchId });
   if (batchId) return <BatchDetail id={batchId} user={user} onBack={() => navigate('/collections/batches')} />;
   if (batches.isPending) return <PageLoading label="Loading collection batches…" />;
   if (batches.isError) return <PageError title="Collection batches unavailable" message={batches.error.message} onRetry={() => void batches.refetch()} />;

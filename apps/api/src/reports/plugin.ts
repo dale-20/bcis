@@ -16,7 +16,12 @@ export const reportPlugin:FastifyPluginAsync<Options>=async(app,options)=>{
     if(typeof query==='object'&&query!==null&&'report' in query&&query.report==='USER_ACTIVITY') await requirePermission(options.authService,'audit.view')(request);
     if(typeof query==='object'&&query!==null&&'report' in query&&query.report==='SUBSCRIBER_MASTER_LIST') await requirePermission(options.authService,'subscriber.view')(request);
   };
-  app.get('/dashboard',{preHandler:[auth,requirePermission(options.authService,'dashboard.view')],schema:{response:{200:response,401:error,403:error}}},async request=>dashboardSchema.parse(await service.dashboard(dashboardQuerySchema.parse(request.query))));
+  app.get('/dashboard',{preHandler:[auth,requirePermission(options.authService,'dashboard.view')],schema:{response:{200:response,401:error,403:error}}},async request=>{
+    const permissions=request.authContext?.permissions??[];
+    return dashboardSchema.parse(await service.dashboard(dashboardQuerySchema.parse(request.query),{
+      collectionView:permissions.includes('collection.view'),subscriberView:permissions.includes('subscriber.view'),
+    }));
+  });
   app.get('/reports/data',{preHandler:[auth,requirePermission(options.authService,'report.view'),activityPermission],schema:{response:{200:response,401:error,403:error}}},async request=>reportDataSchema.parse(await service.report(reportRequestSchema.parse(request.query))));
   app.get('/reports/export',{preHandler:[auth,requirePermission(options.authService,'report.export'),activityPermission]},async(request,reply)=>{
     const raw=z.object({report:z.string(),from:z.string(),to:z.string(),subscriberId:z.string().optional(),collectorId:z.string().optional(),format:reportFormatSchema}).parse(request.query); const {format,...reportQuery}=raw; const input=reportRequestSchema.parse(reportQuery); const data=reportDataSchema.parse(await service.report(input)); const buffer=await service.export(data,format);

@@ -33,6 +33,7 @@ export type CollectionBatch = z.infer<typeof collectionBatchSchema>;
 export const collectionBatchListQuerySchema = z.object({
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().positive().max(100).default(20),
+  exceptionsOnly: z.boolean().default(false),
 }).strict();
 export type CollectionBatchListQuery = z.infer<typeof collectionBatchListQuerySchema>;
 export const collectionBatchListItemSchema = z.object({

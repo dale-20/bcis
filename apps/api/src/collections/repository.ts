@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
 import type { CollectionBatchListQuery, CreateCollectionBatchInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
@@ -22,6 +22,9 @@ export class CollectionRepository {
 
   async list(query: CollectionBatchListQuery) {
     const offset = (query.page - 1) * query.pageSize;
+    const exceptionFilter = query.exceptionsOnly
+      ? or(inArray(collectionBatches.status, ['SUBMITTED', 'REMITTED', 'RECONCILED']), sql`${collectorRemittances.differenceCentavos} <> 0`)
+      : undefined;
     const [rows, [count]] = await Promise.all([
       this.database.db.select({
         id: collectionBatches.id, batchNumber: collectionBatches.batchNumber, collectorId: collectionBatches.collectorId,
@@ -38,8 +41,11 @@ export class CollectionRepository {
       }).from(collectionBatches).innerJoin(collectors, eq(collectionBatches.collectorId, collectors.id))
         .innerJoin(collectionAreas, eq(collectionBatches.collectionAreaId, collectionAreas.id))
         .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId))
-        .orderBy(sql`${collectionBatches.collectionDate} DESC`, sql`${collectionBatches.createdAt} DESC`).limit(query.pageSize).offset(offset),
-      this.database.db.select({ total: sql<number>`count(*)::int` }).from(collectionBatches),
+        .where(exceptionFilter)
+        .orderBy(...(query.exceptionsOnly ? [asc(collectionBatches.collectionDate), asc(collectionBatches.createdAt)] : [desc(collectionBatches.collectionDate), desc(collectionBatches.createdAt)]))
+        .limit(query.pageSize).offset(offset),
+      this.database.db.select({ total: sql<number>`count(*)::int` }).from(collectionBatches)
+        .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId)).where(exceptionFilter),
     ]);
     const total = count?.total ?? 0;
     return { items: rows, page: query.page, pageSize: query.pageSize, total, pageCount: Math.ceil(total / query.pageSize) };

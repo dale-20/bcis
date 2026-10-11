@@ -107,7 +107,7 @@ describe.sequential('synthetic demo workflow seed', () => {
   it('provides visible dashboard metrics and rows for every report type', async () => {
     const currentDate = new Date().toISOString().slice(0, 10);
     const reports = new ReportService(database);
-    const dashboard = await reports.dashboard({ from: '2026-01-01', to: currentDate });
+    const dashboard = await reports.dashboard({ from: '2026-01-01', to: currentDate }, { collectionView: true, subscriberView: true });
     expect(BigInt(dashboard.billedCentavos)).toBeGreaterThan(0n);
     expect(BigInt(dashboard.collectedCentavos)).toBeGreaterThan(0n);
     expect(dashboard.postedPaymentCount).toBeGreaterThan(0);

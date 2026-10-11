@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { centavosSchema } from './money.js';
+import { centavosSchema, signedCentavosSchema } from './money.js';
 
 export const reportKindSchema = z.enum(['DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS', 'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA', 'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS']);
 export const reportFormatSchema = z.enum(['PDF', 'XLSX']);
@@ -26,16 +26,21 @@ export const reportDataSchema = z.object({
 });
 export type ReportData = z.infer<typeof reportDataSchema>;
 
-export const dashboardQuerySchema = z.object({ from: z.iso.date(), to: z.iso.date() }).strict();
+const calendarDayNumber = (value: string) => Date.parse(`${value}T00:00:00.000Z`);
+
+export const dashboardQuerySchema = z.object({ from: z.iso.date(), to: z.iso.date() }).strict().superRefine((value, context) => {
+  if (value.from > value.to) context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after start date' });
+  else if ((calendarDayNumber(value.to) - calendarDayNumber(value.from)) / 86_400_000 > 366) context.addIssue({ code: 'custom', path: ['to'], message: 'Dashboard date range cannot exceed 367 calendar days' });
+});
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
 export const dashboardSchema = z.object({
   range: z.object({ from: z.iso.date(), to: z.iso.date() }),
   billedCentavos: centavosSchema, collectedCentavos: centavosSchema, outstandingCentavos: centavosSchema, overdueCentavos: centavosSchema,
   overdueInvoiceCount: z.number().int().nonnegative(), overdueSubscriberCount: z.number().int().nonnegative(),
   activeSubscribers: z.number().int().nonnegative(), postedPaymentCount: z.number().int().nonnegative(),
-  monthlyCollections: z.array(z.object({ month: z.string(), amountCentavos: centavosSchema, count: z.number().int().nonnegative() })),
+  monthlyCollections: z.array(z.object({ month: z.string(), amountCentavos: centavosSchema, billedCentavos: centavosSchema, count: z.number().int().nonnegative() })),
   paymentMethods: z.array(z.object({ method: z.string(), amountCentavos: centavosSchema, count: z.number().int().nonnegative() })),
-  collectorPerformance: z.array(z.object({ collectorId: z.uuid(), collectorName: z.string(), assignedAccounts: z.number().int().nonnegative(), collectedAccounts: z.number().int().nonnegative(), amountCentavos: centavosSchema, varianceCentavos: z.string() })),
+  collectorPerformance: z.array(z.object({ collectorId: z.uuid(), collectorName: z.string(), assignedAccounts: z.number().int().nonnegative(), collectedAccounts: z.number().int().nonnegative(), amountCentavos: centavosSchema, varianceCentavos: signedCentavosSchema })),
   aging: z.object({ CURRENT: centavosSchema, '1_30': centavosSchema, '31_60': centavosSchema, '61_90': centavosSchema, '90_PLUS': centavosSchema }),
   recentPayments: z.array(z.object({ id: z.uuid(), receiptNumber: z.string(), subscriberName: z.string(), method: z.string(), amountCentavos: centavosSchema, paymentDate: z.iso.datetime() })),
 });

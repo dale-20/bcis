@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { apiUrlSchema, billingPeriodSchema, centavosSchema, postPaymentInputSchema, readinessSchema, signedCentavosSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
+import { apiUrlSchema, billingPeriodSchema, centavosSchema, dashboardQuerySchema, postPaymentInputSchema, readinessSchema, signedCentavosSchema, subscriberCreateSchema, subscriberListQuerySchema } from './index.js';
+
+describe('dashboard query contract', () => {
+  it('accepts a bounded date range and rejects reversed or oversized ranges', () => {
+    expect(dashboardQuerySchema.safeParse({ from: '2026-01-01', to: '2026-12-31' }).success).toBe(true);
+    expect(dashboardQuerySchema.safeParse({ from: '2026-12-31', to: '2026-01-01' }).success).toBe(false);
+    expect(dashboardQuerySchema.safeParse({ from: '2024-01-01', to: '2025-01-02' }).success).toBe(false);
+  });
+});
 
 describe('centavo transport contract', () => {
   it.each(['0', '1', '99900', '300000', '9007199254740993', '9223372036854775807'])('preserves exact integer %s', (value) => {

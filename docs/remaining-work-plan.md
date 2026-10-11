@@ -99,10 +99,14 @@ The dashboard already has five KPI cards, a monthly posted-collections bar chart
 **Exit criteria**
 
 - Every chart is derived from named authoritative API fields and reconciles to an existing report or source query; no synthetic display values are introduced.
-- The dashboard supports its selected range consistently in KPI summaries and time-series data, and business dates match Manila calendar dates.
+- Billed/collected KPIs and their time series use the selected range and Manila business dates. Outstanding/overdue/aging and active-subscriber values are explicitly presented as current snapshots because this schema has no historical snapshots.
 - Each queue is bounded, permission-aware, and navigates to the existing authoritative workflow; pending GCash evidence is never presented as verified revenue.
 - Financial values remain exact centavos, shortages and overages remain signed and visible, and chart information has an accessible textual equivalent.
 - `npm run check`, relevant PostgreSQL integration tests, production build, and the applicable Electron E2E pass before calling the increment complete.
+
+**Implementation status (2026-10-11): completed and verified.** The dashboard now has 30/90-day, 6/12-month, and year-to-date ranges; monthly billed-versus-collected bars with an expandable exact-value table; five responsive KPIs; payment mix; collector completion/variance; and permission-aware overdue, remittance-exception, and GCash-review shortcuts. Manila date boundaries and report totals are tested against PostgreSQL. Collector/receipt row data is omitted server-side when the user lacks the corresponding permission. The remittance preview filters before pagination and has a regression case proving an older shortage remains visible when a newer balanced batch exists. Historical aging/subscriber trends remain deferred until dated snapshots are available.
+
+Verification: `npm run check` passed (21 test files, 182 tests); the collection PostgreSQL integration suite passed (8 tests), including exact monthly reconciliation and the Manila midnight boundary; `npm run test:e2e` passed (2 built-Electron tests). The E2E command rebuilt the API and desktop successfully; existing Zod annotation and renderer chunk-size warnings remain informational.
 
 ### 4. Prepare the demonstration and defense
 

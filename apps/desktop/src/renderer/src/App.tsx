@@ -122,7 +122,7 @@ function WorkspaceRoutes({ user }: { user: AuthenticatedUser }) {
   const fallback = defaultPath(user.permissions);
   return <Routes>
     <Route path="/" element={<Navigate to={fallback} replace />} />
-    <Route path="/dashboard" element={<Allowed user={user} permissions={['dashboard.view']}><DashboardPage /></Allowed>} />
+    <Route path="/dashboard" element={<Allowed user={user} permissions={['dashboard.view']}><DashboardPage user={user} /></Allowed>} />
     <Route path="/subscribers" element={<Allowed user={user} permissions={['subscriber.view']}><SubscribersPage user={user} mode="list" onNavigate={navigate} /></Allowed>} />
     <Route path="/subscribers/new" element={<Allowed user={user} permissions={['subscriber.manage']}><SubscribersPage user={user} mode="create" onNavigate={navigate} /></Allowed>} />
     <Route path="/subscribers/services" element={<Allowed user={user} permissions={['service.view']}><PlansPage user={user} /></Allowed>} />

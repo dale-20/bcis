@@ -20,41 +20,57 @@ const displayNameSql = "coalesce(s.organization_name, concat_ws(' ', s.first_nam
 export class ReportService {
   constructor(private readonly database: Database) {}
 
-  async dashboard(query: DashboardQuery): Promise<Dashboard> {
+  async dashboard(query: DashboardQuery, access: { collectionView?: boolean; subscriberView?: boolean } = {}): Promise<Dashboard> {
     const args = [query.from, query.to];
-    const [summary, monthly, methods, aging, recent, collectorPerformance] = await Promise.all([
-      this.database.pool.query(`select
-        coalesce((select sum(amount_centavos) from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day'),0)::bigint collected,
-        coalesce((select sum(total_centavos) from invoices where status <> 'VOID' and status <> 'DRAFT' and invoice_date >= $1::date and invoice_date <= $2::date),0)::bigint billed,
-        (select count(*) from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day')::int payment_count,
-        coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint outstanding,
-        coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint overdue,
-        (select count(*) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_invoice_count,
-        (select count(distinct subscriber_id) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_subscriber_count,
-        (select count(*) from subscribers where status='ACTIVE')::int active_subscribers`, args),
-      this.database.pool.query(`select to_char(date_trunc('month', payment_date),'YYYY-MM') collection_month, sum(amount_centavos)::bigint amount, count(*)::int count from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by 1 order by 1`, args),
-      this.database.pool.query(`select method, sum(amount_centavos)::bigint amount, count(*)::int count from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by method order by amount desc`, args),
-      this.database.pool.query(`select
-        coalesce(sum(case when due_date >= current_date then balance_centavos else 0 end),0)::bigint current_amount,
-        coalesce(sum(case when current_date-due_date between 1 and 30 then balance_centavos else 0 end),0)::bigint b1,
-        coalesce(sum(case when current_date-due_date between 31 and 60 then balance_centavos else 0 end),0)::bigint b2,
-        coalesce(sum(case when current_date-due_date between 61 and 90 then balance_centavos else 0 end),0)::bigint b3,
-        coalesce(sum(case when current_date-due_date > 90 then balance_centavos else 0 end),0)::bigint b4
-        from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')`),
-      this.database.pool.query(`select p.id, r.receipt_number, ${displayNameSql} subscriber_name, p.method, p.amount_centavos amount, p.payment_date from payments p join subscribers s on s.id=p.subscriber_id join receipts r on r.payment_id=p.id where p.status='POSTED' order by p.payment_date desc limit 8`),
-      this.database.pool.query(`select c.id collector_id,c.name collector_name,
+    const collectorPerformanceQuery = access.collectionView
+      ? this.database.pool.query<Row>(`select c.id collector_id,c.name collector_name,
         (select count(*)::int from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date) assigned_accounts,
         (select count(*)::int from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date and a.payment_id is not null) collected_accounts,
         coalesce((select sum(p.amount_centavos) from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id join payments p on p.id=a.payment_id and p.status='POSTED' where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date),0)::bigint amount,
         coalesce((select sum(cr.difference_centavos) from collection_batches cb join collector_remittances cr on cr.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date),0)::bigint variance
-        from collectors c where c.status='ACTIVE' order by c.collector_number`, args),
+        from collectors c where c.status='ACTIVE' order by c.collector_number`, args)
+      : Promise.resolve({ rows: [] as Row[] });
+    const recentPaymentsQuery = access.subscriberView
+      ? this.database.pool.query<Row>(`select p.id, r.receipt_number, ${displayNameSql} subscriber_name, p.method, p.amount_centavos amount, p.payment_date from payments p join subscribers s on s.id=p.subscriber_id join receipts r on r.payment_id=p.id where p.status='POSTED' order by p.payment_date desc limit 8`)
+      : Promise.resolve({ rows: [] as Row[] });
+    const [summary, monthly, methods, aging, recent, collectorPerformance] = await Promise.all([
+      this.database.pool.query(`select
+        coalesce((select sum(amount_centavos) from payments where status='POSTED' and payment_date >= ($1::date::timestamp at time zone 'Asia/Manila') and payment_date < (($2::date + 1)::timestamp at time zone 'Asia/Manila')),0)::bigint collected,
+        coalesce((select sum(total_centavos) from invoices where status <> 'VOID' and status <> 'DRAFT' and invoice_date >= $1::date and invoice_date <= $2::date),0)::bigint billed,
+        (select count(*) from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day')::int payment_count,
+        coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint outstanding,
+        coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and due_date < (now() at time zone 'Asia/Manila')::date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint overdue,
+        (select count(*) from invoices where balance_centavos > 0 and due_date < (now() at time zone 'Asia/Manila')::date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_invoice_count,
+        (select count(distinct subscriber_id) from invoices where balance_centavos > 0 and due_date < (now() at time zone 'Asia/Manila')::date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_subscriber_count,
+        (select count(*) from subscribers where status='ACTIVE')::int active_subscribers`, args),
+      this.database.pool.query(`with months as (
+        select generate_series(date_trunc('month',$1::date::timestamp),date_trunc('month',$2::date::timestamp),interval '1 month')::date as month_start
+      ), billed as (
+        select date_trunc('month',invoice_date::timestamp)::date as month_start,sum(total_centavos)::bigint as amount
+        from invoices where status not in ('DRAFT','VOID') and invoice_date between $1::date and $2::date group by 1
+      ), collected as (
+        select date_trunc('month',payment_date at time zone 'Asia/Manila')::date as month_start,sum(amount_centavos)::bigint as amount,count(*)::int as count
+        from payments where status='POSTED' and payment_date >= ($1::date::timestamp at time zone 'Asia/Manila') and payment_date < (($2::date + 1)::timestamp at time zone 'Asia/Manila') group by 1
+      )
+      select to_char(months.month_start,'YYYY-MM') collection_month,coalesce(collected.amount,0)::bigint amount,coalesce(billed.amount,0)::bigint billed_amount,coalesce(collected.count,0)::int count
+      from months left join billed using(month_start) left join collected using(month_start) order by months.month_start`, args),
+      this.database.pool.query(`select method, sum(amount_centavos)::bigint amount, count(*)::int count from payments where status='POSTED' and payment_date >= ($1::date::timestamp at time zone 'Asia/Manila') and payment_date < (($2::date + 1)::timestamp at time zone 'Asia/Manila') group by method order by amount desc`, args),
+      this.database.pool.query(`select
+        coalesce(sum(case when due_date >= (now() at time zone 'Asia/Manila')::date then balance_centavos else 0 end),0)::bigint current_amount,
+        coalesce(sum(case when (now() at time zone 'Asia/Manila')::date-due_date between 1 and 30 then balance_centavos else 0 end),0)::bigint b1,
+        coalesce(sum(case when (now() at time zone 'Asia/Manila')::date-due_date between 31 and 60 then balance_centavos else 0 end),0)::bigint b2,
+        coalesce(sum(case when (now() at time zone 'Asia/Manila')::date-due_date between 61 and 90 then balance_centavos else 0 end),0)::bigint b3,
+        coalesce(sum(case when (now() at time zone 'Asia/Manila')::date-due_date > 90 then balance_centavos else 0 end),0)::bigint b4
+        from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')`),
+      recentPaymentsQuery,
+      collectorPerformanceQuery,
     ]);
     const s = summary.rows[0] as Row; const a = aging.rows[0] as Row;
     return {
       range: query, billedCentavos: cents(s.billed), collectedCentavos: cents(s.collected), outstandingCentavos: cents(s.outstanding), overdueCentavos: cents(s.overdue),
       overdueInvoiceCount: Number(s.overdue_invoice_count), overdueSubscriberCount: Number(s.overdue_subscriber_count),
       activeSubscribers: Number(s.active_subscribers), postedPaymentCount: Number(s.payment_count),
-      monthlyCollections: monthly.rows.map((r: Row) => ({ month: text(r.collection_month), amountCentavos: cents(r.amount), count: Number(r.count) })),
+      monthlyCollections: monthly.rows.map((r: Row) => ({ month: text(r.collection_month), amountCentavos: cents(r.amount), billedCentavos: cents(r.billed_amount), count: Number(r.count) })),
       paymentMethods: methods.rows.map((r: Row) => ({ method: text(r.method), amountCentavos: cents(r.amount), count: Number(r.count) })),
       collectorPerformance: collectorPerformance.rows.map((r: Row) => ({ collectorId: text(r.collector_id), collectorName: text(r.collector_name), assignedAccounts: Number(r.assigned_accounts), collectedAccounts: Number(r.collected_accounts), amountCentavos: cents(r.amount), varianceCentavos: cents(r.variance) })),
       aging: { CURRENT: cents(a.current_amount), '1_30': cents(a.b1), '31_60': cents(a.b2), '61_90': cents(a.b3), '90_PLUS': cents(a.b4) },
