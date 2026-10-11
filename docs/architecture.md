@@ -53,8 +53,9 @@ Renderer has no Node integration, DB connection, arbitrary fetch, shell, filesys
 
 ## Current limitations and future invariants
 
-- Authentication, RBAC, normalized storage, audit boundaries, subscriber operations, monthly billing, payments, collection reconciliation, and receivable aging are implemented. Subscriber editing/archival, payment/collection desktop UI, report generation, backup execution/restore, and installer remain future milestones.
-- ExcelJS/pdfmake, Table and React Hook Form are dependencies for later milestones; they are not fake report/table/form implementations.
+- Authentication, RBAC, normalized storage, audit boundaries, subscriber operations, monthly billing, payments, collection reconciliation, receivable aging, dashboards, report generation, and backup creation/verification are implemented. The Windows installer builds and has passed an install/launch/uninstall smoke on the development workstation.
+- Production restore/restart, three physical Windows LAN clients, clean-workstation installation, full operator demo rehearsal, and report-PDF visual inspection remain acceptance tasks. The application does not provide live database replacement; restore is an operator-controlled recovery procedure.
+- ExcelJS/pdfmake, TanStack Table, and React Hook Form are used in report export, paginated table, and form workflows; verify current dependency usage before removing them.
 - Money is represented by canonical integer-centavo strings at the transport boundary and PostgreSQL `bigint` internally. Payment conservation, oldest-first allocation, GCash verification, reversal, idempotency, atomic rollback, and immutable-history rules are covered by real-PostgreSQL integration tests.
 - Ten database pool connections support concurrent clients structurally. Integration tests verify three parallel clients, concurrent idempotent replay, distinct simultaneous payments serialized on one subscriber, and Cashier denial of reversal.
 - Local project cluster is loopback-only on 55432. Production uses a restricted API database role and separately managed migrations; the development cluster owner is not a production account.

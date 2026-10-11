@@ -169,6 +169,13 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('button', { name: 'Confirm and post' }).click();
     await expect(page.getByRole('heading', { name: /Receipt OR-/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Print receipt' })).toBeEnabled();
+    await page.getByRole('link', { name: 'Payment History' }).click();
+    await page.locator('.payment-history-table tbody tr').first().click();
+    await expect(page.getByRole('button', { name: 'Reverse payment and void receipt' })).toBeVisible();
+    await page.getByLabel('Reversal reason').fill('Synthetic E2E correction with preserved receipt history');
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Reverse payment and void receipt' }).click();
+    await expect(page.getByText(/Reversed by .*Reason: Synthetic E2E correction/)).toBeVisible();
     await desktop.evaluate(({ dialog }, selectedFile) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedFile] });
     }, proofFile);
@@ -277,12 +284,36 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
 
     await page.getByRole('link', { name: 'Billing', exact: true }).click();
     await page.getByRole('link', { name: 'Generate Billing', exact: true }).click();
-    await page.getByLabel('Period').fill('2026-07');
-    await expect(page.getByText('To create', { exact: true })).toBeVisible();
     const overdueCycleButton = page.getByRole('button', { name: /Generate \d+ invoices/ });
-    await expect(overdueCycleButton).toBeEnabled();
-    await overdueCycleButton.click();
-    await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
+    const today = new Date();
+    const agingPeriods = Array.from({ length: 4 }, (_, index) => {
+      const period = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 3 + index, 1));
+      return `${period.getUTCFullYear()}-${String(period.getUTCMonth() + 1).padStart(2, '0')}`;
+    });
+    for (const period of agingPeriods) {
+      await page.getByLabel('Period').fill(period);
+      await expect(page.getByText('To create', { exact: true })).toBeVisible();
+      await expect(overdueCycleButton).toBeEnabled();
+      await overdueCycleButton.click();
+      await expect(page.getByText('Billing run completed', { exact: true })).toBeVisible();
+    }
+
+    const agingCoverage = await database.query<{
+      overdue_accounts: number; age_1_30: number; age_31_60: number; age_61_90: number; age_90_plus: number;
+    }>(`SELECT
+      count(DISTINCT service_account_id) FILTER (WHERE due_date < current_date)::int AS overdue_accounts,
+      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 1 AND 30)::int AS age_1_30,
+      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 31 AND 60)::int AS age_31_60,
+      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date BETWEEN 61 AND 90)::int AS age_61_90,
+      count(DISTINCT service_account_id) FILTER (WHERE current_date - due_date > 90)::int AS age_90_plus
+      FROM invoices WHERE balance_centavos > 0 AND status IN ('UNPAID','PARTIALLY_PAID','OVERDUE')`);
+    const coverage = agingCoverage.rows[0];
+    if (!coverage) throw new Error('Synthetic aging coverage query returned no row');
+    expect(coverage.overdue_accounts).toBeGreaterThanOrEqual(10);
+    expect(coverage.age_1_30).toBeGreaterThan(0);
+    expect(coverage.age_31_60).toBeGreaterThan(0);
+    expect(coverage.age_61_90).toBeGreaterThan(0);
+    expect(coverage.age_90_plus).toBeGreaterThan(0);
 
     const syntheticSubscriber = await database.query<{ id: string; account_number: string }>("select id, account_number from subscribers where account_number='BCIS-00001'");
     const subscriber = syntheticSubscriber.rows[0];

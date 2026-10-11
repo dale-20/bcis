@@ -29,7 +29,7 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 | --- | --- |
 | `npm run check` | Passed: typecheck, lint, 15 unit/API/component/script files, 107 tests. |
 | `npm run test:integration` | Passed: 7 PostgreSQL integration files, 69 tests. |
-| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. |
+| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. It posts and reverses a Cash payment with an audit reason, generates four recent billing periods, and verifies overdue services appear in all four AR-aging buckets. |
 | `npm run reports:samples` | Passed: 8 integration tests; six synthetic PDF/XLSX pairs generated and data-checked. |
 | `npm run perf:scale` | Passed: isolated synthetic scale of 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries. Seven measured runs per API repository path; median final subscriber page 74.26 ms, AR aging page 423.99 ms. `EXPLAIN (ANALYZE, BUFFERS)` used `subscribers_account_number_uq` and `invoices_open_receivable_due_idx`; detailed JSON is in `tests/evidence/scale-query-benchmark.json`. Temporary database was dropped. |
 | `npm run db:migrate -w @bcis/api` | Passed on the configured isolated `bcis_dev`; additive index migration applied, and the already-running API readiness endpoint returned `database: connected`. |
@@ -39,7 +39,7 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 | `npm audit --omit=dev --offline` | Passed: 0 reported production vulnerabilities from the local npm audit data. Offline mode limits freshness. |
 | `git diff --check` | Passed. |
 
-The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. The complete acceptance sequence has not been rehearsed end to end by an operator.
+The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, billing, Cash and GCash posting, Cash reversal with audit reason, four populated AR-aging buckets, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. The complete acceptance sequence has not been rehearsed end to end by an operator. This automated run uses an isolated test database and synthetic records.
 
 ## Release artifact
 
