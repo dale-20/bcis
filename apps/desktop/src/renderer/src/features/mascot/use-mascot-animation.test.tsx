@@ -50,11 +50,23 @@ describe('useMascotAnimation', () => {
     const { result, unmount } = renderHook(() => useMascotAnimation());
     act(() => { result.current.play({ name: 'happy', durationMs: 2_000 }, firstCompletion); });
     act(() => { result.current.play({ name: 'success', durationMs: 2_000 }, secondCompletion); });
-    expect(vi.getTimerCount()).toBe(1);
+    expect(result.current.handingOff).toBe(true);
+    expect(vi.getTimerCount()).toBe(2);
     unmount();
     expect(vi.getTimerCount()).toBe(0);
     expect(firstCompletion).not.toHaveBeenCalled();
     expect(secondCompletion).not.toHaveBeenCalled();
+  });
+
+  it('briefly settles an interrupted pose before the next primary animation starts', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useMascotAnimation());
+    act(() => { result.current.play({ name: 'thinking', durationMs: null }); });
+    act(() => { result.current.play({ name: 'success', durationMs: 2_800 }); });
+    expect(result.current.state.name).toBe('success');
+    expect(result.current.handingOff).toBe(true);
+    act(() => { vi.advanceTimersByTime(140); });
+    expect(result.current.handingOff).toBe(false);
   });
 
   it('exposes an explicit completion callback for a looping animation', () => {

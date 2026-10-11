@@ -58,7 +58,9 @@
 }
 
 .mascot-art .buddy-head,
+.mascot-art .buddy-life-motion,
 .mascot-art .buddy-body-root,
+.mascot-art .buddy-action-pose,
 .mascot-art .buddy-head-pivot,
 .mascot-art .buddy-head-turn,
 .mascot-art .buddy-head-ambient,
@@ -77,7 +79,9 @@
 .mascot-art .buddy-shadow,
 .mascot-art .buddy-sleep-mark,
 .mascot-art .buddy-success-check { transform-box: view-box; }
+.mascot-art .buddy-life-motion { transform-origin: 90px 178px; }
 .mascot-art .buddy-body-root { transform-origin: 90px 178px; }
+.mascot-art .buddy-action-pose { transform-origin: 90px 178px; }
 .mascot-art .buddy-head { transform-origin: 90px 139px; }
 .mascot-art .buddy-head-pivot { transform-origin: 90px 139px; }
 .mascot-art .buddy-head-turn { transform-origin: 90px 139px; }
@@ -149,6 +153,7 @@
 .mascot-toolbar button:hover,
 .mascot-preferences button:hover,
 .mascot-dock:hover { background: var(--color-info-muted); }
+.mascot-toolbar button:hover { transform: translateY(-1px); }
 .mascot-toolbar button:active,
 .mascot-preferences button:active { transform: scale(.97); }
 .mascot-toolbar button:focus-visible,
@@ -200,7 +205,7 @@
 
 .mascot-art .buddy-head-turn,
 .mascot-art .buddy-head-ambient,
-.mascot-art .buddy-body-root,
+.mascot-art .buddy-action-pose,
 .mascot-art .buddy-head-pivot,
 .mascot-art .buddy-shoulder,
 .mascot-art .buddy-shoulder-ambient,
@@ -219,18 +224,21 @@
 .mascot-art .buddy-thumbs-up,
 .mascot-art .buddy-success-check,
 .mascot-art .buddy-workpad { opacity: 0; }
+.mascot-art .buddy-wave-hand,
+.mascot-art .buddy-thumbs-up,
+.mascot-art .buddy-success-check { transition: opacity 180ms cubic-bezier(.23, 1, .32, 1); }
 
-/* Each animated transform has one owner and an explicit SVG-space hinge. */
-.anim-idle .buddy-body-root { animation: buddy-idle-shift 5.2s cubic-bezier(.77, 0, .175, 1) infinite; }
-.anim-idle .buddy-torso-rig { animation: buddy-breath 3.8s cubic-bezier(.77, 0, .175, 1) infinite; }
-.anim-walk .buddy-body-root { animation: buddy-walk-bob 680ms cubic-bezier(.77, 0, .175, 1) infinite; }
+/* The life layer breathes continuously; action poses have a separate transform owner. */
+.mascot-art .buddy-life-motion { animation: buddy-breath 4.6s cubic-bezier(.77, 0, .175, 1) infinite; }
+.anim-idle .buddy-action-pose { animation: buddy-idle-shift 5.2s cubic-bezier(.77, 0, .175, 1) infinite; }
+.anim-walk .buddy-action-pose { animation: buddy-walk-bob 680ms cubic-bezier(.77, 0, .175, 1) infinite; }
 .anim-walk .buddy-hip-left { animation: buddy-step-left 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-walk .buddy-hip-right { animation: buddy-step-right 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-walk .buddy-shoulder-left { animation: buddy-arm-left 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-walk .buddy-shoulder-right { animation: buddy-arm-right 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-walk .buddy-foot-left { animation: buddy-foot-left 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-walk .buddy-foot-right { animation: buddy-foot-right 680ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
-.anim-happy .buddy-body-root { animation: buddy-celebrate 1.25s cubic-bezier(.23, 1, .32, 1) 2 both; }
+.anim-happy .buddy-action-pose { animation: buddy-celebrate 1.25s cubic-bezier(.23, 1, .32, 1) 2 both; }
 .anim-happy .buddy-shoulder-left,
 .anim-greeting .buddy-shoulder-left { animation: buddy-wave-shoulder 1.25s cubic-bezier(.23, 1, .32, 1) 2 both; }
 .anim-happy .buddy-elbow-left,
@@ -248,13 +256,12 @@
 .anim-thinking .buddy-thinking-face-hand { animation: buddy-think-reach 320ms cubic-bezier(.23, 1, .32, 1) both; }
 .anim-thinking .buddy-shoulder-right { opacity: 0; }
 .anim-thinking .buddy-hand-base { opacity: 0; }
-.anim-processing .buddy-torso-rig { animation: buddy-breath 3.8s cubic-bezier(.77, 0, .175, 1) infinite; }
 .anim-processing .buddy-shoulder-left { animation: buddy-type-left 520ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-processing .buddy-shoulder-right { animation: buddy-type-right 520ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-processing .buddy-wrist-left,
 .anim-processing .buddy-wrist-right { animation: buddy-type-tap 260ms cubic-bezier(.77, 0, .175, 1) infinite alternate; }
 .anim-processing .buddy-workpad { opacity: 1; }
-.anim-success .buddy-body-root { animation: buddy-success-anticipate 900ms cubic-bezier(.23, 1, .32, 1) 1 both; }
+.anim-success .buddy-action-pose { animation: buddy-success-anticipate 900ms cubic-bezier(.23, 1, .32, 1) 1 both; }
 .anim-success .buddy-body { animation: buddy-finish 900ms cubic-bezier(.23, 1, .32, 1) 1 both; }
 .anim-success .buddy-shoulder-right { animation: buddy-thumb-pose 500ms cubic-bezier(.23, 1, .32, 1) 1 both; }
 .anim-success .buddy-wrist-right { animation: buddy-thumb-wrist 500ms cubic-bezier(.23, 1, .32, 1) 1 both; }
@@ -264,8 +271,8 @@
 .anim-warning .buddy-shoulder-right { animation: buddy-alert 1.5s cubic-bezier(.77, 0, .175, 1) infinite; }
 .anim-warning .buddy-elbow-right { animation: buddy-alert-elbow 1.5s cubic-bezier(.77, 0, .175, 1) infinite; }
 .anim-error .buddy-head-turn { animation: buddy-error 520ms cubic-bezier(.77, 0, .175, 1) 1 both; }
-.anim-sleep .buddy-body-root { animation: buddy-sleep-settle 1.1s cubic-bezier(.23, 1, .32, 1) 1 both; }
-.anim-sleep .buddy-torso-rig { animation: buddy-sleep-breathe 4.8s cubic-bezier(.77, 0, .175, 1) infinite; }
+.anim-sleep .buddy-action-pose { animation: buddy-sleep-settle 1.1s cubic-bezier(.23, 1, .32, 1) 1 both; }
+.anim-sleep .buddy-life-motion { animation-duration: 6s; }
 .anim-sleep .buddy-lid,
 .mood-sleepy .buddy-lid { opacity: .96; }
 .anim-sleep .buddy-lid { animation: buddy-eyelids-close 1s cubic-bezier(.77, 0, .175, 1) 1 both; }
@@ -292,6 +299,23 @@
 .ambient-wave .buddy-hand-base { opacity: 0; }
 .ambient-wave .buddy-wave-hand { opacity: 1; }
 .personality-professional .ambient-wave { visibility: hidden; }
+/* On interruption, let the outgoing pose settle to its rig baseline before the new keyframes begin. */
+.mascot-art.is-handing-off .buddy-action-pose,
+.mascot-art.is-handing-off .buddy-head-turn,
+.mascot-art.is-handing-off .buddy-body,
+.mascot-art.is-handing-off .buddy-head-pivot,
+.mascot-art.is-handing-off .buddy-shoulder,
+.mascot-art.is-handing-off .buddy-elbow,
+.mascot-art.is-handing-off .buddy-wrist,
+.mascot-art.is-handing-off .buddy-hip,
+.mascot-art.is-handing-off .buddy-foot,
+.mascot-art.is-handing-off .buddy-iris,
+.mascot-art.is-handing-off .buddy-thinking-face-hand,
+.mascot-art.is-handing-off .buddy-lid,
+.mascot-art.is-handing-off .buddy-success-check {
+  animation-delay: 140ms !important;
+  animation-fill-mode: none !important;
+}
 .mascot-art.is-paused * { animation-play-state: paused !important; }
 .mascot-art.is-reduced-motion * { animation: none !important; transition: none !important; }
 

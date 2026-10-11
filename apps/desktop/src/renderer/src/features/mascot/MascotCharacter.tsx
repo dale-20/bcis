@@ -121,20 +121,20 @@ function Legs() {
 function CharacterArt({ mood, shadeId, lidId }: { mood: MascotMood; shadeId: string; lidId: string }) {
   return <>
     <ellipse className="buddy-shadow" cx="90" cy="208" rx="36" ry="4" fill="#102a47" opacity=".15" />
-    <g className="buddy-body-root">
+    <g className="buddy-life-motion"><g className="buddy-body-root"><g className="buddy-action-pose">
       <Legs />
       <g className="buddy-torso-rig"><g className="buddy-torso-ambient"><Body mood={mood} /><g className="buddy-shoulders"><Hand side="left" mood={mood} /><Hand side="right" mood={mood} /></g></g></g>
       <g className="buddy-neck"><g className="buddy-head-pivot"><Head mood={mood} shadeId={shadeId} lidId={lidId} /></g></g>
       {mood === 'celebrating' && <g className="buddy-success-check"><circle cx="139" cy="128" r="8" fill="#159b77" /><path d="M135 128l3 3 5-6" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /></g>}
-    </g>
+    </g></g></g>
   </>;
 }
 
-export function MascotCharacter({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+export function MascotCharacter({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false, handingOff = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean; handingOff?: boolean }) {
   const id = useId().replaceAll(':', '');
   const shadeId = `${id}-cap-shade`;
   const lidId = `${id}-lid-shade`;
-  return <svg className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
+  return <svg className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}${handingOff ? ' is-handing-off' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
     <defs>
       <linearGradient id={shadeId} x1=".15" y1="0" x2=".8" y2="1"><stop stopColor="#53baff" /><stop offset=".52" stopColor="#1674c9" /><stop offset="1" stopColor="#14529b" /></linearGradient>
       <linearGradient id={lidId} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#fff8f0" /><stop offset="1" stopColor="#f0d8c8" /></linearGradient>

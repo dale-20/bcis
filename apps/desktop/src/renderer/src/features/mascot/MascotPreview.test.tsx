@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MascotPreview } from './MascotPreview';
-import { MascotAssetBoundary } from './MascotRenderer';
+import { MascotAssetBoundary, MascotRenderer } from './MascotRenderer';
 import { MascotCharacter } from './MascotCharacter';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -31,6 +31,16 @@ describe('mascot character studio', () => {
     render(<MascotPreview />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Reduced motion' }));
     expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toHaveClass('is-reduced-motion');
+  });
+
+  it('keeps the same rig mounted while the primary animation changes', () => {
+    const { container, rerender } = render(<MascotRenderer mood="neutral" animation="idle" />);
+    const originalSvg = container.querySelector('.mascot-art');
+    const originalLifeLayer = container.querySelector('.buddy-life-motion');
+    rerender(<MascotRenderer mood="celebrating" animation="success" />);
+    expect(container.querySelector('.mascot-art')).toBe(originalSvg);
+    expect(container.querySelector('.buddy-life-motion')).toBe(originalLifeLayer);
+    expect(originalSvg).toHaveClass('anim-success');
   });
 
   it('nests shoulders, elbows, wrists, hips, knees, ankles, and feet under body and head pivots', () => {

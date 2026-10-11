@@ -5,14 +5,25 @@ type AnimationCompletion = (state: MascotAnimationState) => void;
 
 export function useMascotAnimation() {
   const [state, setState] = useState<MascotAnimationState>(IDLE_ANIMATION);
+  const [handingOff, setHandingOff] = useState(false);
   const [paused, setPaused] = useState(() => typeof document !== 'undefined' && document.visibilityState === 'hidden');
   const pausedRef = useRef(paused);
   const stateRef = useRef(state);
   const nextId = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deadline = useRef<number | null>(null);
   const remaining = useRef<number | null>(null);
   const completion = useRef<AnimationCompletion | undefined>(undefined);
+
+  const beginHandoff = useCallback(() => {
+    setHandingOff(true);
+    if (handoffTimer.current !== null) clearTimeout(handoffTimer.current);
+    handoffTimer.current = setTimeout(() => {
+      handoffTimer.current = null;
+      setHandingOff(false);
+    }, 140);
+  }, []);
 
   const commit = useCallback((next: MascotAnimationState) => {
     stateRef.current = next;
@@ -28,13 +39,14 @@ export function useMascotAnimation() {
   const finish = useCallback((requestId: number) => {
     const finished = stateRef.current;
     if (finished.requestId !== requestId || finished.name === 'idle') return;
+    beginHandoff();
     clearTimer();
     remaining.current = null;
     const onComplete = completion.current;
     completion.current = undefined;
     commit(transitionAnimation(finished, { type: 'complete', requestId }));
     onComplete?.(finished);
-  }, [clearTimer, commit]);
+  }, [beginHandoff, clearTimer, commit]);
 
   const schedule = useCallback((requestId: number, durationMs: number) => {
     clearTimer();
@@ -47,6 +59,7 @@ export function useMascotAnimation() {
     const requestId = ++nextId.current;
     const next = transitionAnimation(stateRef.current, { type: 'play', request, requestId });
     if (next.requestId !== requestId) return false;
+    if (stateRef.current.name !== 'idle') beginHandoff();
     clearTimer();
     remaining.current = null;
     completion.current = onComplete;
@@ -56,14 +69,15 @@ export function useMascotAnimation() {
       if (!pausedRef.current) schedule(requestId, next.durationMs);
     }
     return true;
-  }, [clearTimer, commit, schedule]);
+  }, [beginHandoff, clearTimer, commit, schedule]);
 
   const reset = useCallback(() => {
+    if (stateRef.current.name !== 'idle') beginHandoff();
     clearTimer();
     remaining.current = null;
     completion.current = undefined;
     commit(transitionAnimation(stateRef.current, { type: 'reset', requestId: ++nextId.current }));
-  }, [clearTimer, commit]);
+  }, [beginHandoff, clearTimer, commit]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -88,8 +102,9 @@ export function useMascotAnimation() {
 
   useEffect(() => () => {
     clearTimer();
+    if (handoffTimer.current !== null) clearTimeout(handoffTimer.current);
     completion.current = undefined;
   }, [clearTimer]);
 
-  return { state, paused, play, reset, complete: finish };
+  return { state, paused, handingOff, play, reset, complete: finish };
 }
