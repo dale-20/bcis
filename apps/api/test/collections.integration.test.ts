@@ -224,6 +224,11 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const accounts = await app.inject({ method: 'GET', url: `/receivables/accounts?asOf=2026-11-15&collectorId=${collectorId}&collectionAreaId=${areaId}&page=1&pageSize=100`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(accounts.statusCode, accounts.body).toBe(200);
     expect(accounts.json<{ arrearsCentavos: string }>().arrearsCentavos).toBe(aging.totals.total);
+    const sortedAccounts = await app.inject({ method: 'GET', url: `/receivables/accounts?asOf=2026-11-15&collectorId=${collectorId}&collectionAreaId=${areaId}&page=1&pageSize=100&sort=arrears&direction=desc`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(sortedAccounts.statusCode, sortedAccounts.body).toBe(200);
+    const sortedRows = sortedAccounts.json<{ rows: { arrearsCentavos: string }[] }>().rows;
+    expect(sortedRows.length).toBeGreaterThan(1);
+    expect(sortedRows.slice(1).every((row, index) => BigInt(sortedRows[index]?.arrearsCentavos ?? '0') >= BigInt(row.arrearsCentavos))).toBe(true);
     for (const row of aging.rows) {
       if (row.daysOverdue === 0) expect(row.bucket).toBe('CURRENT');
       else if (row.daysOverdue <= 30) expect(row.bucket).toBe('1_30');
@@ -327,6 +332,11 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const agingTotal = aging.json<ReportData>().totals.find((total) => total.label === 'Outstanding')?.value;
     const agingSource = await database.pool.query<{ amount: string }>("select coalesce(sum(balance_centavos),0)::text amount from invoices where balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')");
     expect(moneyToCentavos(agingTotal ?? '')).toBe(BigInt(agingSource.rows[0]?.amount ?? '0'));
+    const serviceControlReport = await app.inject({ method: 'GET', url: '/reports/data?report=SERVICE_CONTROL_ACCOUNTS&from=2026-11-15&to=2026-11-15&serviceControlAsOf=2026-11-15&serviceControlOverdueOnly=true&serviceControlCollectorId=' + collectorId + '&serviceControlAreaId=' + areaId + '&serviceControlSort=arrears&serviceControlDirection=desc', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(serviceControlReport.statusCode, serviceControlReport.body).toBe(200);
+    const serviceControlData = serviceControlReport.json<ReportData>();
+    expect(serviceControlData).toMatchObject({ title: 'Overdue service accounts', rows: expect.any(Array) });
+    expect(serviceControlData.columns).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'arrears' }), expect.objectContaining({ key: 'daysOverdue' })]));
     const viewerMasterList = await app.inject({ method: 'GET', url: '/reports/data?report=SUBSCRIBER_MASTER_LIST&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.viewer}` } });
     expect(viewerMasterList.statusCode).toBe(403);
     const remittanceReport = await app.inject({ method: 'GET', url: '/reports/data?report=COLLECTOR_REMITTANCE&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
@@ -488,6 +498,13 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(batchXlsx.statusCode, batchXlsx.body).toBe(200);
     expect(batchXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
     expect(batchXlsx.headers['content-disposition']).toContain('bcis-collection-batch-list-2026-12-31.xlsx');
+    const receivablesPdf = await app.inject({ method: 'GET', url: `/reports/export?report=SERVICE_CONTROL_ACCOUNTS&from=2026-11-15&to=2026-11-15&serviceControlAsOf=2026-11-15&serviceControlOverdueOnly=true&serviceControlCollectorId=${collectorId}&serviceControlAreaId=${areaId}&serviceControlSort=arrears&serviceControlDirection=desc&format=PDF`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(receivablesPdf.statusCode, receivablesPdf.body).toBe(200);
+    expect(receivablesPdf.rawPayload.subarray(0, 4).toString()).toBe('%PDF');
+    const receivablesXlsx = await app.inject({ method: 'GET', url: `/reports/export?report=SERVICE_CONTROL_ACCOUNTS&from=2026-11-15&to=2026-11-15&serviceControlAsOf=2026-11-15&serviceControlOverdueOnly=true&serviceControlCollectorId=${collectorId}&serviceControlAreaId=${areaId}&serviceControlSort=arrears&serviceControlDirection=desc&format=XLSX`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(receivablesXlsx.statusCode, receivablesXlsx.body).toBe(200);
+    expect(receivablesXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    expect(receivablesXlsx.headers['content-disposition']).toContain('bcis-service-control-accounts-2026-11-15.xlsx');
 
     const actor = await database.pool.query<{ id: string }>("select id from users where username='admin.demo'");
     const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
@@ -499,6 +516,6 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(history.statusCode, history.body).toBe(200);
     expect(history.json<ServiceHistory>().events.map((event) => event.type)).toEqual(['RECONNECTION', 'SUSPENSION']);
     const exports = await database.pool.query("select count(*)::int count from audit_logs where action='report.exported'");
-    expect(exports.rows[0]?.count).toBe(5);
+    expect(exports.rows[0]?.count).toBe(7);
   });
 });

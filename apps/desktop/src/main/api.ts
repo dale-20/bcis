@@ -264,7 +264,7 @@ export class DesktopApiClient {
 
   getReceivableAccounts(query: ReceivableAccountQuery): Promise<DesktopResult<ReceivableAccountResponse>> {
     const parsed = serviceReceivableAccountQuerySchema.parse(query);
-    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), suspensionCandidates: String(parsed.suspensionCandidates), query: parsed.query, page: String(parsed.page), pageSize: String(parsed.pageSize) });
+    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), suspensionCandidates: String(parsed.suspensionCandidates), query: parsed.query, sort: parsed.sort, direction: parsed.direction, page: String(parsed.page), pageSize: String(parsed.pageSize) });
     for (const key of ['collectorId', 'collectionAreaId', 'planId', 'serviceTypeId', 'bucket'] as const) { const value = parsed[key]; if (value) parameters.set(key, value); }
     return this.call(`/receivables/accounts?${parameters.toString()}`, { method: 'GET' }, receivableAccountResponseSchema);
   }

@@ -9,6 +9,9 @@ export class ServiceControlService {
   async receivableAccounts(query: ReceivableAccountQuery) {
     return this.repository.receivableAccounts(query, await this.repository.policy());
   }
+  async receivableAccountExport(query: Omit<ReceivableAccountQuery, 'page' | 'pageSize'>) {
+    return this.repository.receivableAccounts({ ...query, page: 1, pageSize: 10_001 }, await this.repository.policy());
+  }
   policy() { return this.repository.policy(); }
   savePolicy(policy: ServiceControlPolicy, actorId: string, requestId: string) { return this.repository.savePolicy(policy, actorId, requestId); }
   createSuspension(input: CreateSuspensionInput, actorId: string, requestId: string) { return this.repository.createSuspension(input, actorId, requestId); }

@@ -24,7 +24,9 @@ export const serviceControlPlugin: FastifyPluginAsync<Options> = async (app, opt
     schema: { querystring: { type: 'object', required: ['asOf'], additionalProperties: false, properties: {
       asOf: { type: 'string', format: 'date' }, overdueOnly: { type: 'string', enum: ['true', 'false'] }, suspensionCandidates: { type: 'string', enum: ['true', 'false'] },
       collectorId: { type: 'string', format: 'uuid' }, collectionAreaId: { type: 'string', format: 'uuid' }, planId: { type: 'string', format: 'uuid' }, serviceTypeId: { type: 'string', format: 'uuid' },
-      bucket: { type: 'string', enum: ['CURRENT', '1_30', '31_60', '61_90', '90_PLUS'] }, query: { type: 'string', maxLength: 100 }, page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' },
+      bucket: { type: 'string', enum: ['CURRENT', '1_30', '31_60', '61_90', '90_PLUS'] }, query: { type: 'string', maxLength: 100 },
+      sort: { type: 'string', enum: ['priority', 'subscriber', 'account', 'oldestDueDate', 'daysOverdue', 'monthsUnpaid', 'arrears'] }, direction: { type: 'string', enum: ['asc', 'desc'] },
+      page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' },
     } }, response: { 200: objectResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse } },
   }, async (request) => {
     const raw = request.query as Record<string, string | undefined>;
@@ -34,6 +36,7 @@ export const serviceControlPlugin: FastifyPluginAsync<Options> = async (app, opt
       ...(raw.query ? { query: raw.query } : {}), ...(raw.collectorId ? { collectorId: raw.collectorId } : {}),
       ...(raw.collectionAreaId ? { collectionAreaId: raw.collectionAreaId } : {}), ...(raw.planId ? { planId: raw.planId } : {}),
       ...(raw.serviceTypeId ? { serviceTypeId: raw.serviceTypeId } : {}), ...(raw.bucket ? { bucket: raw.bucket } : {}),
+      ...(raw.sort ? { sort: raw.sort } : {}), ...(raw.direction ? { direction: raw.direction } : {}),
     });
     return receivableAccountResponseSchema.parse(await service.receivableAccounts(result));
   });

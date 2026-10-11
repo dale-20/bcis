@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import type { Dashboard, DashboardQuery, ReportData, ReportRequest, ServiceHistory } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
+import { ServiceControlService } from '../service-control/service.js';
 
 type Row = Record<string, unknown>;
 const text = (value: unknown) => value === null || value === undefined ? '' : String(value);
@@ -81,6 +82,33 @@ export class ReportService {
 
   async report(request: ReportRequest): Promise<ReportData> {
     const generatedAt = new Date().toISOString();
+    if (request.report === 'SERVICE_CONTROL_ACCOUNTS') {
+      if (!request.serviceControlAsOf) throw new AppError(400, 'INVALID_REPORT_FILTERS', 'An as-of date is required for service-control exports');
+      const result = await new ServiceControlService(this.database).receivableAccountExport({
+        asOf: request.serviceControlAsOf, overdueOnly: request.serviceControlOverdueOnly === 'true', suspensionCandidates: false,
+        query: request.serviceControlQuery ?? '', sort: request.serviceControlSort ?? 'priority', direction: request.serviceControlDirection ?? 'desc',
+        ...(request.serviceControlCollectorId ? { collectorId: request.serviceControlCollectorId } : {}),
+        ...(request.serviceControlAreaId ? { collectionAreaId: request.serviceControlAreaId } : {}),
+        ...(request.serviceControlPlanId ? { planId: request.serviceControlPlanId } : {}),
+        ...(request.serviceControlTypeId ? { serviceTypeId: request.serviceControlTypeId } : {}),
+        ...(request.serviceControlBucket ? { bucket: request.serviceControlBucket } : {}),
+      });
+      if (result.total > 10_000) throw new AppError(413, 'EXPORT_TOO_LARGE', 'More than 10,000 service accounts match. Narrow the filters and try again.');
+      const rows = result.rows.map((row) => ({
+        subscriber: row.subscriberName, account: row.subscriberAccountNumber, service: row.serviceAccountNumber, status: row.serviceStatus,
+        plan: row.planName, serviceType: row.serviceTypeName, area: row.collectionAreaName ?? 'Unassigned', collector: row.collectorName ?? 'Unassigned',
+        oldestDue: row.oldestDueDate, daysOverdue: String(row.daysOverdue), unpaidMonths: String(row.monthsUnpaid),
+        lastPayment: row.lastPaymentDate ?? 'No posted payment', age: row.bucket, arrears: money(row.arrearsCentavos),
+      }));
+      return this.data(request, request.serviceControlOverdueOnly === 'true' ? 'Overdue service accounts' : 'Outstanding service accounts', rows, [
+        { label: 'Matching service accounts', value: String(result.total) }, { label: 'Matching subscribers', value: String(result.overdueSubscriberCount) }, { label: 'Total arrears', value: money(result.arrearsCentavos) },
+      ], [
+        { key: 'subscriber', label: 'Subscriber' }, { key: 'account', label: 'Account' }, { key: 'service', label: 'Service' }, { key: 'status', label: 'Service status' },
+        { key: 'plan', label: 'Plan' }, { key: 'serviceType', label: 'Service type' }, { key: 'area', label: 'Area' }, { key: 'collector', label: 'Collector' },
+        { key: 'oldestDue', label: 'Oldest due' }, { key: 'daysOverdue', label: 'Days overdue', align: 'right' }, { key: 'unpaidMonths', label: 'Unpaid months', align: 'right' },
+        { key: 'lastPayment', label: 'Last payment' }, { key: 'age', label: 'Age bucket' }, { key: 'arrears', label: 'Arrears', align: 'right' },
+      ], generatedAt);
+    }
     if (request.report === 'PAYMENT_LIST') {
       const values: unknown[] = [request.from, request.to];
       const filters = ["p.payment_date >= ($1::date::timestamp at time zone 'Asia/Manila')", "p.payment_date < (($2::date + interval '1 day')::timestamp at time zone 'Asia/Manila')"];

@@ -84,8 +84,16 @@ export class ServiceControlRepository {
     if (query.bucket) accountConditions.push(eq(accounts.bucket, query.bucket));
     const filtered = accountConditions.length ? and(...accountConditions) : undefined;
     const base = this.database.db.select().from(accounts).where(filtered);
-    const rows = await base.orderBy(desc(accounts.daysOverdue), asc(accounts.oldestDueDate), asc(accounts.serviceAccountNumber))
-      .limit(query.pageSize).offset((query.page - 1) * query.pageSize);
+    const sortColumns = {
+      subscriber: accounts.subscriberName, account: accounts.serviceAccountNumber, oldestDueDate: accounts.oldestDueDate,
+      daysOverdue: accounts.daysOverdue, monthsUnpaid: accounts.monthsUnpaid, arrears: accounts.arrearsCentavos,
+    };
+    const order = query.sort === 'priority'
+      ? [desc(accounts.daysOverdue), asc(accounts.oldestDueDate), asc(accounts.serviceAccountNumber), asc(accounts.serviceAccountId)]
+      : query.direction === 'asc'
+        ? [asc(sortColumns[query.sort]), asc(accounts.serviceAccountNumber), asc(accounts.serviceAccountId)]
+        : [desc(sortColumns[query.sort]), asc(accounts.serviceAccountNumber), asc(accounts.serviceAccountId)];
+    const rows = await base.orderBy(...order).limit(query.pageSize).offset((query.page - 1) * query.pageSize);
     const [totals] = await this.database.db.select({
       total: count(), overdueSubscriberCount: sql<number>`count(distinct ${accounts.subscriberId})::int`,
       arrearsCentavos: sql<bigint>`coalesce(sum(${accounts.arrearsCentavos}), 0)::bigint`.mapWith(invoices.balanceCentavos),

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, FileBarChart2, RefreshCw, WalletCards } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, FileBarChart2, FileSpreadsheet, FileText, RefreshCw, WalletCards } from 'lucide-react';
 import { receivableAgingBucketLabel, type AgingBucket, type ReceivableAccountQuery, type ReceivableAgingQuery } from '@bcis/shared';
 import { Button } from '../../components/ui/button';
 import { PageError, PageLoading } from '../../components/PageFeedback';
-import { getCollectionReferences, getReceivableAccounts, getReceivableAging, getServicePlans } from '../../services/api';
+import { exportReport, getCollectionReferences, getReceivableAccounts, getReceivableAging, getServicePlans } from '../../services/api';
 
 type ReceivablesMode = 'outstanding' | 'overdue' | 'aging';
 const dateToday = () => new Date().toISOString().slice(0, 10);
@@ -66,7 +66,7 @@ function AgingReceivablesPage() {
   </div>;
 }
 
-function ReceivableAccountsPage({ mode }: { mode: 'outstanding' | 'overdue' }) {
+function ReceivableAccountsPage({ mode, canExport }: { mode: 'outstanding' | 'overdue'; canExport: boolean }) {
   const [asOf, setAsOf] = useState(dateToday);
   const [collectorId, setCollectorId] = useState('');
   const [collectionAreaId, setCollectionAreaId] = useState('');
@@ -74,6 +74,8 @@ function ReceivableAccountsPage({ mode }: { mode: 'outstanding' | 'overdue' }) {
   const [serviceTypeId, setServiceTypeId] = useState('');
   const [bucket, setBucket] = useState<ReceivableAccountQuery['bucket'] | ''>('');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<ReceivableAccountQuery['sort']>('priority');
+  const [direction, setDirection] = useState<ReceivableAccountQuery['direction']>('desc');
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const references = useQuery({ queryKey: ['collection-reference-data'], queryFn: getCollectionReferences });
@@ -81,15 +83,34 @@ function ReceivableAccountsPage({ mode }: { mode: 'outstanding' | 'overdue' }) {
   const query: ReceivableAccountQuery = {
     asOf, overdueOnly: mode === 'overdue', suspensionCandidates: false, query: search.trim(), page, pageSize,
     ...(collectorId ? { collectorId } : {}), ...(collectionAreaId ? { collectionAreaId } : {}),
-    ...(planId ? { planId } : {}), ...(serviceTypeId ? { serviceTypeId } : {}), ...(bucket ? { bucket } : {}),
+    ...(planId ? { planId } : {}), ...(serviceTypeId ? { serviceTypeId } : {}), ...(bucket ? { bucket } : {}), sort, direction,
   };
   const result = useQuery({ queryKey: ['receivable-accounts', query], queryFn: () => getReceivableAccounts(query) });
+  const exportList = useMutation({ mutationFn: (format: 'PDF' | 'XLSX') => exportReport({
+    report: 'SERVICE_CONTROL_ACCOUNTS', from: asOf, to: asOf, serviceControlAsOf: asOf, serviceControlOverdueOnly: `${mode === 'overdue'}`,
+    serviceControlQuery: search.trim(), ...(collectorId ? { serviceControlCollectorId: collectorId } : {}),
+    ...(collectionAreaId ? { serviceControlAreaId: collectionAreaId } : {}), ...(planId ? { serviceControlPlanId: planId } : {}),
+    ...(serviceTypeId ? { serviceControlTypeId: serviceTypeId } : {}), ...(bucket ? { serviceControlBucket: bucket } : {}),
+    serviceControlSort: sort, serviceControlDirection: direction, format,
+  }) });
   if (references.isPending || catalog.isPending) return <PageLoading label="Loading receivable filters…" />;
   if (references.isError) return <PageError title="Receivable filters unavailable" message={references.error.message} onRetry={() => void references.refetch()} />;
   if (catalog.isError) return <PageError title="Service filters unavailable" message={catalog.error.message} onRetry={() => void catalog.refetch()} />;
   const title = mode === 'overdue' ? 'Overdue accounts' : 'Outstanding receivables';
+  const changeSort = (field: Exclude<ReceivableAccountQuery['sort'], 'priority'>) => {
+    const activeField = sort === 'priority' ? 'daysOverdue' : sort;
+    setPage(1);
+    if (activeField === field) { setSort(field); setDirection((value) => value === 'asc' ? 'desc' : 'asc'); }
+    else { setSort(field); setDirection(field === 'daysOverdue' || field === 'monthsUnpaid' || field === 'arrears' ? 'desc' : 'asc'); }
+  };
+  const sortHeader = (label: string, field: Exclude<ReceivableAccountQuery['sort'], 'priority'>) => {
+    const active = sort === field || (sort === 'priority' && field === 'daysOverdue');
+    const sortDirection = sort === 'priority' ? 'desc' : direction;
+    return <button className="table-sort" aria-pressed={active} aria-label={active ? `${label}, sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`} onClick={() => changeSort(field)}>{label}{active ? sortDirection === 'asc' ? ' ↑' : ' ↓' : ''}</button>;
+  };
   return <div className="content-enter">
-    <header className="page-heading page-heading-actions"><div><span className="eyebrow">Receivables</span><h1>{title}</h1><p>{mode === 'overdue' ? 'Prioritize delinquent services and collection follow-up.' : 'Positive finalized invoice balances grouped by service account.'}</p></div><Button variant="outline" onClick={() => void result.refetch()} disabled={result.isFetching}><RefreshCw aria-hidden="true" /> Refresh</Button></header>
+    <header className="page-heading page-heading-actions"><div><span className="eyebrow">Receivables</span><h1>{title}</h1><p>{mode === 'overdue' ? 'Prioritize delinquent services and collection follow-up.' : 'Positive finalized invoice balances grouped by service account.'}</p></div><div className="flex flex-wrap gap-2">{canExport && <><Button variant="outline" disabled={exportList.isPending} onClick={() => exportList.mutate('PDF')}><FileText aria-hidden="true" />PDF</Button><Button variant="outline" disabled={exportList.isPending} onClick={() => exportList.mutate('XLSX')}><FileSpreadsheet aria-hidden="true" />XLSX</Button></>}<Button variant="outline" onClick={() => void result.refetch()} disabled={result.isFetching}><RefreshCw aria-hidden="true" /> Refresh</Button></div></header>
+    {exportList.isSuccess && <p className="export-notice" role="status">{exportList.data.saved ? `Saved to ${exportList.data.filename}` : 'Export canceled. No file was saved.'}</p>}{exportList.isError && <p className="form-error" role="alert">{exportList.error.message}</p>}
     <section className="list-surface receivable-filters account-receivable-filters" aria-label="Receivable filters">
       <label className="field-label"><span>As of</span><input className="text-input" type="date" value={asOf} onChange={(event) => { setAsOf(event.target.value); setPage(1); }} /></label>
       <label className="field-label"><span>Search subscriber or service</span><input className="text-input" type="search" value={search} placeholder="Account, name, service…" onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></label>
@@ -103,13 +124,13 @@ function ReceivableAccountsPage({ mode }: { mode: 'outstanding' | 'overdue' }) {
       {result.isFetching && <p className="refreshing-note" role="status">Updating receivables…</p>}
       <section className="receivable-total-grid account-receivable-totals" aria-label="Receivable totals"><article className="receivable-total"><span>Matching service accounts</span><strong>{result.data.total}</strong></article><article className="receivable-total"><span>Overdue subscribers</span><strong>{result.data.overdueSubscriberCount}</strong></article><article className="receivable-total"><span>Total arrears</span><strong>{money(result.data.arrearsCentavos)}</strong><small>All matching rows</small></article></section>
       <section className="list-surface receivable-table-wrap" aria-label="Receivable service accounts">
-        {result.data.rows.length === 0 ? <div className="empty-state"><div><WalletCards aria-hidden="true" /></div><h2>No accounts found</h2><p>Try a different date or remove one of the route, plan, service, or age filters.</p></div> : <div className="table-scroll" role="region" aria-label="Receivable account results" tabIndex={0}><table className="data-table receivable-table"><thead><tr><th>Subscriber / service</th><th>Plan / type</th><th>Area / collector</th><th>Oldest due</th><th>Last payment</th><th>Unpaid months</th><th>Age</th><th className="amount-cell">Arrears</th></tr></thead><tbody>{result.data.rows.map((row) => <tr key={row.serviceAccountId}><td><strong>{row.subscriberName}</strong><small>{row.subscriberAccountNumber} · {row.serviceAccountNumber}</small></td><td>{row.planName}<small>{row.serviceTypeName}</small></td><td>{row.collectionAreaName ?? 'Unassigned'}<small>{row.collectorName ?? 'No collector'}</small></td><td>{row.oldestDueDate}</td><td>{row.lastPaymentDate ? new Date(row.lastPaymentDate).toLocaleDateString() : 'No posted payment'}</td><td>{row.monthsUnpaid}</td><td><span className={`status-badge ${row.daysOverdue > 0 ? 'status-warning' : 'status-active'}`}>{row.bucket === 'CURRENT' ? 'Current' : `${row.daysOverdue} days`}</span></td><td className="amount-cell">{money(row.arrearsCentavos)}</td></tr>)}</tbody></table></div>}
+        {result.data.rows.length === 0 ? <div className="empty-state"><div><WalletCards aria-hidden="true" /></div><h2>No accounts found</h2><p>Try a different date or remove one of the route, plan, service, or age filters.</p></div> : <div className="table-scroll" role="region" aria-label="Receivable account results" tabIndex={0}><table className="data-table receivable-table"><thead><tr><th>{sortHeader('Subscriber / service', 'subscriber')}</th><th>Plan / type</th><th>Area / collector</th><th>{sortHeader('Oldest due', 'oldestDueDate')}</th><th>Last payment</th><th>{sortHeader('Unpaid months', 'monthsUnpaid')}</th><th>{sortHeader('Age', 'daysOverdue')}</th><th className="amount-cell">{sortHeader('Arrears', 'arrears')}</th></tr></thead><tbody>{result.data.rows.map((row) => <tr key={row.serviceAccountId}><td><strong>{row.subscriberName}</strong><small>{row.subscriberAccountNumber} · {row.serviceAccountNumber}</small></td><td>{row.planName}<small>{row.serviceTypeName}</small></td><td>{row.collectionAreaName ?? 'Unassigned'}<small>{row.collectorName ?? 'No collector'}</small></td><td>{row.oldestDueDate}</td><td>{row.lastPaymentDate ? new Date(row.lastPaymentDate).toLocaleDateString() : 'No posted payment'}</td><td>{row.monthsUnpaid}</td><td><span className={`status-badge ${row.daysOverdue > 0 ? 'status-warning' : 'status-active'}`}>{row.bucket === 'CURRENT' ? 'Current' : `${row.daysOverdue} days`}</span></td><td className="amount-cell">{money(row.arrearsCentavos)}</td></tr>)}</tbody></table></div>}
         <footer className="receivable-pagination"><span>{result.data.total} service account{result.data.total === 1 ? '' : 's'} · page {result.data.page}</span><div><Button variant="outline" size="sm" disabled={page <= 1 || result.isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))}><ArrowLeft aria-hidden="true" /> Previous</Button><Button variant="outline" size="sm" disabled={page * pageSize >= result.data.total || result.isFetching} onClick={() => setPage((value) => value + 1)}>Next <ArrowRight aria-hidden="true" /></Button></div></footer>
       </section>
     </>}
   </div>;
 }
 
-export function ReceivablesPage({ mode }: { mode: ReceivablesMode }) {
-  return mode === 'aging' ? <AgingReceivablesPage /> : <ReceivableAccountsPage mode={mode} />;
+export function ReceivablesPage({ mode, canExport }: { mode: ReceivablesMode; canExport: boolean }) {
+  return mode === 'aging' ? <AgingReceivablesPage /> : <ReceivableAccountsPage mode={mode} canExport={canExport} />;
 }

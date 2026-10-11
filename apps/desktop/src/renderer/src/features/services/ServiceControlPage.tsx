@@ -27,7 +27,7 @@ function SuspensionCandidates({ user }: { user: AuthenticatedUser }) {
   const [reason, setReason] = useState('Delinquent account');
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
-  const query: ReceivableAccountQuery = { asOf: today(), overdueOnly: false, suspensionCandidates: true, query: search.trim(), page: 1, pageSize: 50 };
+  const query: ReceivableAccountQuery = { asOf: today(), overdueOnly: false, suspensionCandidates: true, query: search.trim(), sort: 'priority', direction: 'desc', page: 1, pageSize: 50 };
   const candidates = useQuery({ queryKey: ['receivable-accounts', query], queryFn: () => getReceivableAccounts(query) });
   const suspensions = useQuery({ queryKey: ['suspensions'], queryFn: () => listSuspensions(1, 50), enabled: canManage });
   const request = useMutation({

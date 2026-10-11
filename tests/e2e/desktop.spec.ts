@@ -36,6 +36,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   const reportExportDirectory = await mkdtemp(path.join(tmpdir(), 'bcis-report-export-'));
   const pdfExportPath = path.join(reportExportDirectory, 'monthly-collections.pdf');
   const xlsxExportPath = path.join(reportExportDirectory, 'monthly-collections.xlsx');
+  const receivablesExportPath = path.join(reportExportDirectory, 'overdue-accounts.xlsx');
   const proofFile = path.join(proofDirectory, 'synthetic-proof.png');
   await writeFile(proofFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=', 'base64'));
   const database = new pg.Client({ connectionString: databaseUrl });
@@ -289,6 +290,18 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('heading', { name: 'Outstanding receivables' })).toBeVisible();
     await expect(page.getByLabel('As of')).toBeVisible();
     await expect(page.locator('.receivable-table, .empty-state')).toBeVisible();
+    await page.getByRole('link', { name: 'Overdue', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Overdue accounts' })).toBeVisible();
+    await page.getByLabel('As of').fill('2027-12-31');
+    await expect(page.locator('.receivable-table tbody tr').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Sort by Arrears' }).click();
+    await expect(page.getByRole('button', { name: 'Arrears, sorted descending' })).toBeVisible();
+    await desktop.evaluate(({ dialog }, filePath: string) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, receivablesExportPath);
+    await page.getByRole('button', { name: 'XLSX', exact: true }).click();
+    await expect(page.getByText(`Saved to ${receivablesExportPath}`, { exact: true })).toBeVisible();
+    expect((await readFile(receivablesExportPath)).subarray(0, 2).toString('ascii')).toBe('PK');
     await page.getByRole('link', { name: 'Aging', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Accounts receivable aging' })).toBeVisible();
     await expect(page.getByText(/Day 90 belongs to 61–90/)).toBeVisible();

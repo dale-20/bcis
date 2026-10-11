@@ -6,6 +6,8 @@ export const receivableAccountQuerySchema = z.object({
   asOf: z.iso.date(), overdueOnly: z.boolean().default(false), suspensionCandidates: z.boolean().default(false),
   collectorId: z.uuid().optional(), collectionAreaId: z.uuid().optional(), planId: z.uuid().optional(), serviceTypeId: z.uuid().optional(),
   bucket: agingBucketSchema.optional(), query: z.string().trim().max(100).default(''),
+  sort: z.enum(['priority', 'subscriber', 'account', 'oldestDueDate', 'daysOverdue', 'monthsUnpaid', 'arrears']).default('priority'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
   page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(25),
 }).strict();
 export type ReceivableAccountQuery = z.infer<typeof receivableAccountQuerySchema>;
