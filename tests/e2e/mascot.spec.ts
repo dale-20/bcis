@@ -87,7 +87,7 @@ test('Buddy displays messages, replays motion, and respects reduced motion in bu
 
     await announce(page, 'payment-posted');
     const body = page.locator('.mascot-art .buddy-body');
-    await expect(body).toHaveCSS('animation-name', 'buddy-celebrate-hop');
+    await expect(body).toHaveCSS('animation-name', 'buddy-finish');
     await expect.poll(() => body.evaluate((element) => Number(element.getAnimations()[0]?.currentTime ?? 0)), { intervals: [50], timeout: 2_000 }).toBeGreaterThan(300);
     await announce(page, 'payment-posted');
     expect(await body.evaluate((element) => Number(element.getAnimations()[0]?.currentTime ?? 0))).toBeLessThan(300);

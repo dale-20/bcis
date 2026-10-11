@@ -1,110 +1,136 @@
+import { useId } from 'react';
 import type { MascotMood } from './mascot-model';
 import type { MascotAnimationName } from './mascot-animation';
 import type { MascotIdleBehavior } from './mascot-behavior';
 
-function Cap() {
-  return <g className="buddy-cap">
-    <path d="M43 72Q40 53 53 42Q64 32 90 32Q119 32 132 48Q138 57 135 75L126 81Q91 65 49 81Z" fill="#1472cf" stroke="#0b315e" strokeWidth="3" strokeLinejoin="round" />
-    <path d="M49 72Q86 60 131 75Q140 78 136 84Q92 70 47 85Z" fill="#22a6f2" stroke="#0b315e" strokeWidth="2.5" strokeLinejoin="round" />
-    <path d="M79 48Q90 39 101 48M83 52Q90 46 97 52M87 56Q90 53 93 56" fill="none" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-    <text x="90" y="68" textAnchor="middle" fill="white" fontSize="10" fontWeight="800" fontFamily="Inter, Segoe UI, sans-serif" letterSpacing=".5">BCIS</text>
+function WifiMark() {
+  return <g className="buddy-wifi-mark" fill="none" stroke="currentColor" strokeLinecap="round"><path d="M-7 0a10 10 0 0 1 14 0M-4 3a5.7 5.7 0 0 1 8 0M-1 6a1.5 1.5 0 0 1 2 0" /></g>;
+}
+
+function Cap({ shadeId }: { shadeId: string }) {
+  return <g className="buddy-cap" stroke="#153b68" strokeLinejoin="round" strokeWidth="2.35">
+    <path d="M47 65c1-16 12-26 25-30 13-4 29-3 40 3 11 6 17 16 18 29l-8 8H53z" fill={`url(#${shadeId})`} />
+    <path d="M53 65c22-8 52-8 78-1 7 2 9 7 2 10-23-5-50-5-80 3-9 1-12-5-4-8z" fill="#69caff" />
+    <path d="M67 61q23-9 48-1" fill="none" stroke="#a9e6ff" strokeLinecap="round" strokeWidth="1.4" />
+    <g transform="translate(88 47)" color="#e7f8ff" stroke="none"><WifiMark /></g>
+    <text x="88" y="67" fill="#f5fbff" stroke="none" textAnchor="middle" fontFamily="Inter, Segoe UI, sans-serif" fontSize="7.4" fontWeight="800" letterSpacing=".75">BCIS</text>
+    <path d="M54 74q32-7 72-1" fill="none" stroke="#0e4a8c" strokeLinecap="round" strokeWidth="1.3" />
   </g>;
 }
 
 function Headphones() {
-  return <g className="buddy-headphones">
-    <path d="M42 72Q35 75 35 89Q35 102 44 105M137 72Q144 75 144 89Q144 102 135 105" fill="none" stroke="#0b315e" strokeWidth="6" strokeLinecap="round" />
-    <path d="M36 79Q28 81 29 92Q30 103 39 104L43 101L43 80ZM143 79Q151 81 150 92Q149 103 140 104L136 101L136 80Z" fill="#0877d8" stroke="#0b315e" strokeWidth="2.5" />
-    <ellipse cx="36" cy="92" rx="3.5" ry="7" fill="#9ee7ff" /><ellipse cx="143" cy="92" rx="3.5" ry="7" fill="#9ee7ff" />
+  return <g className="buddy-headphones" stroke="#12365d" strokeLinejoin="round">
+    <path d="M42 85V75c0-25 19-41 46-41s46 16 46 41v10" fill="none" stroke="#12365d" strokeLinecap="round" strokeWidth="5.5" />
+    <path d="M44 72h8v31h-8c-5 0-8-4-8-9V81c0-5 3-9 8-9m88 0h-8v31h8c5 0 8-4 8-9V81c0-5-3-9-8-9" fill="#2489e7" strokeWidth="2.2" />
+    <path d="M44 79h3v16h-3c-2 0-3-2-3-4v-8c0-2 1-4 3-4m88 0h-3v16h3c2 0 3-2 3-4v-8c0-2-1-4-3-4" fill="#8edcff" stroke="none" />
+    <path d="M45 75v6m86-6v6" stroke="#d9f6ff" strokeLinecap="round" strokeWidth="1.5" />
   </g>;
 }
 
-function Eyes() {
+function Eyes({ lidId }: { lidId: string }) {
   return <g className="buddy-eyes">
-    <path className="buddy-brows" d="M58 82Q66 77 73 82M105 82Q113 77 121 82" fill="none" stroke="#0b315e" strokeWidth="3" strokeLinecap="round" />
-    <g className="buddy-eye buddy-eye-left"><ellipse cx="67" cy="94" rx="7.4" ry="10" fill="#1472b9" stroke="#0b315e" strokeWidth="1.7" /><ellipse cx="69" cy="91" rx="2.4" ry="3.2" fill="white" /></g>
-    <g className="buddy-eye buddy-eye-right"><ellipse cx="113" cy="94" rx="7.4" ry="10" fill="#1472b9" stroke="#0b315e" strokeWidth="1.7" /><ellipse cx="115" cy="91" rx="2.4" ry="3.2" fill="white" /></g>
-    <g className="buddy-eyelids"><path className="buddy-eyelid buddy-eyelid-left" d="M59 91Q67 84 75 91V96H59Z" /><path className="buddy-eyelid buddy-eyelid-right" d="M105 91Q113 84 121 91V96H105Z" /></g>
-    <ellipse cx="53" cy="105" rx="6" ry="2.8" fill="#f58d83" opacity=".46" /><ellipse cx="127" cy="105" rx="6" ry="2.8" fill="#f58d83" opacity=".46" />
-  </g>;
-}
-
-function Face({ mood }: { mood: MascotMood }) {
-  return <g className="buddy-face">
-    <path className="buddy-face-shape" d="M42 72Q48 45 69 39Q91 31 112 42Q132 53 136 79L130 109Q123 131 91 133Q58 132 48 111Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2.8" />
-    <Eyes />
-    {mood === 'thinking' && <g className="buddy-thinking-mark"><circle cx="136" cy="42" r="10" fill="#00a68a" /><text x="136" y="47" fill="white" fontSize="14" fontWeight="800" textAnchor="middle">?</text></g>}
-    <path className={`buddy-mouth mouth-${mood}`} d={mood === 'sleepy' ? 'M84 110Q90 112 96 110' : mood === 'concerned' ? 'M82 113Q90 106 98 113' : mood === 'surprised' ? 'M86 108Q90 104 94 108Q98 116 90 119Q82 116 86 108Z' : 'M81 105Q90 112 99 105Q98 117 90 118Q82 117 81 105Z'} fill={mood === 'sleepy' || mood === 'concerned' ? 'none' : '#db554b'} stroke="#0b315e" strokeWidth="1.6" strokeLinecap="round" />
-  </g>;
-}
-
-function Head({ mood }: { mood: MascotMood }) {
-  return <g className="buddy-head">
-    <Face mood={mood} />
-    <Headphones />
-    <Cap />
-    <g className="buddy-sleep-mark"><text x="139" y="39" fill="#1682dd" fontSize="13" fontWeight="800">Zz</text></g>
-  </g>;
-}
-
-function Arms() {
-  return <g className="buddy-arms">
-    <g className="buddy-arm-pair buddy-arm-pair-left">
-      <path className="buddy-arm buddy-arm-base" d="M60 143Q49 149 47 160" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-hand buddy-hand-base" d="M40 153Q36 149 33 153Q30 157 35 162L46 171Q51 174 56 167L68 157L57 145Q48 147 45 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <path className="buddy-wave-hand" d="M46 149Q42 146 41 139L38 132Q38 128 42 128Q45 129 47 137L49 130Q51 127 54 130L54 138Q57 134 60 137L59 146L56 153Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <path className="buddy-type-arm" d="M60 143Q65 151 72 159" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-type-hand" d="M68 158Q71 155 74 159L78 164Q78 167 75 168L68 165Q65 163 68 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+    <path className="buddy-brow buddy-brow-left" d="M57 91q9-7 19-1" fill="none" stroke="#183c67" strokeLinecap="round" strokeWidth="3" />
+    <path className="buddy-brow buddy-brow-right" d="M101 90q10-6 19 1" fill="none" stroke="#183c67" strokeLinecap="round" strokeWidth="3" />
+    <g className="buddy-eye buddy-eye-left">
+      <ellipse cx="68" cy="105" rx="9.7" ry="12.7" fill="#fff" stroke="#264a70" strokeWidth="1.35" />
+      <g className="buddy-iris"><ellipse cx="69" cy="107" rx="6.2" ry="8.1" fill="#2185dd" /><ellipse cx="69" cy="109" rx="3.2" ry="4.8" fill="#172f51" /><circle cx="71" cy="103" r="2.3" fill="#fff" /><circle cx="66" cy="111" r="1.05" fill="#bceaff" /></g>
+      <path className="buddy-lid" d="M58 102q10-13 20 0v4q-10-6-20 0z" fill={`url(#${lidId})`} />
     </g>
-    <g className="buddy-arm-pair buddy-arm-pair-right">
-      <path className="buddy-arm buddy-arm-base" d="M119 143Q130 149 132 160" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-hand buddy-hand-base" d="M138 153Q142 150 145 154Q148 158 143 163L132 172Q127 175 122 168L110 158L119 145Q129 146 132 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <path className="buddy-type-arm" d="M119 143Q114 151 108 159" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-type-hand" d="M111 158Q108 155 105 159L101 164Q101 167 104 168L111 165Q114 163 111 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <path className="buddy-thinking-arm" d="M119 143Q114 126 102 119" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-thinking-hand" d="M98 122Q94 120 94 116L93 109Q94 106 97 108L100 113L100 106Q102 103 104 107L105 113Q108 110 110 114L109 121L104 126Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <path className="buddy-success-arm" d="M119 143Q128 132 130 121" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
-      <path className="buddy-thumbs-up" d="M122 124L124 113Q125 109 129 110L131 117L136 115Q140 115 140 119L138 131Q137 134 133 135L126 134Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-      <g className="buddy-success-check"><circle cx="136" cy="105" r="12" fill="#16a77a" /><path d="M130 105L134 109L142 100" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></g>
+    <g className="buddy-eye buddy-eye-right">
+      <ellipse cx="108" cy="105" rx="9.7" ry="12.7" fill="#fff" stroke="#264a70" strokeWidth="1.35" />
+      <g className="buddy-iris"><ellipse cx="107" cy="107" rx="6.2" ry="8.1" fill="#2185dd" /><ellipse cx="107" cy="109" rx="3.2" ry="4.8" fill="#172f51" /><circle cx="109" cy="103" r="2.3" fill="#fff" /><circle cx="104" cy="111" r="1.05" fill="#bceaff" /></g>
+      <path className="buddy-lid" d="M98 102q10-13 20 0v4q-10-6-20 0z" fill={`url(#${lidId})`} />
     </g>
+    <ellipse cx="51" cy="119" rx="7" ry="3.5" fill="#fa9b97" opacity=".36" /><ellipse cx="125" cy="119" rx="7" ry="3.5" fill="#fa9b97" opacity=".36" />
   </g>;
 }
 
-function Body() {
+function Face({ mood, lidId }: { mood: MascotMood; lidId: string }) {
+  const concerned = mood === 'concerned';
+  const surprised = mood === 'surprised';
+  const sleepy = mood === 'sleepy';
+  return <g className={`buddy-face mood-face-${mood}`}>
+    <path className="buddy-face-outline" d="M45 80c4-20 19-31 42-32 24-1 42 11 47 31l-1 31c-1 20-16 35-44 36-27 0-42-14-44-34z" fill="#fff8f0" stroke="#183b65" strokeLinejoin="round" strokeWidth="2.4" />
+    <path d="M50 83c4-18 18-27 38-29 20-1 35 8 41 26l-1 7c-12-5-24-7-39-7-14 0-27 3-39 9z" fill="#fff" opacity=".66" />
+    <Eyes lidId={lidId} />
+    <path className="buddy-mouth" d={surprised ? 'M84 125c0-5 4-8 8-8s8 3 8 8-4 8-8 8-8-3-8-8' : concerned ? 'M83 129q9-9 18 0' : sleepy ? 'M85 127q7 2 13 0' : 'M80 122q12 12 24 0c-2 10-8 15-13 15s-9-5-11-15'} fill={surprised || sleepy || concerned ? 'none' : '#cf5465'} stroke="#183b65" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" />
+    {!surprised && !sleepy && !concerned && <path d="M86 130q6 4 12 0" fill="none" stroke="#f6a1a1" strokeLinecap="round" strokeWidth="1.4" />}
+    <path className="buddy-sleep-mark" d="M131 42h10m-6-4 5 4-5 4m6-10h7" fill="none" stroke="#1682dd" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.3" />
+    {mood === 'thinking' && <g className="buddy-thinking-face-hand">
+      <path d="M118 165q-1-13-8-22l-9-10q-3-4-5-1t2 7l4 6q-5-4-7-1-2 2 2 6l8 11q5 5 13 4z" fill="#fff5e6" stroke="#173b64" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M116 165q-1-12-7-20" fill="none" stroke="#e1bc99" strokeLinecap="round" strokeWidth="1.3" />
+    </g>}
+  </g>;
+}
+
+function Head({ mood, shadeId, lidId }: { mood: MascotMood; shadeId: string; lidId: string }) {
+  return <g className="buddy-head"><g className="buddy-head-ambient"><g className="buddy-head-turn"><Headphones /><Face mood={mood} lidId={lidId} /><Cap shadeId={shadeId} /></g></g></g>;
+}
+
+function Hand({ side, mood }: { side: 'left' | 'right'; mood: MascotMood }) {
+  const left = side === 'left';
+  const x = left ? 0 : 180;
+  return <g className={`buddy-arm-ambient buddy-arm-ambient-${side}`}><g className={`buddy-arm-pair buddy-arm-pair-${side}`}>
+    <g className="buddy-arm-art" transform={`translate(${x} 0) scale(${left ? 1 : -1} 1) translate(${-x} 0)`}>
+    <path className="buddy-sleeve" d="M64 151q-10 3-14 14l7 9q10-4 17-12z" fill={left ? '#258be1' : '#1d6dbb'} stroke="#173b64" strokeLinejoin="round" strokeWidth="2.15" />
+    <path className="buddy-glove buddy-hand-base" d="M59 166q-5-1-7 3l-3 7q-1 4 3 5l3-2q-1 5 3 5 3 0 4-3 2 3 5 1 2-1 1-4 4 1 5-3l-2-7q-2-4-7-2z" fill="#fff5e6" stroke="#173b64" strokeLinejoin="round" strokeWidth="1.8" />
+    {left && <g className="buddy-wave-hand" transform="translate(2 -2)"><path d="M57 169q-5-2-6-8l-1-8q1-4 4-3l3 9-1-10q1-4 4-3l2 11 1-8q2-3 4 0l1 9 3-5q3-2 4 1l-3 10q-2 7-9 8z" fill="#fff5e6" stroke="#173b64" strokeLinejoin="round" strokeWidth="1.8" /></g>}
+    {!left && mood === 'celebrating' && <g className="buddy-thumbs-up"><path d="M58 165l4-13q2-5 5-3l2 8q7-4 11 0l-2 12q-1 4-6 5l-10-1z" fill="#fff5e6" stroke="#173b64" strokeLinejoin="round" strokeWidth="1.8" /></g>}
+    {!left && mood === 'celebrating' && <g className="buddy-success-check"><circle cx="139" cy="128" r="8" fill="#159b77" /><path d="M135 128l3 3 5-6" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /></g>}
+    <path className="buddy-arm-joint" d="M67 153q8-4 13 2" fill="none" stroke="#4298dc" strokeLinecap="round" strokeWidth="2" />
+    </g>
+  </g></g>;
+}
+
+function Body({ mood }: { mood: MascotMood }) {
   return <g className="buddy-body">
-    <path className="buddy-cape" d="M58 130Q37 139 38 176Q45 168 57 177L67 153M119 130Q140 139 142 176Q134 168 122 177L111 153" fill="#1682dd" stroke="#0b315e" strokeWidth="2.5" strokeLinejoin="round" />
-    <path className="buddy-uniform" d="M57 128Q88 116 119 129L126 169Q105 181 75 177Q61 175 53 168Z" fill="#1455a4" stroke="#0b315e" strokeWidth="2.8" strokeLinejoin="round" />
-    <path d="M75 131Q89 138 103 131L108 169Q91 175 70 168Z" fill="#edf6ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
-    <path className="buddy-uniform-mark" d="M79 148Q89 139 99 148M82 155Q89 149 96 155M86 162Q89 159 92 162" fill="none" stroke="#1188df" strokeWidth="3.2" strokeLinecap="round" />
-    <circle cx="89" cy="132" r="3" fill="#ffd24a" stroke="#0b315e" strokeWidth="1.5" />
-    <g className="buddy-workpad">
-      <path d="M68 155L110 155L114 174L65 174Z" fill="#0e2949" stroke="#071a31" strokeWidth="2" strokeLinejoin="round" />
-      <rect x="73" y="159" width="32" height="10" rx="2" fill="#bde9ff" />
-      <path d="M63 175L116 175L120 179L60 179Z" fill="#c5d3e2" stroke="#071a31" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M73 177H108M77 175V179M83 175V179M89 175V179M95 175V179M101 175V179" stroke="#52708d" strokeWidth="1" />
+    <path className="buddy-cape" d="M57 145q-13 9-13 34l14-6 10-19m48-9q14 9 14 33l-13-6-10-18" fill="#258be1" stroke="#173b64" strokeLinejoin="round" strokeWidth="2.2" />
+    <path className="buddy-uniform" d="M62 140q27-13 54 0l10 35q-7 9-37 9t-37-9z" fill="#1762ac" stroke="#173b64" strokeLinejoin="round" strokeWidth="2.4" />
+    <path d="M71 139l18 9 18-9-5 15H76z" fill="#e9f7ff" stroke="#173b64" strokeLinejoin="round" strokeWidth="1.65" />
+    <path d="M89 150v24" stroke="#9dc8ea" strokeWidth="1.25" />
+    <circle cx="92" cy="158" r="1.15" fill="#ffd66d" /><circle cx="92" cy="165" r="1.15" fill="#ffd66d" />
+    <g className="buddy-chest-badge" transform="translate(107 160) scale(.67)" color="#b9efff">
+      <circle r="11" fill="#124c88" stroke="#6cbbe9" strokeWidth="1.3" /><g transform="translate(0 -1)" stroke="currentColor" strokeWidth="1.8"><WifiMark /></g>
     </g>
-    <Arms />
+    <path d="M64 146q-4 3-6 9m65-9q4 3 6 9" fill="none" stroke="#71b9ed" strokeLinecap="round" strokeWidth="1.2" />
+    {mood === 'processing' && <g className="buddy-workpad"><rect x="69" y="153" width="40" height="24" rx="4" fill="#0d3157" stroke="#173b64" strokeWidth="2" /><rect x="73" y="157" width="32" height="16" rx="2" fill="#bceeff" /><path d="M66 179h47l-4 4H70z" fill="#cfdae3" stroke="#173b64" strokeWidth="1.4" /></g>}
+    <path className="buddy-hem" d="M65 176q24 8 48 0" fill="none" stroke="#5ba4dd" strokeLinecap="round" strokeWidth="1.35" />
   </g>;
 }
 
 function Legs() {
   return <g className="buddy-legs">
-    <path className="buddy-leg buddy-leg-left" d="M66 170L60 189Q59 196 66 198L81 198L87 177Z" fill="#143e74" stroke="#0b315e" strokeWidth="2.5" />
-    <path className="buddy-leg buddy-leg-right" d="M103 174L110 190Q113 196 106 198L92 198L88 178Z" fill="#143e74" stroke="#0b315e" strokeWidth="2.5" />
-    <path className="buddy-foot buddy-foot-left" d="M61 190Q70 186 81 192L83 202Q82 205 77 205L55 204Q51 202 55 197Z" fill="#1472cf" stroke="#0b315e" strokeWidth="2.5" strokeLinejoin="round" />
-    <path className="buddy-foot buddy-foot-right" d="M101 191Q111 187 119 194L124 200Q124 204 118 205L96 204L94 198Z" fill="#1472cf" stroke="#0b315e" strokeWidth="2.5" strokeLinejoin="round" />
+    <g className="buddy-leg buddy-leg-left">
+      <path d="M72 177h13v17H72z" fill="#245483" stroke="#173b64" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M69 192q8-3 17 1l3 7q0 4-5 4H64q-4-2-2-6z" fill="#1262b2" stroke="#173b64" strokeLinejoin="round" strokeWidth="2.2" />
+      <path d="M65 199q10 2 21 0" fill="none" stroke="#78caff" strokeLinecap="round" strokeWidth="1.35" /><ellipse cx="78" cy="177" rx="6" ry="2" fill="#3989cc" />
+    </g>
+    <g className="buddy-leg buddy-leg-right">
+      <path d="M94 177h13v17H94z" fill="#245483" stroke="#173b64" strokeLinejoin="round" strokeWidth="2" />
+      <path d="M93 193q8-4 17 0l6 6q1 4-4 5H91q-4-2-2-6z" fill="#1262b2" stroke="#173b64" strokeLinejoin="round" strokeWidth="2.2" />
+      <path d="M92 200q10 2 21 0" fill="none" stroke="#78caff" strokeLinecap="round" strokeWidth="1.35" /><ellipse cx="100" cy="177" rx="6" ry="2" fill="#3989cc" />
+    </g>
   </g>;
 }
 
-function CharacterArt() {
+function CharacterArt({ mood, shadeId, lidId }: { mood: MascotMood; shadeId: string; lidId: string }) {
   return <>
-    <ellipse className="buddy-shadow" cx="91" cy="204" rx="40" ry="6" fill="#0f2747" opacity=".14" />
-    <Legs /><Body />
+    <ellipse className="buddy-shadow" cx="90" cy="208" rx="36" ry="4" fill="#102a47" opacity=".15" />
+    <Legs />
+    <g className="buddy-torso-rig"><g className="buddy-torso-ambient"><Body mood={mood} /><g className="buddy-arms"><Hand side="left" mood={mood} /><Hand side="right" mood={mood} /></g></g></g>
+    <g className="buddy-head-rig"><Head mood={mood} shadeId={shadeId} lidId={lidId} /></g>
   </>;
 }
 
 export function MascotCharacter({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+  const id = useId().replaceAll(':', '');
+  const shadeId = `${id}-cap-shade`;
+  const lidId = `${id}-lid-shade`;
   return <svg className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
-    <g className="buddy-character"><CharacterArt /><Head mood={mood} /></g>
+    <defs>
+      <linearGradient id={shadeId} x1=".15" y1="0" x2=".8" y2="1"><stop stopColor="#53baff" /><stop offset=".52" stopColor="#1674c9" /><stop offset="1" stopColor="#14529b" /></linearGradient>
+      <linearGradient id={lidId} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#fff8f0" /><stop offset="1" stopColor="#f0d8c8" /></linearGradient>
+    </defs>
+    <g className="buddy-character"><CharacterArt mood={mood} shadeId={shadeId} lidId={lidId} /></g>
   </svg>;
 }

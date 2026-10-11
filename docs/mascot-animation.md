@@ -10,6 +10,14 @@ Phase 3 uses the Phase 2 authored SVG layers and CSS keyframes, as selected in `
 
 The motion is implemented in `mascot.css` with transform and opacity keyframes on named vector layers. Idle blinks, breathing, looks, stretches, and rare waves are individually scheduled short poses; they do not create a continuously moving idle loop. Walk alternates feet and arms with a small body bounce; happy and greeting wave; thinking reveals the authored chin-touch glove; processing reveals a compact authored laptop and loops separated typing hands; success shows an authored thumbs-up/checkmark and short bounce; warning gestures for attention; error briefly dips then returns to idle; sleep closes the eyes and shows an intermittent drifting Z; surprised briefly widens the eyes. Temporary event reactions use the existing fixed local messages and their confirmed event timing.
 
+## Artwork layers and transform ownership
+
+`MascotCharacter.tsx` draws a local vector illustration with separate groups for the head, ambient head turn, head pose, face, eyes, eyelids, torso, ambient torso movement, ambient shoulder pose, event arm pose, mirrored arm art, and each leg. The principal hinges are specified in SVG coordinates: head at `(90, 139)`, shoulders at `(69, 153)` and `(111, 153)`, torso at `(90, 178)`, and boot tops at `(78, 177)` and `(101, 177)`. The chin-touch hand, typing pad, wave hand, thumbs-up, and success mark are authored as intentional pose/details.
+
+Each transform is assigned to one nested layer. Event keyframes animate the inner pose group while idle look/stretch/wave behavior animates a wrapper, so those independent behaviors compose. Mood styling uses opacity or expression paths for lids and brows. SVG transitions are not relied on to recover a base transform after a one-shot animation; one-shots use explicit fill behavior where a pose needs to remain visible. Reduced motion removes keyframes and transitions while preserving the chosen static expression. This is an articulated 2D pose rig, not mesh deformation or independent finger/elbow bending.
+
+The pre-redesign findings are preserved in `docs/mascot-redesign-diagnosis.md` to distinguish the original transform and artwork limitations from the current design.
+
 ## Reduced motion and visibility
 
 The application follows `prefers-reduced-motion`, with its existing preference observer updating Buddy without reloading. Reduced motion removes all character keyframes while retaining the selected expression as a static pose. When the document becomes hidden, the SVG remains mounted with CSS animations paused and temporary reaction time is frozen; it resumes with the remaining time when visible again. Unmount clears timers and completion closures.
