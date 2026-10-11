@@ -1,30 +1,46 @@
 import { useState } from 'react';
+import { animationMood, MASCOT_ANIMATIONS, type MascotAnimationName } from './mascot-animation';
 import { MascotRenderer } from './MascotRenderer';
-import type { MascotMood } from './mascot-model';
+import { useMascotAnimation } from './use-mascot-animation';
 import './mascot-preview.css';
 
-const poses = [
-  { mood: 'neutral', label: 'Neutral', note: 'Quiet default expression' },
-  { mood: 'happy', label: 'Happy', note: 'Warm smile and relaxed eyes' },
-  { mood: 'thinking', label: 'Thinking', note: 'Head tilt and question cue' },
-  { mood: 'surprised', label: 'Surprised', note: 'Wide eyes and open mouth' },
-  { mood: 'concerned', label: 'Concerned', note: 'Soft worried brows and mouth' },
-  { mood: 'sleepy', label: 'Sleepy', note: 'Lowered eyelids and calm pose' },
-  { mood: 'celebrating', label: 'Celebrating', note: 'Raised arms and joyful bounce' },
-] as const satisfies readonly { mood: MascotMood; label: string; note: string }[];
+const animationNotes: Record<MascotAnimationName, string> = {
+  idle: 'Gentle breathing, natural blinks, and a small occasional glance.',
+  walk: 'Alternating feet with a coordinated arm swing and soft body bounce.',
+  happy: 'Warm smile, friendly wave, and a brief celebratory bounce.',
+  thinking: 'A thoughtful tilt with the glove resting near the chin.',
+  processing: 'Subtle alternating arm movement while Buddy works.',
+  success: 'Thumbs-up and checkmark with a short celebratory hop.',
+  warning: 'Concerned brows and a quiet attention gesture.',
+  error: 'A brief disappointed reaction that returns to idle.',
+  sleep: 'Closed eyes, slow breathing, and a drifting sleep indicator.',
+  surprised: 'Wide eyes and a quick, restrained reaction.',
+  greeting: 'A clear, welcoming hand wave.',
+};
+
+const animationLabels: Record<MascotAnimationName, string> = {
+  idle: 'Idle', walk: 'Walk', happy: 'Happy', thinking: 'Thinking', processing: 'Processing',
+  success: 'Success', warning: 'Warning', error: 'Error', sleep: 'Sleep', surprised: 'Surprised', greeting: 'Greeting',
+};
 
 export function MascotPreview() {
-  const [selected, setSelected] = useState<MascotMood>('neutral');
-  const current = poses.find((pose) => pose.mood === selected) ?? poses[0];
+  const { state, paused, play } = useMascotAnimation();
+  const [reducedMotion, setReducedMotion] = useState(() => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [completedAnimation, setCompletedAnimation] = useState<MascotAnimationName | null>(null);
+  const triggerAnimation = (name: MascotAnimationName) => {
+    setCompletedAnimation(null);
+    play({ name, priority: 100 }, (finished) => setCompletedAnimation(finished.name));
+  };
+
   return <main className="mascot-preview">
-    <header className="mascot-preview-header"><div className="mascot-preview-brand"><span aria-hidden="true">⌁</span><div><strong>BCIS Buddy</strong><small>Character studio · Phase 2</small></div></div><span className="mascot-preview-badge">LOCAL VECTOR ART</span></header>
-    <section className="mascot-preview-stage" aria-label="Selected character preview">
-      <div className="mascot-preview-copy"><p className="mascot-preview-eyebrow">CHARACTER STATES</p><h1>Meet your office companion.</h1><p>One consistent character, with expression and motion tuned to each moment in BCIS.</p><div className="mascot-preview-selected"><span className="mascot-preview-dot" /><strong>{current.label}</strong><span>{current.note}</span></div></div>
-      <div className="mascot-preview-hero"><MascotRenderer mood={selected} /><span className="mascot-preview-ground" /></div>
+    <header className="mascot-preview-header"><div className="mascot-preview-brand"><span aria-hidden="true">⌁</span><div><strong>BCIS Buddy</strong><small>Animation studio · Phase 3</small></div></div><label className="mascot-preview-motion"><input type="checkbox" checked={reducedMotion} onChange={(event) => setReducedMotion(event.currentTarget.checked)} /> Reduced motion</label></header>
+    <section className="mascot-preview-stage" aria-label="Selected character animation">
+      <div className="mascot-preview-copy"><p className="mascot-preview-eyebrow">ANIMATION PLAYGROUND</p><h1>Meet your office companion.</h1><p>Test each motion on the same layered vector character. Temporary reactions return to idle; looping poses run until you choose another.</p><div className="mascot-preview-selected"><span className="mascot-preview-dot" /><strong>{animationLabels[state.name]}</strong><span>{completedAnimation ? `${animationLabels[completedAnimation]} completed and returned to idle.` : animationNotes[state.name]}</span></div></div>
+      <div className="mascot-preview-hero"><MascotRenderer mood={animationMood[state.name]} animation={state.name} paused={paused} reducedMotion={reducedMotion} key={state.requestId} /><span className="mascot-preview-ground" /></div>
     </section>
-    <section className="mascot-pose-list" aria-label="Choose a Buddy expression">
-      {poses.map((pose) => <button key={pose.mood} type="button" className={selected === pose.mood ? 'is-selected' : ''} aria-pressed={selected === pose.mood} onClick={() => setSelected(pose.mood)}><span className="mascot-pose-thumbnail"><MascotRenderer mood={pose.mood} compact /></span><span className="mascot-pose-label">{pose.label}</span></button>)}
+    <section className="mascot-pose-list" aria-label="Trigger a Buddy animation">
+      {MASCOT_ANIMATIONS.map((animationName) => <button key={animationName} type="button" className={state.name === animationName ? 'is-selected' : ''} aria-pressed={state.name === animationName} onClick={() => triggerAnimation(animationName)}><span className="mascot-pose-thumbnail"><MascotRenderer mood={animationMood[animationName]} animation={animationName} compact reducedMotion /></span><span className="mascot-pose-label">{animationLabels[animationName]}</span></button>)}
     </section>
-    <footer className="mascot-preview-footer"><span>Layered SVG · no network assets · reduced-motion aware</span><span>Use <kbd>Tab</kbd> and <kbd>Enter</kbd> to inspect poses</span></footer>
+    <footer className="mascot-preview-footer"><span>CSS keyframes on authored SVG layers · no network assets</span><span>Use <kbd>Tab</kbd> and <kbd>Enter</kbd> to trigger</span></footer>
   </main>;
 }

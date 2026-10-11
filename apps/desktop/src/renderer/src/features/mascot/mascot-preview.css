@@ -11,6 +11,8 @@
 .mascot-preview-brand strong { color: var(--color-navy); font-size: 14px; }
 .mascot-preview-brand small { margin-top: 3px; color: var(--color-secondary); font-size: 11px; }
 .mascot-preview-badge { border: 1px solid var(--color-border); border-radius: 999px; padding: 7px 11px; color: var(--color-secondary); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+.mascot-preview-motion { display: inline-flex; align-items: center; gap: 8px; color: var(--color-secondary); font-size: 11px; font-weight: 600; }
+.mascot-preview-motion input { accent-color: var(--color-primary); }
 .mascot-preview-stage { display: grid; min-height: min(68vh, 560px); grid-template-columns: 1fr .85fr; align-items: center; margin: 28px 0 16px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 26px; background: rgb(255 255 255 / 76%); box-shadow: 0 16px 50px rgb(15 39 71 / 7%); }
 .mascot-preview-copy { padding: 40px 0 40px clamp(28px, 6vw, 80px); }
 .mascot-preview-eyebrow { color: var(--color-primary); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
@@ -24,11 +26,11 @@
 .mascot-preview-hero::before { position: absolute; width: min(32vw, 330px); aspect-ratio: 1; border: 1px solid rgb(33 137 224 / 13%); border-radius: 50%; background: radial-gradient(circle, rgb(255 255 255 / 74%), rgb(214 239 255 / 58%) 63%, transparent 64%); content: ''; }
 .mascot-preview-hero .mascot-art { position: relative; z-index: 1; width: 250px; height: 300px; filter: drop-shadow(0 13px 11px rgb(14 49 95 / 12%)); }
 .mascot-preview-ground { position: absolute; z-index: 0; bottom: 55px; width: 150px; height: 17px; border-radius: 50%; background: rgb(15 39 71 / 10%); filter: blur(5px); }
-.mascot-pose-list { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
-.mascot-pose-list button { display: grid; min-width: 0; justify-items: center; gap: 7px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); padding: 10px 6px 12px; color: var(--color-secondary); cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease; }
-.mascot-pose-list button:hover { transform: translateY(-2px); border-color: var(--color-primary); }
+.mascot-pose-list { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.mascot-pose-list button { display: grid; min-width: 0; justify-items: center; gap: 7px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); padding: 10px 6px 12px; color: var(--color-secondary); cursor: pointer; transition: transform 180ms cubic-bezier(.23, 1, .32, 1), border-color 160ms ease, background-color 160ms ease; }
 .mascot-pose-list button:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
 .mascot-pose-list button.is-selected { border-color: var(--color-primary); background: var(--color-info-muted); color: var(--color-navy); }
+@media (hover: hover) and (pointer: fine) { .mascot-pose-list button:hover { transform: translateY(-2px); border-color: var(--color-primary); } }
 .mascot-pose-thumbnail { display: grid; width: 68px; height: 68px; place-items: center; overflow: hidden; border-radius: 14px; background: linear-gradient(145deg, #f1f8ff, #e7f2ff); }
 .mascot-pose-thumbnail .mascot-art { width: 60px; height: 72px; margin-top: 7px; }
 .mascot-pose-label { font-size: 11px; font-weight: 700; }
@@ -43,4 +45,4 @@
   .mascot-pose-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .mascot-preview-footer { align-items: flex-start; gap: 12px; flex-direction: column; }
 }
-@media (prefers-reduced-motion: reduce) { .mascot-pose-list button { transition: none; } .mascot-pose-list button:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mascot-pose-list button { transition: none; } }

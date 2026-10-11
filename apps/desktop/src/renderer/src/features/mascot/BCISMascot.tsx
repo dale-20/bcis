@@ -4,6 +4,7 @@ import { MascotControls } from './MascotControls';
 import { MascotPreferences } from './MascotPreferences';
 import { MASCOT_EVENT } from './mascot-events';
 import { isMascotEvent, mascotReactions, type MascotMood, type MascotReaction } from './mascot-model';
+import { useMascotAnimation } from './use-mascot-animation';
 import { clampMascotPosition, initialMascotPosition, loadMascotPreferences, saveMascotPreferences, type MascotPosition, type MascotPreferences as MascotPreferencesState } from './mascot-preferences';
 
 const defaultMessage = 'Need help? I’m here.';
@@ -28,45 +29,43 @@ function playCue(context: AudioContext | null, mood: MascotMood): void {
 export function BCISMascot() {
   const [preferences, setPreferences] = useState<MascotPreferencesState>(loadMascotPreferences);
   const [position, setPosition] = useState<MascotPosition>(() => initialMascotPosition(preferences, window.innerWidth, window.innerHeight));
+  const { state: animationState, paused: animationPaused, play, reset } = useMascotAnimation();
+  const animationStateRef = useRef(animationState);
   const [mood, setMood] = useState<MascotMood>('neutral');
   const [message, setMessage] = useState(defaultMessage);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [visible, setVisible] = useState(true);
-  const currentPriority = useRef(0);
-  const moodTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioContext = useRef<AudioContext | null>(null);
   const drag = useRef<DragState | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const preferencesTrigger = useRef<HTMLButtonElement>(null);
 
+  useEffect(() => { animationStateRef.current = animationState; }, [animationState]);
+
   const persist = useCallback((next: MascotPreferencesState) => {
     setPreferences(next);
     saveMascotPreferences(next);
     if (next.minimized) {
-      if (moodTimer.current) clearTimeout(moodTimer.current);
       if (restTimer.current) clearTimeout(restTimer.current);
-      currentPriority.current = 0;
+      reset();
       setMood('neutral');
       setMessage(defaultMessage);
       setPreferencesOpen(false);
     }
-  }, []);
+  }, [reset]);
 
   const react = useCallback((reaction: MascotReaction) => {
-    if (reaction.priority < currentPriority.current) return;
-    currentPriority.current = reaction.priority;
-    setMood(reaction.mood);
-    setMessage(reaction.message);
-    if (moodTimer.current) clearTimeout(moodTimer.current);
-    moodTimer.current = setTimeout(() => {
+    const accepted = play({ name: reaction.animation, priority: reaction.priority, durationMs: reaction.durationMs }, () => {
       setMood('neutral');
       setMessage(defaultMessage);
-      currentPriority.current = 0;
-    }, reaction.durationMs);
+    });
+    if (!accepted) return;
+    setMood(reaction.mood);
+    setMessage(reaction.message);
     if (preferences.soundEnabled) playCue(audioContext.current, reaction.mood);
-  }, [preferences.soundEnabled]);
+  }, [play, preferences.soundEnabled]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
@@ -85,7 +84,6 @@ export function BCISMascot() {
     window.addEventListener(MASCOT_EVENT, handleEvent);
     return () => {
       window.removeEventListener(MASCOT_EVENT, handleEvent);
-      if (moodTimer.current) clearTimeout(moodTimer.current);
     };
   }, [preferences.minimized, react]);
 
@@ -94,11 +92,7 @@ export function BCISMascot() {
       const nextVisible = document.visibilityState !== 'hidden';
       setVisible(nextVisible);
       if (nextVisible) return;
-      if (moodTimer.current) clearTimeout(moodTimer.current);
       if (restTimer.current) clearTimeout(restTimer.current);
-      currentPriority.current = 0;
-      setMood('neutral');
-      setMessage(defaultMessage);
     };
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
@@ -134,12 +128,14 @@ export function BCISMascot() {
     }
     const rest = () => {
       if (restTimer.current) clearTimeout(restTimer.current);
-      if (mood === 'sleepy') {
+      if (animationStateRef.current.name === 'sleep') {
+        reset();
         setMood('neutral');
         setMessage(defaultMessage);
       }
       restTimer.current = setTimeout(() => {
-        if (currentPriority.current === 0) {
+        if (animationStateRef.current.name === 'idle') {
+          play({ name: 'sleep', priority: 0, durationMs: null });
           setMood('sleepy');
           setMessage('Taking a quiet moment.');
         }
@@ -153,10 +149,9 @@ export function BCISMascot() {
       window.removeEventListener('keydown', rest);
       if (restTimer.current) clearTimeout(restTimer.current);
     };
-  }, [mood, preferences.minimized, visible]);
+  }, [play, preferences.minimized, reset, visible]);
 
   useEffect(() => () => {
-    if (moodTimer.current) clearTimeout(moodTimer.current);
     if (restTimer.current) clearTimeout(restTimer.current);
     if (audioContext.current && audioContext.current.state !== 'closed') void audioContext.current.close();
   }, []);
@@ -177,7 +172,10 @@ export function BCISMascot() {
     const { moved, lastPosition } = drag.current;
     drag.current = null;
     if (moved) persist({ ...preferences, ...lastPosition });
-    if (currentPriority.current === 0) setMood('neutral');
+    if (animationState.name === 'walk') {
+      reset();
+      setMood('neutral');
+    }
   };
 
   const startDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -185,7 +183,10 @@ export function BCISMascot() {
     const bounds = rootRef.current?.getBoundingClientRect();
     if (!bounds) return;
     drag.current = { pointerId: event.pointerId, offsetX: event.clientX - bounds.left, offsetY: event.clientY - bounds.top, lastPosition: position, moved: false };
-    if (currentPriority.current === 0) setMood('walking');
+    if (animationState.priority === 0) {
+      play({ name: 'walk', priority: 1, durationMs: null });
+      setMood('walking');
+    }
   };
 
   const moveByKeyboard = (dx: number, dy: number) => {
@@ -196,7 +197,7 @@ export function BCISMascot() {
     persist({ ...preferences, ...next });
   };
 
-  const showTip = () => react({ mood: 'thinking', message: 'I react to confirmed actions and stay quiet while you work.', priority: 1, durationMs: 6_000 });
+  const showTip = () => react({ animation: 'thinking', mood: 'thinking', message: 'I react to confirmed actions and stay quiet while you work.', priority: 2, durationMs: 6_000 });
 
   const toggleSound = () => {
     const soundEnabled = !preferences.soundEnabled;
@@ -212,12 +213,11 @@ export function BCISMascot() {
     preferencesTrigger.current?.focus();
   };
 
-  if (!visible) return null;
-  if (preferences.minimized) return <button className="mascot-dock" aria-label="Show BCIS Buddy" onClick={() => persist({ ...preferences, minimized: false })}><MascotRenderer mood="neutral" compact /></button>;
+  if (preferences.minimized) return <button className="mascot-dock" aria-label="Show BCIS Buddy" onClick={() => persist({ ...preferences, minimized: false })}><MascotRenderer mood="neutral" animation="idle" compact reducedMotion={reducedMotion} /></button>;
 
-  return <div ref={rootRef} className={`bcis-mascot${reducedMotion ? ' reduced-motion' : ''}`} style={{ left: position.x, top: position.y }} onPointerMove={updatePosition} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
+  return <div ref={rootRef} className={`bcis-mascot${reducedMotion ? ' reduced-motion' : ''}${animationPaused ? ' is-window-paused' : ''}`} style={{ left: position.x, top: position.y, display: visible ? undefined : 'none' }} onPointerMove={updatePosition} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
     <div className="mascot-bubble" aria-live="polite" aria-atomic="true">{message}</div>
-    <MascotRenderer mood={mood} />
+    <MascotRenderer mood={mood} animation={animationState.name} paused={animationPaused} reducedMotion={reducedMotion} key={animationState.requestId} />
     <MascotControls preferencesOpen={preferencesOpen} preferencesButtonRef={preferencesTrigger} onOpenPreferences={() => setPreferencesOpen((open) => !open)} onMinimize={() => persist({ ...preferences, minimized: true })} onPointerDown={startDrag} onKeyboardMove={moveByKeyboard} />
     {preferencesOpen && <MascotPreferences preferences={preferences} reducedMotion={reducedMotion} onToggleSound={toggleSound} onTip={showTip} onHide={() => persist({ ...preferences, minimized: true })} onClose={closePreferences} />}
   </div>;

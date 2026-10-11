@@ -8,12 +8,28 @@ import { MascotAssetBoundary } from './MascotRenderer';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('mascot character studio', () => {
-  it('lets a developer inspect all seven requested expressions', () => {
+  it('lets a developer trigger each animation and inspect its current state', () => {
     render(<MascotPreview />);
     expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Celebrating/ }));
-    expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Celebrating/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Greeting' }));
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, hello' })).toHaveClass('anim-greeting');
+    expect(screen.getByRole('button', { name: 'Greeting' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it.each([
+    ['idle', 'neutral'], ['walk', 'walking'], ['happy', 'happy'], ['thinking', 'thinking'],
+    ['processing', 'processing'], ['success', 'celebrating'], ['warning', 'concerned'],
+    ['error', 'concerned'], ['sleep', 'sleepy'], ['surprised', 'surprised'], ['greeting', 'hello'],
+  ] as const)('triggers the %s animation with its matching expression', (animation, mood) => {
+    render(<MascotPreview />);
+    fireEvent.click(screen.getByRole('button', { name: animation[0]?.toUpperCase() + animation.slice(1) }));
+    expect(screen.getByRole('img', { name: `BCIS Buddy, ${mood}` })).toHaveClass(`anim-${animation}`);
+  });
+
+  it('applies the reduced-motion variant when enabled in the playground', () => {
+    render(<MascotPreview />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Reduced motion' }));
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toHaveClass('is-reduced-motion');
   });
 
   it('shows bundled vector fallback if character artwork throws while rendering', () => {

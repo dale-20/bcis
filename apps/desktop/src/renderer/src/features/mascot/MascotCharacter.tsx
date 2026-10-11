@@ -1,4 +1,5 @@
 import type { MascotMood } from './mascot-model';
+import type { MascotAnimationName } from './mascot-animation';
 
 function Cap() {
   return <g className="buddy-cap">
@@ -41,20 +42,30 @@ function Head({ mood }: { mood: MascotMood }) {
     <Face mood={mood} />
     <Headphones />
     <Cap />
-  </g>;
-}
-
-function Gloves() {
-  return <g className="buddy-hands" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round">
-    <path className="buddy-hand buddy-hand-left" d="M40 153Q36 149 33 153Q30 157 35 162L46 171Q51 174 56 167L68 157L57 145Q48 147 45 158Z" />
-    <path className="buddy-hand buddy-hand-right" d="M138 153Q142 150 145 154Q148 158 143 163L132 172Q127 175 122 168L110 158L119 145Q129 146 132 158Z" />
+    <g className="buddy-sleep-mark"><text x="139" y="39" fill="#1682dd" fontSize="13" fontWeight="800">Zz</text></g>
   </g>;
 }
 
 function Arms() {
-  return <g className="buddy-arms" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round">
-    <path className="buddy-arm buddy-arm-left" d="M60 143Q49 149 47 160" />
-    <path className="buddy-arm buddy-arm-right" d="M119 143Q130 149 132 160" />
+  return <g className="buddy-arms">
+    <g className="buddy-arm-pair buddy-arm-pair-left">
+      <path className="buddy-arm buddy-arm-base" d="M60 143Q49 149 47 160" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-hand buddy-hand-base" d="M40 153Q36 149 33 153Q30 157 35 162L46 171Q51 174 56 167L68 157L57 145Q48 147 45 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <path className="buddy-wave-hand" d="M46 149Q42 146 41 139L38 132Q38 128 42 128Q45 129 47 137L49 130Q51 127 54 130L54 138Q57 134 60 137L59 146L56 153Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <path className="buddy-type-arm" d="M60 143Q65 151 72 159" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-type-hand" d="M68 158Q71 155 74 159L78 164Q78 167 75 168L68 165Q65 163 68 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+    </g>
+    <g className="buddy-arm-pair buddy-arm-pair-right">
+      <path className="buddy-arm buddy-arm-base" d="M119 143Q130 149 132 160" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-hand buddy-hand-base" d="M138 153Q142 150 145 154Q148 158 143 163L132 172Q127 175 122 168L110 158L119 145Q129 146 132 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <path className="buddy-type-arm" d="M119 143Q114 151 108 159" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-type-hand" d="M111 158Q108 155 105 159L101 164Q101 167 104 168L111 165Q114 163 111 158Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <path className="buddy-thinking-arm" d="M119 143Q114 126 102 119" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-thinking-hand" d="M98 122Q94 120 94 116L93 109Q94 106 97 108L100 113L100 106Q102 103 104 107L105 113Q108 110 110 114L109 121L104 126Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <path className="buddy-success-arm" d="M119 143Q128 132 130 121" fill="none" stroke="#0b315e" strokeWidth="7" strokeLinecap="round" />
+      <path className="buddy-thumbs-up" d="M122 124L124 113Q125 109 129 110L131 117L136 115Q140 115 140 119L138 131Q137 134 133 135L126 134Z" fill="#f5f9ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
+      <g className="buddy-success-check"><circle cx="136" cy="105" r="12" fill="#16a77a" /><path d="M130 105L134 109L142 100" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></g>
+    </g>
   </g>;
 }
 
@@ -65,7 +76,13 @@ function Body() {
     <path d="M75 131Q89 138 103 131L108 169Q91 175 70 168Z" fill="#edf6ff" stroke="#0b315e" strokeWidth="2" strokeLinejoin="round" />
     <path className="buddy-uniform-mark" d="M79 148Q89 139 99 148M82 155Q89 149 96 155M86 162Q89 159 92 162" fill="none" stroke="#1188df" strokeWidth="3.2" strokeLinecap="round" />
     <circle cx="89" cy="132" r="3" fill="#ffd24a" stroke="#0b315e" strokeWidth="1.5" />
-    <Arms /><Gloves />
+    <g className="buddy-workpad">
+      <path d="M68 155L110 155L114 174L65 174Z" fill="#0e2949" stroke="#071a31" strokeWidth="2" strokeLinejoin="round" />
+      <rect x="73" y="159" width="32" height="10" rx="2" fill="#bde9ff" />
+      <path d="M63 175L116 175L120 179L60 179Z" fill="#c5d3e2" stroke="#071a31" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M73 177H108M77 175V179M83 175V179M89 175V179M95 175V179M101 175V179" stroke="#52708d" strokeWidth="1" />
+    </g>
+    <Arms />
   </g>;
 }
 
@@ -85,11 +102,8 @@ function CharacterArt() {
   </>;
 }
 
-export function MascotCharacter({ mood, compact = false }: { mood: MascotMood; compact?: boolean }) {
-  return <svg className={`mascot-art mood-${mood}${compact ? ' mascot-art-compact' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
-    <defs>
-      <linearGradient id="buddy-depth" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#fff" stopOpacity=".25" /><stop offset="1" stopColor="#0b315e" stopOpacity=".08" /></linearGradient>
-    </defs>
+export function MascotCharacter({ mood, animation = 'idle', compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+  return <svg className={`mascot-art mood-${mood} anim-${animation}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
     <g className="buddy-character"><CharacterArt /><Head mood={mood} /></g>
   </svg>;
 }
