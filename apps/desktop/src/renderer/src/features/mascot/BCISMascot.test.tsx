@@ -16,7 +16,7 @@ class TestPointerEvent extends MouseEvent {
 }
 
 beforeEach(() => vi.stubGlobal('PointerEvent', TestPointerEvent));
-afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('BCIS Buddy', () => {
   it('uses event-specific poses and restrained messages', () => {
@@ -72,18 +72,89 @@ describe('BCIS Buddy', () => {
     vi.useRealTimers();
   });
 
-  it('suppresses speech while a user is entering sensitive form data', () => {
+  it('keeps confirmed payment feedback visible on the payment entry screen', () => {
     const input = document.createElement('input');
+    input.className = 'payment-workspace';
     document.body.append(input);
     input.focus();
     try {
       render(<BCISMascot />);
       act(() => announceMascotEvent('payment-posted'));
-      expect(screen.queryByText('Payment recorded successfully!')).not.toBeInTheDocument();
+      expect(screen.getByText('Payment recorded successfully!')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
     } finally {
       input.remove();
     }
+  });
+
+  it('keeps error text readable after its short animation finishes', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('payment-error'));
+    act(() => vi.advanceTimersByTime(1_800));
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toBeInTheDocument();
+    expect(screen.getByText(/Payment could not be confirmed/).parentElement).not.toHaveClass('is-muted');
+    act(() => vi.advanceTimersByTime(3_200));
+    expect(screen.queryByText(/Payment could not be confirmed/)).not.toBeInTheDocument();
+  });
+
+  it('shows recovery immediately when the connection returns during a warning', () => {
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('connection-lost'));
+    act(() => announceMascotEvent('connection-restored'));
+    expect(screen.getByText('Connection restored.')).toBeInTheDocument();
+    expect(screen.queryByText('Connection to the office server was lost.')).not.toBeInTheDocument();
+  });
+
+  it('plays a deferred result after a higher-priority reaction finishes', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('payment-posted'));
+    act(() => announceMascotEvent('subscriber-created'));
+    expect(screen.getByText('Payment recorded successfully!')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(2_800));
+    expect(screen.getByText('Subscriber created successfully.')).toBeInTheDocument();
+  });
+
+  it('replaces queued processing with its completed result', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('payment-posted'));
+    act(() => announceMascotEvent('report-start'));
+    act(() => announceMascotEvent('report-finish'));
+    act(() => vi.advanceTimersByTime(2_800));
+    expect(screen.getByText('Your report is ready.')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(3_200));
+    expect(screen.queryByText('Preparing your report…')).not.toBeInTheDocument();
+  });
+
+  it('offers a direct tip without opening preferences', () => {
+    render(<BCISMascot />);
+    fireEvent.click(screen.getByRole('button', { name: 'Talk to BCIS Buddy' }));
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, thinking' })).toBeInTheDocument();
+    expect(screen.getByText('I react to confirmed actions and stay quiet while you work.')).toBeInTheDocument();
+  });
+
+  it('settles two quick report runs without replaying the second processing event', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('report-finish'));
+    act(() => announceMascotEvent('report-start'));
+    act(() => announceMascotEvent('report-finish'));
+    act(() => vi.advanceTimersByTime(3_200));
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, neutral' })).toBeInTheDocument();
+    expect(screen.getByText('Your report is ready.')).toBeInTheDocument();
+  });
+
+  it('clears deferred feedback when minimized', () => {
+    vi.useFakeTimers();
+    render(<BCISMascot />);
+    act(() => announceMascotEvent('payment-posted'));
+    act(() => announceMascotEvent('report-finish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize BCIS Buddy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show BCIS Buddy' }));
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(screen.queryByText('Your report is ready.')).not.toBeInTheDocument();
   });
 
   it('keeps the dock affordance available when minimized and restores the mascot', () => {

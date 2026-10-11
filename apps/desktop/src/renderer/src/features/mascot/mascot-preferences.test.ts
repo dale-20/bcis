@@ -21,7 +21,7 @@ describe('mascot preferences', () => {
   });
 
   it('clamps restored and dragged positions inside the active viewport', () => {
-    expect(initialMascotPosition({ ...defaultMascotPreferences, x: 9000, y: 9000 }, 960, 640)).toEqual({ x: 832, y: 450 });
+    expect(initialMascotPosition({ ...defaultMascotPreferences, x: 9000, y: 9000 }, 960, 640)).toEqual({ x: 808, y: 450 });
     expect(clampMascotPosition({ x: -500, y: 8000 }, 960, 640, 184, 276)).toEqual({ x: 752, y: 352 });
   });
 

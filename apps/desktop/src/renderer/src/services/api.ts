@@ -64,7 +64,7 @@ import {
   type SubscriberListResponse,
   type SubscriberStatusChange,
   type SubscriberUpdate,
-  dashboardQuerySchema, dashboardSchema, reportDataSchema, reportRequestSchema, serviceHistorySchema, exportResultSchema,
+  dashboardQuerySchema, dashboardSchema, reportDataSchema, reportRequestSchema, reportFormatSchema, serviceHistorySchema, exportResultSchema,
   type Dashboard, type DashboardQuery, type ExportResult, type ReportData, type ReportRequest, type ServiceHistory,
   billingCycleDetailResultSchema, billingCycleListResultSchema, billingGenerationResultDesktopSchema, billingPreviewResultSchema,
   generateBillingCycleInputSchema, invoiceDetailResultSchema, invoiceListQuerySchema, invoiceListResultSchema,
@@ -244,13 +244,14 @@ export async function getReport(input: ReportRequest): Promise<ReportData> {
 }
 
 export async function exportReport(input: ReportRequest & { format: 'PDF' | 'XLSX' }): Promise<ExportResult> {
-  const query = { ...reportRequestSchema.parse(input), format: input.format };
+  const { format, ...reportInput } = input;
+  const query = { ...reportRequestSchema.parse(reportInput), format: reportFormatSchema.parse(format) };
   announceMascotEvent('report-start');
   try {
     const result = await bridge().exportReport(query);
     if (!result.ok) throw new DesktopServiceError(result.error.code, result.error.message);
     const exported = exportResultSchema.parse(result.data);
-    if (exported.saved) announceMascotEvent('report-finish');
+    announceMascotEvent(exported.saved ? 'report-finish' : 'report-canceled');
     return exported;
   } catch (error) {
     announceMascotEvent('report-error');
@@ -459,9 +460,17 @@ export async function listBackups() {
   return backupListSchema.parse(result.data);
 }
 export async function createBackup() {
-  const result = await bridge().createBackup();
-  if (!result.ok) throw new Error(result.error.message);
-  return backupCreatedSchema.parse(result.data);
+  announceMascotEvent('backup-start');
+  try {
+    const result = await bridge().createBackup();
+    if (!result.ok) throw new Error(result.error.message);
+    const backup = backupCreatedSchema.parse(result.data);
+    announceMascotEvent('backup-success', backup.id);
+    return backup;
+  } catch (error) {
+    announceMascotEvent('backup-error');
+    throw error;
+  }
 }
 export async function downloadBackup(id: string) {
   const result = await bridge().downloadBackup(id);

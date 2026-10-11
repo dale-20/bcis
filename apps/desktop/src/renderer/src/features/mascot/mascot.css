@@ -16,7 +16,7 @@
   border: 1px solid var(--color-border);
   border-radius: 15px 15px 15px 5px;
   background: var(--color-surface);
-  padding: 8px 11px;
+  padding: 8px 24px 8px 11px;
   color: var(--color-navy);
   box-shadow: 0 7px 22px rgb(15 39 71 / 14%);
   font-size: 11px;
@@ -24,6 +24,8 @@
   line-height: 1.4;
   text-align: center;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 180ms cubic-bezier(.23, 1, .32, 1), visibility 180ms;
 }
 
 .mascot-bubble-dismiss {
@@ -264,7 +266,7 @@
 
 /* Phase 4: compact, click-through companion with interactive controls only. */
 .bcis-mascot {
-  --buddy-width: 116px;
+  --buddy-width: 140px;
   --buddy-art-width: 100px;
   --buddy-art-height: 122px;
   --buddy-safe-lane: 170px;
@@ -283,7 +285,7 @@
   background: var(--buddy-surface);
   color: var(--buddy-text);
 }
-.bcis-mascot .mascot-bubble.is-muted { visibility: hidden; }
+.bcis-mascot .mascot-bubble.is-muted { visibility: hidden; opacity: 0; }
 .bcis-mascot .mascot-toolbar { min-height: 30px; }
 .bcis-mascot .mascot-toolbar button,
 .bcis-mascot .mascot-preferences button { background-color: var(--buddy-surface); color: var(--buddy-text); }
@@ -354,7 +356,7 @@
 }
 @media (max-width: 520px), (max-height: 420px) {
   .bcis-mascot.size-medium,
-  .bcis-mascot.size-large { --buddy-width: 116px; --buddy-art-width: 100px; --buddy-art-height: 122px; --buddy-safe-lane: 170px; }
+  .bcis-mascot.size-large { --buddy-width: 140px; --buddy-art-width: 100px; --buddy-art-height: 122px; --buddy-safe-lane: 170px; }
   .app-shell:has(> .bcis-mascot.size-medium),
   .app-shell:has(> .bcis-mascot.size-large) { --buddy-safe-lane: 170px; }
 }

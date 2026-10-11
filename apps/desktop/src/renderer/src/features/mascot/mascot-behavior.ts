@@ -155,8 +155,12 @@ export function createMascotBehaviorScheduler(options: MascotBehaviorSchedulerOp
       if (sleeping) {
         sleeping = false;
         options.onWake();
+        restartIdleTimers();
+        return;
       }
-      restartIdleTimers();
+      // Activity postpones sleep, not every blink and ambient gesture.
+      clear(sleepTimer);
+      scheduleSleep();
     },
   };
 }
@@ -169,10 +173,10 @@ export function isSensitiveMascotWorkflowActive(documentRoot: Document): boolean
 export function shouldShowPersonalityDialogue(personality: MascotPersonality, event: string): boolean {
   if (event === 'extended-inactivity') return mascotBehaviorProfiles[personality].sleepDialogue;
   if (personality !== 'professional') return true;
-  return ['billing-success', 'billing-error', 'payment-posted', 'payment-error', 'gcash-approved', 'backup-success', 'connection-lost', 'connection-restored'].includes(event);
+  return ['billing-success', 'billing-error', 'payment-posted', 'payment-error', 'gcash-approved', 'backup-success', 'backup-error', 'connection-lost', 'connection-restored'].includes(event);
 }
 
 export function shouldReactToApplicationEvent(personality: MascotPersonality, event: string): boolean {
   if (personality !== 'professional') return true;
-  return ['billing-success', 'billing-error', 'payment-posted', 'payment-error', 'gcash-approved', 'backup-success', 'connection-lost', 'connection-restored'].includes(event);
+  return ['billing-success', 'billing-error', 'payment-posted', 'payment-error', 'gcash-approved', 'backup-success', 'backup-error', 'connection-lost', 'connection-restored'].includes(event);
 }

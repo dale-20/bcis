@@ -38,8 +38,9 @@ function FallbackMascot({ mood, compact }: { mood: MascotMood; compact: boolean 
   </svg>;
 }
 
-export function MascotRenderer({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
-  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter mood={mood} animation={animation} idleBehavior={idleBehavior} compact={compact} paused={paused} reducedMotion={reducedMotion} /></MascotAssetBoundary>;
+export function MascotRenderer({ mood, animation = 'idle', animationId = 0, idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; animationId?: number; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+  // A fresh confirmed event restarts one-shot CSS motion even when its pose is unchanged.
+  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter key={animationId} mood={mood} animation={animation} idleBehavior={idleBehavior} compact={compact} paused={paused} reducedMotion={reducedMotion} /></MascotAssetBoundary>;
 }
 
 export { MascotAssetBoundary };

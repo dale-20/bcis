@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { MascotRenderer } from './MascotRenderer';
 import { MascotControls } from './MascotControls';
 import { MascotPreferences } from './MascotPreferences';
-import { announceMascotEvent, MASCOT_EVENT, type MascotEventDetail } from './mascot-events';
+import { announceMascotEvent, MASCOT_EVENT, type MascotEvent, type MascotEventDetail } from './mascot-events';
 import { isMascotEvent, mascotReactions, type MascotMood, type MascotReaction } from './mascot-model';
 import { useMascotAnimation } from './use-mascot-animation';
 import { clampMascotPosition, initialMascotPosition, loadMascotPreferences, mascotDimensions, saveMascotPreferences, type MascotPosition, type MascotPreferences as MascotPreferencesState } from './mascot-preferences';
@@ -11,9 +11,13 @@ import { createMascotBehaviorScheduler, isSensitiveMascotWorkflowActive, shouldR
 const defaultMessage = 'Need help? I’m here.';
 const fallbackDimensions = mascotDimensions('small');
 const dialogueDurationMs = 5_000;
-const reactionCooldownMs = 900;
 
 type DragState = { pointerId: number; offsetX: number; offsetY: number; lastPosition: MascotPosition; moved: boolean };
+type PendingReaction = { event: MascotEvent; reaction: MascotReaction; showDialogue: boolean; expiresAt: number };
+
+function reactionGroup(event: MascotEvent): string {
+  return event.split('-')[0] ?? event;
+}
 
 function playCue(context: AudioContext | null, mood: MascotMood): void {
   if (!context || context.state !== 'running') return;
@@ -42,7 +46,8 @@ export function BCISMascot() {
   const dialogueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleBehaviorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenEventIds = useRef(new Set<string>());
-  const lastReactionAt = useRef(new Map<string, number>());
+  const pendingReactions = useRef<PendingReaction[]>([]);
+  const activeEvent = useRef<MascotEvent | undefined>(undefined);
   const audioContext = useRef<AudioContext | null>(null);
   const drag = useRef<DragState | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -56,6 +61,8 @@ export function BCISMascot() {
     if (next.minimized || !next.enabled) {
       if (dialogueTimer.current) clearTimeout(dialogueTimer.current);
       dialogueTimer.current = null;
+      pendingReactions.current = [];
+      activeEvent.current = undefined;
       reset();
       setMood('neutral');
       setMessage(defaultMessage);
@@ -63,12 +70,27 @@ export function BCISMascot() {
     }
   }, [reset]);
 
-  const react = useCallback((reaction: MascotReaction, showDialogue = true) => {
+  const react = useCallback(function reactTo(reaction: MascotReaction, showDialogue = true, event?: MascotEvent) {
+    // Keep only the newest phase per workflow; never replay a stale "preparing" pose.
+    pendingReactions.current = pendingReactions.current.filter((pending) => pending.expiresAt > Date.now()
+      && (!event || reactionGroup(pending.event) !== reactionGroup(event)));
+    if (event === 'connection-restored' && activeEvent.current === 'connection-lost') reset();
     const accepted = play({ name: reaction.animation, priority: reaction.priority, durationMs: reaction.durationMs }, () => {
       setMood('neutral');
-      setMessage('');
+      activeEvent.current = undefined;
+      pendingReactions.current = pendingReactions.current.filter((pending) => pending.expiresAt > Date.now());
+      const next = pendingReactions.current.shift();
+      if (next) reactTo(next.reaction, next.showDialogue, next.event);
     });
-    if (!accepted) return;
+    if (!accepted) {
+      if (event) {
+        pendingReactions.current.push({ event, reaction, showDialogue, expiresAt: Date.now() + 10_000 });
+        pendingReactions.current.sort((left, right) => right.reaction.priority - left.reaction.priority);
+        pendingReactions.current = pendingReactions.current.slice(0, 4);
+      }
+      return;
+    }
+    activeEvent.current = event;
     if (dialogueTimer.current) clearTimeout(dialogueTimer.current);
     if (idleBehaviorTimer.current) clearTimeout(idleBehaviorTimer.current);
     idleBehaviorTimer.current = null;
@@ -82,7 +104,7 @@ export function BCISMascot() {
       }, dialogueDurationMs);
     }
     if (preferences.soundEnabled) playCue(audioContext.current, reaction.mood);
-  }, [play, preferences.soundEnabled]);
+  }, [play, preferences.soundEnabled, reset]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return;
@@ -105,11 +127,8 @@ export function BCISMascot() {
       seenEventIds.current.add(eventDetail.eventId);
       if (seenEventIds.current.size > 128) seenEventIds.current.delete(seenEventIds.current.values().next().value ?? '');
       if (!shouldReactToApplicationEvent(preferences.personality, eventDetail.type)) return;
-      const now = Date.now();
-      const previousReaction = lastReactionAt.current.get(eventDetail.type);
-      if (previousReaction !== undefined && now - previousReaction < reactionCooldownMs) return;
-      lastReactionAt.current.set(eventDetail.type, now);
-      react(mascotReactions[eventDetail.type], shouldShowPersonalityDialogue(preferences.personality, eventDetail.type) && !isSensitiveMascotWorkflowActive(document));
+      // Quiet ambient behavior during entry, but keep confirmed outcomes and errors readable.
+      react(mascotReactions[eventDetail.type], shouldShowPersonalityDialogue(preferences.personality, eventDetail.type), eventDetail.type);
     };
     window.addEventListener(MASCOT_EVENT, handleEvent);
     return () => window.removeEventListener(MASCOT_EVENT, handleEvent);
@@ -118,7 +137,10 @@ export function BCISMascot() {
   useEffect(() => {
     const updateVisibility = () => {
       setVisible(document.visibilityState !== 'hidden');
-      if (document.visibilityState === 'hidden') setIdleBehavior(null);
+      if (document.visibilityState === 'hidden') {
+        setIdleBehavior(null);
+        pendingReactions.current = [];
+      }
     };
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
@@ -262,9 +284,16 @@ export function BCISMascot() {
     persist({ ...preferences, ...next });
   };
 
-  const showTip = () => react({ animation: 'thinking', mood: 'thinking', message: 'I react to confirmed actions and stay quiet while you work.', priority: 2, durationMs: 6_000 });
+  const showTip = () => {
+    if (preferencesOpen) {
+      setPreferencesOpen(false);
+      preferencesTrigger.current?.focus();
+    }
+    react({ animation: 'thinking', mood: 'thinking', message: 'I react to confirmed actions and stay quiet while you work.', priority: 4, durationMs: 6_000 });
+  };
   const updatePreferences = (patch: Partial<MascotPreferencesState>) => {
     if (patch.animationsEnabled !== undefined || patch.personality !== undefined) setIdleBehavior(null);
+    if (patch.personality !== undefined) pendingReactions.current = [];
     if (patch.soundEnabled && typeof AudioContext !== 'undefined') {
       audioContext.current ??= new AudioContext();
       void audioContext.current.resume().catch(() => undefined);
@@ -287,12 +316,12 @@ export function BCISMascot() {
   const personalityClass = `personality-${preferences.personality}`;
   const sizeClass = `size-${preferences.size}`;
   return <div ref={rootRef} role="region" aria-label="BCIS Buddy companion" className={`bcis-mascot ${personalityClass} ${sizeClass}${position.y < 250 ? ' is-near-top' : ''}${position.x < 248 ? ' is-near-left' : ''}${reducedMotion ? ' reduced-motion' : ''}${animationPaused || !visible ? ' is-window-paused' : ''}`} style={{ left: position.x, top: position.y, display: visible ? undefined : 'none', pointerEvents: 'none' }} onPointerMove={updatePosition} onPointerUp={finishDrag} onPointerCancel={finishDrag}>
-    <div className={`mascot-bubble${mood === 'neutral' || !message ? ' is-muted' : ''}`} aria-live="polite" aria-atomic="true">
+    <div className={`mascot-bubble${!message ? ' is-muted' : ''}`} aria-live="polite" aria-atomic="true">
       <span>{message}</span>
-      {mood !== 'neutral' && message && <button type="button" className="mascot-bubble-dismiss" aria-label="Dismiss BCIS Buddy message" onClick={() => { if (dialogueTimer.current) clearTimeout(dialogueTimer.current); dialogueTimer.current = null; setMessage(''); }}>×</button>}
+      {message && <button type="button" className="mascot-bubble-dismiss" aria-label="Dismiss BCIS Buddy message" onClick={() => { if (dialogueTimer.current) clearTimeout(dialogueTimer.current); dialogueTimer.current = null; setMessage(''); }}>×</button>}
     </div>
-    <MascotRenderer mood={mood} animation={animationState.name} idleBehavior={idleBehavior} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} />
-    <MascotControls preferencesOpen={preferencesOpen} preferencesButtonRef={preferencesTrigger} onOpenPreferences={() => setPreferencesOpen((open) => !open)} onMinimize={() => persist({ ...preferences, minimized: true })} onPointerDown={startDrag} onKeyboardMove={moveByKeyboard} />
+    <MascotRenderer mood={mood} animation={animationState.name} animationId={animationState.requestId} idleBehavior={idleBehavior} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} />
+    <MascotControls preferencesOpen={preferencesOpen} preferencesButtonRef={preferencesTrigger} onOpenPreferences={() => setPreferencesOpen((open) => !open)} onTip={showTip} onMinimize={() => persist({ ...preferences, minimized: true })} onPointerDown={startDrag} onKeyboardMove={moveByKeyboard} />
     {preferencesOpen && <MascotPreferences preferences={preferences} reducedMotion={reducedMotion} onUpdate={updatePreferences} onTip={showTip} onResetPosition={resetPosition} onClose={closePreferences} />}
   </div>;
 }

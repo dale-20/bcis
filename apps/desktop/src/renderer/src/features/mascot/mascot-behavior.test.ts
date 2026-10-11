@@ -76,6 +76,23 @@ describe('mascot natural behavior', () => {
     scheduler.stop();
   });
 
+  it('keeps natural gestures scheduled during ordinary activity without going to sleep', () => {
+    const clock = new FakeClock();
+    const behaviors: string[] = [];
+    let sleeps = 0;
+    const scheduler = createMascotBehaviorScheduler({ personality: 'playful', clock, random: () => 0, canBehave: () => true, onBehavior: (behavior) => behaviors.push(behavior), onSleep: () => { sleeps += 1; }, onWake: () => undefined });
+    scheduler.start();
+    for (let second = 0; second < 70; second += 1) {
+      clock.advanceBy(1_000);
+      scheduler.activity();
+    }
+    expect(behaviors).toContain('blink');
+    expect(behaviors).toContain('breathe');
+    expect(sleeps).toBe(0);
+    scheduler.stop();
+    expect(clock.pendingCount).toBe(0);
+  });
+
   it('rate-limits ambient poses so one idle gesture cannot overlap another', () => {
     const clock = new FakeClock();
     const behaviors: string[] = [];

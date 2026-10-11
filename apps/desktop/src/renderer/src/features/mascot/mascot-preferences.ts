@@ -78,7 +78,7 @@ export function saveMascotPreferences(preferences: MascotPreferences): void {
 
 export function mascotDimensions(size: MascotPreferences['size']): { width: number; height: number } {
   switch (size) {
-    case 'small': return { width: 116, height: 178 };
+    case 'small': return { width: 140, height: 178 };
     case 'medium': return { width: 184, height: 276 };
     case 'large': return { width: 216, height: 322 };
   }
