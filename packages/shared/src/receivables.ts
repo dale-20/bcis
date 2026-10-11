@@ -15,6 +15,9 @@ export function receivableAgingBucketLabel(bucket: AgingBucket): string {
 }
 export const receivableAgingQuerySchema = z.object({
   asOf: z.iso.date(), overdueOnly: z.boolean().default(false), collectorId: z.uuid().optional(), collectionAreaId: z.uuid().optional(),
+  query: z.string().trim().max(100).default(''),
+  sort: z.enum(['dueDate', 'subscriber', 'account', 'service', 'daysOverdue', 'balance']).default('dueDate'),
+  direction: z.enum(['asc', 'desc']).default('asc'),
   page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(25),
 }).strict();
 export type ReceivableAgingQuery = z.infer<typeof receivableAgingQuerySchema>;

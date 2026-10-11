@@ -126,13 +126,15 @@ describe.sequential('synthetic demo workflow seed', () => {
     const reportKinds = [
       'DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS',
       'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA',
-      'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING',
+      'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'RECEIVABLE_AGING_LIST',
       'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY',
       'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS',
     ] as const;
     for (const report of reportKinds) {
       const request = report === 'SUBSCRIBER_STATEMENT'
         ? { report, from: '2026-01-01', to: '2026-12-31', subscriberId: subscriber.id }
+        : report === 'RECEIVABLE_AGING_LIST'
+          ? { report, from: '2026-01-01', to: '2026-12-31', agingAsOf: '2026-12-31' }
         : { report, from: '2026-01-01', to: '2026-12-31' };
       const result = await reports.report(request);
       expect(result.rows.length, `${report} should have seeded rows`).toBeGreaterThan(0);

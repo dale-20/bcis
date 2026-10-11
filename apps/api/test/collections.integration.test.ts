@@ -229,6 +229,11 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const sortedRows = sortedAccounts.json<{ rows: { arrearsCentavos: string }[] }>().rows;
     expect(sortedRows.length).toBeGreaterThan(1);
     expect(sortedRows.slice(1).every((row, index) => BigInt(sortedRows[index]?.arrearsCentavos ?? '0') >= BigInt(row.arrearsCentavos))).toBe(true);
+    const searchTerm = aging.rows[0]?.invoiceNumber;
+    if (!searchTerm) throw new Error('Expected a receivable invoice for search coverage');
+    const searched = await app.inject({ method: 'GET', url: `/receivables/aging?asOf=2026-11-15&query=${encodeURIComponent(searchTerm)}&page=1&pageSize=100`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(searched.statusCode, searched.body).toBe(200);
+    expect(searched.json<ReceivableAgingResponse>().rows.map((row) => row.invoiceNumber)).toEqual([searchTerm]);
     for (const row of aging.rows) {
       if (row.daysOverdue === 0) expect(row.bucket).toBe('CURRENT');
       else if (row.daysOverdue <= 30) expect(row.bucket).toBe('1_30');
@@ -332,6 +337,9 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const agingTotal = aging.json<ReportData>().totals.find((total) => total.label === 'Outstanding')?.value;
     const agingSource = await database.pool.query<{ amount: string }>("select coalesce(sum(balance_centavos),0)::text amount from invoices where balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')");
     expect(moneyToCentavos(agingTotal ?? '')).toBe(BigInt(agingSource.rows[0]?.amount ?? '0'));
+    const agingList = await app.inject({ method: 'GET', url: `/reports/data?report=RECEIVABLE_AGING_LIST&from=2026-11-15&to=2026-11-15&agingAsOf=2026-11-15&agingOverdueOnly=false&agingCollectorId=${collectorId}&agingAreaId=${areaId}&agingSort=balance&agingDirection=desc`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(agingList.statusCode, agingList.body).toBe(200);
+    expect(agingList.json<ReportData>()).toMatchObject({ title: 'Receivable aging list', rows: expect.any(Array), columns: expect.arrayContaining([expect.objectContaining({ key: 'balance' })]) });
     const serviceControlReport = await app.inject({ method: 'GET', url: '/reports/data?report=SERVICE_CONTROL_ACCOUNTS&from=2026-11-15&to=2026-11-15&serviceControlAsOf=2026-11-15&serviceControlOverdueOnly=true&serviceControlCollectorId=' + collectorId + '&serviceControlAreaId=' + areaId + '&serviceControlSort=arrears&serviceControlDirection=desc', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(serviceControlReport.statusCode, serviceControlReport.body).toBe(200);
     const serviceControlData = serviceControlReport.json<ReportData>();
@@ -505,6 +513,13 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(receivablesXlsx.statusCode, receivablesXlsx.body).toBe(200);
     expect(receivablesXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
     expect(receivablesXlsx.headers['content-disposition']).toContain('bcis-service-control-accounts-2026-11-15.xlsx');
+    const agingPdf = await app.inject({ method: 'GET', url: `/reports/export?report=RECEIVABLE_AGING_LIST&from=2026-11-15&to=2026-11-15&agingAsOf=2026-11-15&agingOverdueOnly=true&agingCollectorId=${collectorId}&agingAreaId=${areaId}&agingSort=balance&agingDirection=desc&format=PDF`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(agingPdf.statusCode, agingPdf.body).toBe(200);
+    expect(agingPdf.rawPayload.subarray(0, 4).toString()).toBe('%PDF');
+    const agingXlsx = await app.inject({ method: 'GET', url: `/reports/export?report=RECEIVABLE_AGING_LIST&from=2026-11-15&to=2026-11-15&agingAsOf=2026-11-15&agingOverdueOnly=true&agingCollectorId=${collectorId}&agingAreaId=${areaId}&agingSort=balance&agingDirection=desc&format=XLSX`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(agingXlsx.statusCode, agingXlsx.body).toBe(200);
+    expect(agingXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    expect(agingXlsx.headers['content-disposition']).toContain('bcis-receivable-aging-list-2026-11-15.xlsx');
 
     const actor = await database.pool.query<{ id: string }>("select id from users where username='admin.demo'");
     const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
@@ -516,6 +531,6 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(history.statusCode, history.body).toBe(200);
     expect(history.json<ServiceHistory>().events.map((event) => event.type)).toEqual(['RECONNECTION', 'SUSPENSION']);
     const exports = await database.pool.query("select count(*)::int count from audit_logs where action='report.exported'");
-    expect(exports.rows[0]?.count).toBe(7);
+    expect(exports.rows[0]?.count).toBe(9);
   });
 });

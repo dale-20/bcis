@@ -256,7 +256,7 @@ export class DesktopApiClient {
 
   getReceivableAging(query: ReceivableAgingQuery): Promise<DesktopResult<ReceivableAgingResponse>> {
     const parsed = receivableAgingQuerySchema.parse(query);
-    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), page: String(parsed.page), pageSize: String(parsed.pageSize) });
+    const parameters = new URLSearchParams({ asOf: parsed.asOf, overdueOnly: String(parsed.overdueOnly), query: parsed.query, sort: parsed.sort, direction: parsed.direction, page: String(parsed.page), pageSize: String(parsed.pageSize) });
     if (parsed.collectorId) parameters.set('collectorId', parsed.collectorId);
     if (parsed.collectionAreaId) parameters.set('collectionAreaId', parsed.collectionAreaId);
     return this.call(`/receivables/aging?${parameters.toString()}`, { method: 'GET' }, receivableAgingResponseSchema);

@@ -58,7 +58,7 @@ export function DashboardPage({ user }: { user: AuthenticatedUser }) {
   const query = useQuery({ queryKey: ['dashboard', user.userId, range], queryFn: () => getDashboard(range), refetchInterval: 60_000 });
   const overdueQueue = useQuery({
     queryKey: ['dashboard-attention', 'overdue', user.userId, today],
-    queryFn: () => getReceivableAging({ asOf: today, overdueOnly: true, page: 1, pageSize: 5 }),
+    queryFn: () => getReceivableAging({ asOf: today, overdueOnly: true, query: '', sort: 'dueDate', direction: 'asc', page: 1, pageSize: 5 }),
     enabled: canViewReceivables,
   });
   const batchQueue = useQuery({

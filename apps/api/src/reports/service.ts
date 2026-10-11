@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import type { Dashboard, DashboardQuery, ReportData, ReportRequest, ServiceHistory } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { AppError } from '../errors.js';
+import { ReceivableService } from '../receivables/service.js';
 import { ServiceControlService } from '../service-control/service.js';
 
 type Row = Record<string, unknown>;
@@ -107,6 +108,28 @@ export class ReportService {
         { key: 'plan', label: 'Plan' }, { key: 'serviceType', label: 'Service type' }, { key: 'area', label: 'Area' }, { key: 'collector', label: 'Collector' },
         { key: 'oldestDue', label: 'Oldest due' }, { key: 'daysOverdue', label: 'Days overdue', align: 'right' }, { key: 'unpaidMonths', label: 'Unpaid months', align: 'right' },
         { key: 'lastPayment', label: 'Last payment' }, { key: 'age', label: 'Age bucket' }, { key: 'arrears', label: 'Arrears', align: 'right' },
+      ], generatedAt);
+    }
+    if (request.report === 'RECEIVABLE_AGING_LIST') {
+      if (!request.agingAsOf) throw new AppError(400, 'INVALID_REPORT_FILTERS', 'An as-of date is required for receivable-aging exports');
+      const result = await new ReceivableService(this.database).agingExport({
+        asOf: request.agingAsOf, overdueOnly: request.agingOverdueOnly === 'true', query: request.agingQuery ?? '',
+        sort: request.agingSort ?? 'dueDate', direction: request.agingDirection ?? 'asc',
+        ...(request.agingCollectorId ? { collectorId: request.agingCollectorId } : {}),
+        ...(request.agingAreaId ? { collectionAreaId: request.agingAreaId } : {}),
+      });
+      if (result.total > 10_000) throw new AppError(413, 'EXPORT_TOO_LARGE', 'More than 10,000 invoices match. Narrow the filters and try again.');
+      const rows = result.rows.map((row) => ({
+        invoice: row.invoiceNumber, subscriber: row.subscriberName, account: row.accountNumber, service: row.serviceAccountNumber,
+        dueDate: row.dueDate, daysOverdue: String(row.daysOverdue), bucket: row.bucket, area: row.collectionAreaName ?? 'Unassigned',
+        collector: row.collectorName ?? 'Unassigned', balance: money(row.balanceCentavos),
+      }));
+      return this.data(request, request.agingOverdueOnly === 'true' ? 'Overdue invoice aging' : 'Receivable aging list', rows, [
+        { label: 'Matching open invoices', value: String(result.total) }, { label: 'Outstanding balance', value: money(result.totals.total) },
+      ], [
+        { key: 'invoice', label: 'Invoice' }, { key: 'subscriber', label: 'Subscriber' }, { key: 'account', label: 'Account' },
+        { key: 'service', label: 'Service account' }, { key: 'dueDate', label: 'Due date' }, { key: 'daysOverdue', label: 'Days overdue', align: 'right' },
+        { key: 'bucket', label: 'Age bucket' }, { key: 'area', label: 'Collection area' }, { key: 'collector', label: 'Collector' }, { key: 'balance', label: 'Balance', align: 'right' },
       ], generatedAt);
     }
     if (request.report === 'PAYMENT_LIST') {

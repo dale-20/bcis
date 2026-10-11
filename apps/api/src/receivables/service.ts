@@ -21,4 +21,8 @@ export class ReceivableService {
       })),
     };
   }
+
+  agingExport(query: Omit<ReceivableAgingQuery, 'page' | 'pageSize'>): Promise<ReceivableAgingResponse> {
+    return this.aging({ ...query, page: 1, pageSize: 10_001 });
+  }
 }

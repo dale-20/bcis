@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, sql, type SQL } from 'drizzle-orm';
 import type { ReceivableAgingQuery } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import { collectionAreas, collectors, invoices, serviceAccounts, subscribers } from '../db/schema.js';
@@ -14,6 +14,10 @@ export class ReceivableRepository {
     if (query.overdueOnly) conditions.push(sql`${invoices.dueDate} < CAST(${query.asOf} AS date)`);
     if (query.collectorId) conditions.push(eq(serviceAccounts.assignedCollectorId, query.collectorId));
     if (query.collectionAreaId) conditions.push(eq(serviceAccounts.collectionAreaId, query.collectionAreaId));
+    if (query.query) {
+      const pattern = `%${query.query.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+      conditions.push(sql`(${subscribers.accountNumber} ILIKE ${pattern} ESCAPE '\\' OR ${invoices.invoiceNumber} ILIKE ${pattern} ESCAPE '\\' OR ${serviceAccounts.serviceAccountNumber} ILIKE ${pattern} ESCAPE '\\' OR COALESCE(NULLIF(trim(${subscribers.organizationName}), ''), trim(concat_ws(' ', ${subscribers.firstName}, ${subscribers.lastName}))) ILIKE ${pattern} ESCAPE '\\')`);
+    }
     const where = and(...conditions);
     const daysOverdue = sql<number>`greatest(0, CAST(${query.asOf} AS date) - ${invoices.dueDate})::int`;
     const bucket = sql<'CURRENT' | '1_30' | '31_60' | '61_90' | '90_PLUS'>`CASE
@@ -32,17 +36,27 @@ export class ReceivableRepository {
       .innerJoin(subscribers, eq(invoices.subscriberId, subscribers.id))
       .leftJoin(collectors, eq(serviceAccounts.assignedCollectorId, collectors.id))
       .leftJoin(collectionAreas, eq(serviceAccounts.collectionAreaId, collectionAreas.id));
-    const rows = await base.where(where).orderBy(asc(invoices.dueDate), asc(invoices.invoiceNumber))
+    const subscriberName = sql<string>`COALESCE(NULLIF(trim(${subscribers.organizationName}), ''), trim(concat_ws(' ', ${subscribers.firstName}, ${subscribers.lastName})))`;
+    const sortColumns = {
+      dueDate: invoices.dueDate, subscriber: subscriberName, account: subscribers.accountNumber,
+      service: serviceAccounts.serviceAccountNumber, daysOverdue, balance: invoices.balanceCentavos,
+    };
+    const order = query.direction === 'asc'
+      ? [asc(sortColumns[query.sort]), asc(invoices.dueDate), asc(invoices.invoiceNumber), asc(invoices.id)]
+      : [desc(sortColumns[query.sort]), asc(invoices.dueDate), asc(invoices.invoiceNumber), asc(invoices.id)];
+    const rows = await base.where(where).orderBy(...order)
       .limit(query.pageSize).offset((query.page - 1) * query.pageSize);
     const [totalRow] = await this.database.db.select({ total: count() }).from(invoices)
-      .innerJoin(serviceAccounts, eq(invoices.serviceAccountId, serviceAccounts.id)).where(where);
+      .innerJoin(serviceAccounts, eq(invoices.serviceAccountId, serviceAccounts.id))
+      .innerJoin(subscribers, eq(invoices.subscriberId, subscribers.id)).where(where);
     const [totals] = await this.database.db.select({
       CURRENT: sql<bigint>`coalesce(sum(CASE WHEN ${invoices.dueDate} >= CAST(${query.asOf} AS date) THEN ${invoices.balanceCentavos} ELSE 0 END), 0)::bigint`.mapWith(invoices.balanceCentavos),
       '1_30': sql<bigint>`coalesce(sum(CASE WHEN CAST(${query.asOf} AS date) - ${invoices.dueDate} BETWEEN 1 AND 30 THEN ${invoices.balanceCentavos} ELSE 0 END), 0)::bigint`.mapWith(invoices.balanceCentavos),
       '31_60': sql<bigint>`coalesce(sum(CASE WHEN CAST(${query.asOf} AS date) - ${invoices.dueDate} BETWEEN 31 AND 60 THEN ${invoices.balanceCentavos} ELSE 0 END), 0)::bigint`.mapWith(invoices.balanceCentavos),
       '61_90': sql<bigint>`coalesce(sum(CASE WHEN CAST(${query.asOf} AS date) - ${invoices.dueDate} BETWEEN 61 AND 90 THEN ${invoices.balanceCentavos} ELSE 0 END), 0)::bigint`.mapWith(invoices.balanceCentavos),
       '90_PLUS': sql<bigint>`coalesce(sum(CASE WHEN CAST(${query.asOf} AS date) - ${invoices.dueDate} > 90 THEN ${invoices.balanceCentavos} ELSE 0 END), 0)::bigint`.mapWith(invoices.balanceCentavos),
-    }).from(invoices).innerJoin(serviceAccounts, eq(invoices.serviceAccountId, serviceAccounts.id)).where(where);
+    }).from(invoices).innerJoin(serviceAccounts, eq(invoices.serviceAccountId, serviceAccounts.id))
+      .innerJoin(subscribers, eq(invoices.subscriberId, subscribers.id)).where(where);
     return { rows, total: totalRow?.total ?? 0, totals: totals ?? { CURRENT: 0n, '1_30': 0n, '31_60': 0n, '61_90': 0n, '90_PLUS': 0n } };
   }
 }

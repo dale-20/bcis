@@ -16,14 +16,17 @@ export const receivablePlugin: FastifyPluginAsync<ReceivablePluginOptions> = asy
     schema: {
       querystring: { type: 'object', required: ['asOf'], additionalProperties: false, properties: {
         asOf: { type: 'string', format: 'date' }, overdueOnly: { type: 'string', enum: ['true', 'false'] }, collectorId: { type: 'string', format: 'uuid' },
-        collectionAreaId: { type: 'string', format: 'uuid' }, page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' },
+        collectionAreaId: { type: 'string', format: 'uuid' }, query: { type: 'string', maxLength: 100 },
+        sort: { type: 'string', enum: ['dueDate', 'subscriber', 'account', 'service', 'daysOverdue', 'balance'] }, direction: { type: 'string', enum: ['asc', 'desc'] },
+        page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' },
       } }, response: { 200: response, 400: errorResponse, 401: errorResponse, 403: errorResponse },
     },
   }, async (request) => {
-    const raw = request.query as { asOf: string; overdueOnly?: string; collectorId?: string; collectionAreaId?: string; page?: string; pageSize?: string };
+    const raw = request.query as { asOf: string; overdueOnly?: string; collectorId?: string; collectionAreaId?: string; query?: string; sort?: 'dueDate' | 'subscriber' | 'account' | 'service' | 'daysOverdue' | 'balance'; direction?: 'asc' | 'desc'; page?: string; pageSize?: string };
     const query = receivableAgingQuerySchema.parse({
       asOf: raw.asOf, overdueOnly: raw.overdueOnly === 'true', page: raw.page ? Number(raw.page) : 1, pageSize: raw.pageSize ? Number(raw.pageSize) : 25,
       ...(raw.collectorId ? { collectorId: raw.collectorId } : {}), ...(raw.collectionAreaId ? { collectionAreaId: raw.collectionAreaId } : {}),
+      ...(raw.query ? { query: raw.query } : {}), ...(raw.sort ? { sort: raw.sort } : {}), ...(raw.direction ? { direction: raw.direction } : {}),
     });
     return receivableAgingResponseSchema.parse(await service.aging(query));
   });

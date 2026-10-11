@@ -37,6 +37,7 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
   const pdfExportPath = path.join(reportExportDirectory, 'monthly-collections.pdf');
   const xlsxExportPath = path.join(reportExportDirectory, 'monthly-collections.xlsx');
   const receivablesExportPath = path.join(reportExportDirectory, 'overdue-accounts.xlsx');
+  const agingExportPath = path.join(reportExportDirectory, 'receivable-aging.xlsx');
   const proofFile = path.join(proofDirectory, 'synthetic-proof.png');
   await writeFile(proofFile, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+nm6kAAAAASUVORK5CYII=', 'base64'));
   const database = new pg.Client({ connectionString: databaseUrl });
@@ -93,6 +94,19 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByText(/Unverified proofs? awaiting review/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Collector performance' })).toBeVisible();
     await page.screenshot({ path: 'test-results/dashboard.png' });
+    await page.getByRole('link', { name: 'Receivables', exact: true }).click();
+    await page.getByRole('link', { name: 'Aging', exact: true }).click();
+    await page.getByLabel('As of').fill('2099-12-31');
+    await page.getByLabel('Search invoice, subscriber or service').fill('SVC-00001-1');
+    await expect(page.locator('.receivable-table tbody tr').first()).toContainText('SVC-00001-1');
+    await page.getByRole('button', { name: 'Sort by Balance' }).click();
+    await expect(page.getByRole('button', { name: 'Balance, sorted descending' })).toBeVisible();
+    await desktop.evaluate(({ dialog }, filePath: string) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, agingExportPath);
+    await page.getByRole('button', { name: 'XLSX', exact: true }).click();
+    await expect(page.getByText(`Saved to ${agingExportPath}`, { exact: true })).toBeVisible();
+    expect((await readFile(agingExportPath)).subarray(0, 2).toString('ascii')).toBe('PK');
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
     for (const [report, heading] of ([
