@@ -172,13 +172,18 @@ export class BillingRepository {
     if (query.maxAmountCentavos) filters.push(`i.total_centavos<=${add(query.maxAmountCentavos)}::bigint`);
     const where = filters.length ? `where ${filters.join(' and ')}` : '';
     const countValues = [...values];
+    const sortColumn = {
+      invoiceDate: 'i.invoice_date', invoice: 'i.invoice_number', subscriber: 's.account_number', service: 'sa.service_account_number',
+      dueDate: 'i.due_date', status: 'i.status', total: 'i.total_centavos', balance: 'i.balance_centavos',
+    }[query.sort];
+    const direction = query.direction === 'asc' ? 'asc' : 'desc';
     const limit = add(query.pageSize);
     const offset = add((query.page - 1) * query.pageSize);
     const base = `from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id join subscribers s on s.id=i.subscriber_id join service_accounts sa on sa.id=i.service_account_id ${where}`;
     const [countResult, rows] = await Promise.all([
       this.database.pool.query<{ total: number }>(`select count(*)::int total ${base}`, countValues),
       this.database.pool.query<{ id: string; invoice_number: string; period: string; subscriber_id: string; subscriber_account_number: string; subscriber_name: string; service_account_id: string; service_account_number: string; invoice_date: string; due_date: string; status: 'DRAFT' | 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' | 'CREDITED'; total: string; balance: string }>(
-        `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance ${base} order by i.invoice_date desc,i.invoice_number desc limit ${limit} offset ${offset}`,
+        `select i.id,i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,i.subscriber_id,s.account_number subscriber_account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber_name,i.service_account_id,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status::text,i.total_centavos::text total,i.balance_centavos::text balance ${base} order by ${sortColumn} ${direction},i.id ${direction} limit ${limit} offset ${offset}`,
         values,
       ),
     ]);

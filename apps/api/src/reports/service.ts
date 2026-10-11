@@ -81,6 +81,35 @@ export class ReportService {
 
   async report(request: ReportRequest): Promise<ReportData> {
     const generatedAt = new Date().toISOString();
+    if (request.report === 'INVOICE_LIST') {
+      const values: unknown[] = [];
+      const filters: string[] = [];
+      const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
+      if (request.invoiceQuery) {
+        const term = `%${request.invoiceQuery.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+        const parameter = add(term);
+        filters.push(`(i.invoice_number ilike ${parameter} escape '\\' or s.account_number ilike ${parameter} escape '\\' or sa.service_account_number ilike ${parameter} escape '\\' or concat_ws(' ',s.first_name,s.middle_name,s.last_name) ilike ${parameter} escape '\\')`);
+      }
+      if (request.invoicePeriod && request.invoicePeriod !== 'ALL') filters.push(`bc.period_start=${add(`${request.invoicePeriod}-01`)}::date`);
+      if (request.invoiceStatus && request.invoiceStatus !== 'ALL') filters.push(`i.status=${add(request.invoiceStatus)}::invoice_status`);
+      if (request.invoiceDueFrom) filters.push(`i.due_date>=${add(request.invoiceDueFrom)}::date`);
+      if (request.invoiceDueTo) filters.push(`i.due_date<=${add(request.invoiceDueTo)}::date`);
+      if (request.invoiceMinAmountCentavos) filters.push(`i.total_centavos>=${add(request.invoiceMinAmountCentavos)}::bigint`);
+      if (request.invoiceMaxAmountCentavos) filters.push(`i.total_centavos<=${add(request.invoiceMaxAmountCentavos)}::bigint`);
+      const orderColumn = { invoiceDate: 'i.invoice_date', invoice: 'i.invoice_number', subscriber: 's.account_number', service: 'sa.service_account_number', dueDate: 'i.due_date', status: 'i.status', total: 'i.total_centavos', balance: 'i.balance_centavos' }[request.invoiceSort ?? 'invoice'];
+      const direction = request.invoiceDirection === 'asc' ? 'asc' : 'desc';
+      const where = filters.length ? `where ${filters.join(' and ')}` : '';
+      const result = await this.database.pool.query<Row>(`select i.invoice_number,to_char(bc.period_start,'YYYY-MM') period,s.account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber,sa.service_account_number,i.invoice_date::text,i.due_date::text,i.status,i.total_centavos::text total,i.balance_centavos::text balance
+        from invoices i join billing_cycles bc on bc.id=i.billing_cycle_id join subscribers s on s.id=i.subscriber_id join service_accounts sa on sa.id=i.service_account_id
+        ${where} order by ${orderColumn} ${direction},i.id ${direction} limit 10001`, values);
+      if (result.rows.length > 10000) throw new AppError(413, 'EXPORT_TOO_LARGE', 'More than 10,000 invoices match. Narrow the filters and try again.');
+      const rows = result.rows.map((row) => ({ invoice: text(row.invoice_number), period: text(row.period), subscriber: text(row.subscriber), account: text(row.account_number), service: text(row.service_account_number), invoiceDate: text(row.invoice_date), dueDate: text(row.due_date), status: text(row.status), total: money(cents(row.total)), balance: money(cents(row.balance)) }));
+      return this.data(request, 'Invoice list', rows, [{ label: 'Matching invoices', value: String(rows.length) }], [
+        { key: 'invoice', label: 'Invoice' }, { key: 'period', label: 'Period' }, { key: 'subscriber', label: 'Subscriber' }, { key: 'account', label: 'Account' },
+        { key: 'service', label: 'Service' }, { key: 'invoiceDate', label: 'Invoice date' }, { key: 'dueDate', label: 'Due date' }, { key: 'status', label: 'Status' },
+        { key: 'total', label: 'Total', align: 'right' }, { key: 'balance', label: 'Balance', align: 'right' },
+      ], generatedAt);
+    }
     if (request.report === 'COLLECTION_BATCH_LIST') {
       const values: unknown[] = [request.from, request.to];
       const filters: string[] = ['cb.collection_date between $1::date and $2::date'];

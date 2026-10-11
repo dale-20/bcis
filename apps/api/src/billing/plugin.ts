@@ -96,7 +96,7 @@ export const billingPlugin: FastifyPluginAsync<BillingPluginOptions> = async (ap
   app.get('/invoices', {
     preHandler: [authenticate, requirePermission(options.authService, 'billing.view')],
     schema: {
-      querystring: { type: 'object', additionalProperties: false, properties: { query: { type: 'string', maxLength: 100 }, period: { type: 'string' }, status: { type: 'string' }, dueFrom: { type: 'string', format: 'date' }, dueTo: { type: 'string', format: 'date' }, minAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, maxAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' } } },
+      querystring: { type: 'object', additionalProperties: false, properties: { query: { type: 'string', maxLength: 100 }, period: { type: 'string' }, status: { type: 'string' }, dueFrom: { type: 'string', format: 'date' }, dueTo: { type: 'string', format: 'date' }, minAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, maxAmountCentavos: { type: 'string', pattern: '^(0|[1-9]\\d*)$' }, sort: { type: 'string' }, direction: { type: 'string' }, page: { type: 'string', pattern: '^[1-9]\\d*$' }, pageSize: { type: 'string', pattern: '^[1-9]\\d*$' } } },
       response: { 200: invoiceListResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse },
     },
   }, async (request) => invoiceListResponseSchema.parse(await service.invoices(invoiceListQuerySchema.parse(request.query))));

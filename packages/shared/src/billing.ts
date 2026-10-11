@@ -54,6 +54,8 @@ export const invoiceListQuerySchema = z.object({
   status: z.union([invoiceStatusSchema, z.literal('ALL')]).default('ALL'),
   dueFrom: z.iso.date().optional(), dueTo: z.iso.date().optional(),
   minAmountCentavos: centavosSchema.optional(), maxAmountCentavos: centavosSchema.optional(),
+  sort: z.enum(['invoiceDate', 'invoice', 'subscriber', 'service', 'dueDate', 'status', 'total', 'balance']).default('invoice'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(20),
 }).superRefine((value, context) => {
   if (value.dueFrom && value.dueTo && value.dueFrom > value.dueTo) context.addIssue({ code: 'custom', message: 'Due date range is invalid', path: ['dueTo'] });

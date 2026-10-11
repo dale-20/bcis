@@ -125,6 +125,18 @@ describe.sequential('monthly billing and reproducible ledger', () => {
     const list = listResponse.json<InvoiceListResponse>();
     expect(list.total).toBe(1);
     expect(list.items[0]).toMatchObject({ period: '2026-08', serviceAccountNumber: 'SVC-00001-1', totalCentavos: '99900', balanceCentavos: '99900' });
+    const sortedResponse = await app.inject({ method: 'GET', url: '/invoices?period=2026-08&sort=total&direction=asc&page=1&pageSize=100', headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(sortedResponse.statusCode, sortedResponse.body).toBe(200);
+    const sorted = sortedResponse.json<InvoiceListResponse>().items;
+    expect(sorted.length).toBeGreaterThan(1);
+    expect(sorted.map((item) => BigInt(item.totalCentavos))).toEqual([...sorted.map((item) => BigInt(item.totalCentavos))].sort((left, right) => left < right ? -1 : left > right ? 1 : 0));
+    const invoiceExportQuery = 'report=INVOICE_LIST&from=0001-01-01&to=9999-12-31&invoiceQuery=SVC-00001-1&invoicePeriod=2026-08&invoiceStatus=UNPAID&invoiceMinAmountCentavos=99900&invoiceMaxAmountCentavos=99900&invoiceSort=total&invoiceDirection=asc';
+    const invoiceReport = await app.inject({ method: 'GET', url: `/reports/data?${invoiceExportQuery}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(invoiceReport.statusCode, invoiceReport.body).toBe(200);
+    expect(invoiceReport.json<ReportData>().rows).toHaveLength(1);
+    const invoiceXlsx = await app.inject({ method: 'GET', url: `/reports/export?${invoiceExportQuery}&format=XLSX`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(invoiceXlsx.statusCode, invoiceXlsx.body).toBe(200);
+    expect(invoiceXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
     const invoiceId = list.items[0]?.id;
     if (!invoiceId) throw new Error('Invoice list row missing');
     const detailResponse = await app.inject({ method: 'GET', url: `/invoices/${invoiceId}`, headers: { authorization: `Bearer ${cashierToken}` } });
