@@ -61,65 +61,6 @@
 }
 @media print{body:has(.receipt-preview) *{visibility:hidden!important}body:has(.receipt-preview) .receipt-preview,body:has(.receipt-preview) .receipt-preview *{visibility:visible!important}body:has(.receipt-preview) .receipt-preview{position:absolute!important;inset:0 auto auto 0;width:100%;border:0!important;padding:0!important}.receipt-actions{display:none!important}.receipt-paper{max-width:none;border:0;border-radius:0;padding:0}.receipt-paper>header{border-color:#1d5fa9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 
-/* BCIS Buddy is a layered SVG: each body part has its own pose, so events change the character rather than moving a static picture. */
-.bcis-mascot { position: fixed; z-index: 40; display: grid; justify-items: center; width: 154px; touch-action: none; user-select: none; }
-.mascot-art { width: 144px; height: 162px; overflow: visible; }
-.mascot-body { transform-box: fill-box; transform-origin: 50% 90%; animation: buddy-breathe 3.6s ease-in-out infinite; }
-.mascot-arm { transform-box: fill-box; transform-origin: 55% 15%; }
-.mascot-arm-left { animation: buddy-arm-rest 3.6s ease-in-out infinite; }
-.mascot-arm-right { animation: buddy-arm-rest 3.6s ease-in-out infinite; }
-.mascot-shadow { animation: buddy-shadow 3.6s ease-in-out infinite; }
-.mascot-bubble { position: relative; z-index: 1; max-width: 188px; margin: 0 auto -2px; border: 1px solid var(--color-border); border-radius: 15px 15px 15px 5px; background: var(--color-surface); padding: 8px 11px; color: var(--color-navy); box-shadow: 0 7px 22px rgb(15 39 71 / 14%); font-size: 11px; font-weight: 600; line-height: 1.4; text-align: center; }
-.mascot-toolbar { position: absolute; top: 0; right: 1px; display: flex; gap: 2px; opacity: .72; transition: opacity 160ms ease; }
-.mascot-toolbar button:first-child { cursor: grab; }
-.mascot-toolbar button:first-child:active { cursor: grabbing; }
-.bcis-mascot:hover .mascot-toolbar, .bcis-mascot:focus-within .mascot-toolbar { opacity: 1; }
-.mascot-toolbar button, .mascot-preferences button, .mascot-dock { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 28px; min-height: 28px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); color: var(--color-navy); box-shadow: 0 3px 12px rgb(15 39 71 / 12%); cursor: pointer; }
-.mascot-toolbar svg, .mascot-preferences svg { width: 14px; height: 14px; }
-.mascot-toolbar button:active, .mascot-preferences button:active { transform: scale(.96); }
-.mascot-preferences { position: absolute; z-index: 2; top: 31px; right: 2px; width: 218px; padding: 12px; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: 0 12px 32px rgb(15 39 71 / 18%); color: var(--color-foreground); }
-.mascot-preferences header, .mascot-sound-setting { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mascot-preferences header { margin-bottom: 12px; }
-.mascot-sound-setting { font-size: 11px; font-weight: 600; }
-.mascot-preferences p { margin: 10px 0; color: var(--color-secondary); font-size: 10px; line-height: 1.5; }
-.mascot-preferences button { min-height: 28px; padding: 0 8px; font-size: 10px; }
-.mascot-preferences .mascot-hide { width: 100%; background: var(--color-canvas); }
-.mascot-dock { position: fixed; z-index: 40; right: 14px; bottom: 14px; width: 48px; height: 48px; overflow: hidden; border-radius: 50%; }
-.mascot-dock .mascot-art { width: 53px; height: 60px; margin-top: 4px; }
-.mood-hello .mascot-arm-right { animation: buddy-wave 520ms ease-in-out 3; }
-.mood-happy .mascot-body, .mood-success .mascot-body { animation: buddy-hop 520ms ease-in-out 2; }
-.mood-happy .mascot-arm-left, .mood-success .mascot-arm-left { animation: buddy-cheer 500ms ease-in-out 2; }
-.mood-happy .mascot-arm-right, .mood-success .mascot-arm-right { animation: buddy-cheer 500ms ease-in-out 2 reverse; }
-.mascot-thumb { opacity: 0; transform-box: fill-box; transform-origin: center; }
-.mood-success .mascot-thumb { opacity: 1; transform: translateY(-3px); }
-.mood-processing .mascot-arm-right { animation: buddy-work 900ms ease-in-out infinite; }
-.mood-walking .mascot-leg-left, .mood-walking .mascot-boot-left { transform-box: fill-box; transform-origin: 50% 0; animation: buddy-step 260ms ease-in-out infinite alternate; }
-.mood-walking .mascot-leg-right, .mood-walking .mascot-boot-right { transform-box: fill-box; transform-origin: 50% 0; animation: buddy-step 260ms ease-in-out infinite alternate-reverse; }
-.mood-processing .mascot-eye { animation: buddy-blink 1400ms ease-in-out infinite; }
-.mood-thinking .mascot-body { animation: buddy-think 1.6s ease-in-out infinite alternate; }
-.mood-warning .mascot-body, .mood-error .mascot-body { animation: buddy-alert 420ms ease-in-out 2; }
-.mood-warning .mascot-mouth, .mood-error .mascot-mouth { transform: translateY(2px) scale(.7); }
-.mood-surprised .mascot-eye { transform: scale(1.22); }
-.mood-surprised .mascot-mouth { transform: scale(1.45); transform-origin: center; }
-.mood-sleeping .mascot-body { animation: buddy-sleep 3s ease-in-out infinite; }
-.mood-sleeping .mascot-eye { transform: scaleY(.12); transform-origin: center; }
-.mood-sleeping .mascot-mouth { transform: scaleX(.7); }
-.reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
-@keyframes buddy-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-2px) scale(1.015); } }
-@keyframes buddy-arm-rest { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-3deg); } }
-@keyframes buddy-shadow { 0%, 100% { transform: scaleX(1); opacity: .12; } 50% { transform: scaleX(.9); opacity: .09; } }
-@keyframes buddy-wave { 0%, 100% { transform: rotate(0); } 25%, 75% { transform: rotate(-24deg); } 50% { transform: rotate(18deg); } }
-@keyframes buddy-hop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-9px); } }
-@keyframes buddy-cheer { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-52deg); } }
-@keyframes buddy-work { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(24deg); } }
-@keyframes buddy-step { from { transform: rotate(-12deg) translateY(-1px); } to { transform: rotate(12deg) translateY(1px); } }
-@keyframes buddy-blink { 0%, 90%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
-@keyframes buddy-think { from { transform: rotate(0); } to { transform: rotate(4deg) translateY(-2px); } }
-@keyframes buddy-alert { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px) rotate(-2deg); } 75% { transform: translateX(3px) rotate(2deg); } }
-@keyframes buddy-sleep { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(3px) rotate(2deg); } }
-@media (max-width: 760px) { .bcis-mascot { transform: scale(.84); transform-origin: bottom right; } }
-@media (prefers-reduced-motion: reduce) { .bcis-mascot *, .bcis-mascot *::before, .bcis-mascot *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
-
 @layer base {
   * { box-sizing: border-box; }
   body { @apply m-0 bg-canvas font-sans text-sm text-foreground antialiased; caret-color: var(--color-primary); }
