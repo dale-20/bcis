@@ -6,16 +6,12 @@ import { announceMascotEvent, MASCOT_EVENT, type MascotEventDetail } from './mas
 import { isMascotEvent, mascotReactions, type MascotMood, type MascotReaction } from './mascot-model';
 import { useMascotAnimation } from './use-mascot-animation';
 import { clampMascotPosition, initialMascotPosition, loadMascotPreferences, mascotDimensions, saveMascotPreferences, type MascotPosition, type MascotPreferences as MascotPreferencesState } from './mascot-preferences';
+import { createMascotBehaviorScheduler, isSensitiveMascotWorkflowActive, shouldReactToApplicationEvent, shouldShowPersonalityDialogue, type MascotIdleBehavior } from './mascot-behavior';
 
 const defaultMessage = 'Need help? I’m here.';
 const fallbackDimensions = mascotDimensions('small');
 const dialogueDurationMs = 5_000;
 const reactionCooldownMs = 900;
-
-function isSensitiveEntryFocused(): boolean {
-  const activeElement = document.activeElement;
-  return activeElement instanceof HTMLElement && activeElement.matches('input, textarea, select, [contenteditable="true"]');
-}
 
 type DragState = { pointerId: number; offsetX: number; offsetY: number; lastPosition: MascotPosition; moved: boolean };
 
@@ -39,11 +35,12 @@ export function BCISMascot() {
   const animationStateRef = useRef(animationState);
   const [mood, setMood] = useState<MascotMood>('neutral');
   const [message, setMessage] = useState(defaultMessage);
+  const [idleBehavior, setIdleBehavior] = useState<MascotIdleBehavior | null>(null);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [visible, setVisible] = useState(true);
-  const restTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleBehaviorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenEventIds = useRef(new Set<string>());
   const lastReactionAt = useRef(new Map<string, number>());
   const audioContext = useRef<AudioContext | null>(null);
@@ -57,7 +54,6 @@ export function BCISMascot() {
     setPreferences(next);
     saveMascotPreferences(next);
     if (next.minimized || !next.enabled) {
-      if (restTimer.current) clearTimeout(restTimer.current);
       if (dialogueTimer.current) clearTimeout(dialogueTimer.current);
       dialogueTimer.current = null;
       reset();
@@ -74,6 +70,9 @@ export function BCISMascot() {
     });
     if (!accepted) return;
     if (dialogueTimer.current) clearTimeout(dialogueTimer.current);
+    if (idleBehaviorTimer.current) clearTimeout(idleBehaviorTimer.current);
+    idleBehaviorTimer.current = null;
+    setIdleBehavior(null);
     setMood(reaction.mood);
     setMessage(showDialogue ? reaction.message : '');
     if (showDialogue) {
@@ -105,23 +104,21 @@ export function BCISMascot() {
       if (seenEventIds.current.has(eventDetail.eventId)) return;
       seenEventIds.current.add(eventDetail.eventId);
       if (seenEventIds.current.size > 128) seenEventIds.current.delete(seenEventIds.current.values().next().value ?? '');
+      if (!shouldReactToApplicationEvent(preferences.personality, eventDetail.type)) return;
       const now = Date.now();
       const previousReaction = lastReactionAt.current.get(eventDetail.type);
       if (previousReaction !== undefined && now - previousReaction < reactionCooldownMs) return;
       lastReactionAt.current.set(eventDetail.type, now);
-      react(mascotReactions[eventDetail.type], !isSensitiveEntryFocused());
+      react(mascotReactions[eventDetail.type], shouldShowPersonalityDialogue(preferences.personality, eventDetail.type) && !isSensitiveMascotWorkflowActive(document));
     };
     window.addEventListener(MASCOT_EVENT, handleEvent);
     return () => window.removeEventListener(MASCOT_EVENT, handleEvent);
-  }, [preferences.enabled, preferences.minimized, react]);
+  }, [preferences.enabled, preferences.minimized, preferences.personality, react]);
 
   useEffect(() => {
     const updateVisibility = () => {
-      const nextVisible = document.visibilityState !== 'hidden';
-      setVisible(nextVisible);
-      if (nextVisible || !restTimer.current) return;
-      clearTimeout(restTimer.current);
-      restTimer.current = null;
+      setVisible(document.visibilityState !== 'hidden');
+      if (document.visibilityState === 'hidden') setIdleBehavior(null);
     };
     document.addEventListener('visibilitychange', updateVisibility);
     return () => document.removeEventListener('visibilitychange', updateVisibility);
@@ -162,34 +159,63 @@ export function BCISMascot() {
   }, [preferencesOpen]);
 
   useEffect(() => {
-    if (preferences.minimized || !preferences.enabled || !visible) {
-      if (restTimer.current) clearTimeout(restTimer.current);
-      return;
-    }
-    const rest = () => {
-      if (restTimer.current) clearTimeout(restTimer.current);
-      if (animationStateRef.current.name === 'sleep') {
-        reset();
-        setMood('neutral');
-        setMessage(defaultMessage);
-      }
-      restTimer.current = setTimeout(() => {
-      if (animationStateRef.current.name === 'idle') announceMascotEvent('extended-inactivity');
-      }, 60_000);
-    };
-    rest();
-    window.addEventListener('pointerdown', rest);
-    window.addEventListener('keydown', rest);
+    if (preferences.minimized || !preferences.enabled || !visible) return;
+    const scheduler = createMascotBehaviorScheduler({
+      personality: preferences.personality,
+      clock: { setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs), clearTimeout: (handle) => window.clearTimeout(handle as number) },
+      random: Math.random,
+      canBehave: () => preferences.animationsEnabled && !reducedMotion && !animationPaused
+        && animationStateRef.current.name === 'idle' && !isSensitiveMascotWorkflowActive(document),
+      onBehavior: (behavior) => {
+        setIdleBehavior(behavior);
+        if (idleBehaviorTimer.current) clearTimeout(idleBehaviorTimer.current);
+        const durationMs = behavior === 'blink' ? 160 : behavior === 'breathe' ? 2_400 : 1_200;
+        idleBehaviorTimer.current = setTimeout(() => {
+          setIdleBehavior(null);
+          idleBehaviorTimer.current = null;
+        }, durationMs);
+      },
+      onSleep: () => announceMascotEvent('extended-inactivity'),
+      onWake: () => {
+        if (isSensitiveMascotWorkflowActive(document)) {
+          reset();
+          setMood('neutral');
+          setMessage('');
+          return;
+        }
+        if (animationStateRef.current.name === 'sleep') reset();
+        if (preferences.personality === 'professional') {
+          setMood('neutral');
+          setMessage('');
+          setIdleBehavior('look');
+          idleBehaviorTimer.current = setTimeout(() => setIdleBehavior(null), 900);
+          return;
+        }
+        react({
+          animation: preferences.personality === 'playful' ? 'happy' : 'greeting',
+          mood: preferences.personality === 'playful' ? 'happy' : 'hello',
+          message: 'Welcome back!',
+          priority: 3,
+          durationMs: preferences.personality === 'playful' ? 2_400 : 3_200,
+        }, true);
+      },
+    });
+    scheduler.start();
+    const onActivity = () => scheduler.activity();
+    window.addEventListener('pointerdown', onActivity, { passive: true });
+    window.addEventListener('keydown', onActivity);
     return () => {
-      window.removeEventListener('pointerdown', rest);
-      window.removeEventListener('keydown', rest);
-      if (restTimer.current) clearTimeout(restTimer.current);
+      scheduler.stop();
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      if (idleBehaviorTimer.current) clearTimeout(idleBehaviorTimer.current);
+      idleBehaviorTimer.current = null;
     };
-  }, [play, preferences.enabled, preferences.minimized, reset, visible]);
+  }, [animationPaused, play, preferences.animationsEnabled, preferences.enabled, preferences.minimized, preferences.personality, react, reducedMotion, reset, visible]);
 
   useEffect(() => () => {
-    if (restTimer.current) clearTimeout(restTimer.current);
     if (dialogueTimer.current) clearTimeout(dialogueTimer.current);
+    if (idleBehaviorTimer.current) clearTimeout(idleBehaviorTimer.current);
     if (audioContext.current && audioContext.current.state !== 'closed') void audioContext.current.close();
   }, []);
 
@@ -238,6 +264,7 @@ export function BCISMascot() {
 
   const showTip = () => react({ animation: 'thinking', mood: 'thinking', message: 'I react to confirmed actions and stay quiet while you work.', priority: 2, durationMs: 6_000 });
   const updatePreferences = (patch: Partial<MascotPreferencesState>) => {
+    if (patch.animationsEnabled !== undefined || patch.personality !== undefined) setIdleBehavior(null);
     if (patch.soundEnabled && typeof AudioContext !== 'undefined') {
       audioContext.current ??= new AudioContext();
       void audioContext.current.resume().catch(() => undefined);
@@ -264,7 +291,7 @@ export function BCISMascot() {
       <span>{message}</span>
       {mood !== 'neutral' && message && <button type="button" className="mascot-bubble-dismiss" aria-label="Dismiss BCIS Buddy message" onClick={() => { if (dialogueTimer.current) clearTimeout(dialogueTimer.current); dialogueTimer.current = null; setMessage(''); }}>×</button>}
     </div>
-    <MascotRenderer mood={mood} animation={animationState.name} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} />
+    <MascotRenderer mood={mood} animation={animationState.name} idleBehavior={idleBehavior} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} />
     <MascotControls preferencesOpen={preferencesOpen} preferencesButtonRef={preferencesTrigger} onOpenPreferences={() => setPreferencesOpen((open) => !open)} onMinimize={() => persist({ ...preferences, minimized: true })} onPointerDown={startDrag} onKeyboardMove={moveByKeyboard} />
     {preferencesOpen && <MascotPreferences preferences={preferences} reducedMotion={reducedMotion} onUpdate={updatePreferences} onTip={showTip} onResetPosition={resetPosition} onClose={closePreferences} />}
   </div>;

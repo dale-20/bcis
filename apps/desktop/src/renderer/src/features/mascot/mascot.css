@@ -160,10 +160,6 @@
 }
 .mascot-art-compact { width: 60px; height: 72px; margin-top: 5px; }
 
-.anim-idle .buddy-body { transform-origin: 50% 95%; animation: buddy-breathe 3.8s ease-in-out infinite; }
-.anim-idle .buddy-shadow { transform-origin: center; animation: buddy-shadow 3.8s ease-in-out infinite; }
-.anim-idle .buddy-head { animation: buddy-idle-look 8s ease-in-out infinite; }
-.anim-idle .buddy-eyelid { animation: buddy-blink 5.2s linear infinite; }
 .anim-walk .buddy-body { transform-origin: 50% 95%; animation: buddy-walk-bob 420ms ease-in-out infinite; }
 .anim-walk .buddy-arm-pair-left { animation: buddy-arm-swing 420ms ease-in-out infinite alternate-reverse; }
 .anim-walk .buddy-arm-pair-right { animation: buddy-arm-swing 420ms ease-in-out infinite alternate; }
@@ -193,7 +189,6 @@
 .anim-processing .buddy-type-hand,
 .anim-processing .buddy-workpad { opacity: 1; }
 .anim-processing .buddy-type-hand { animation: buddy-type-tap 230ms ease-in-out infinite alternate; }
-.anim-processing .buddy-eyelid { animation: buddy-blink 5.2s linear infinite; }
 .anim-success .buddy-body { transform-origin: 50% 95%; animation: buddy-celebrate-hop 620ms cubic-bezier(.23, 1, .32, 1) 2; }
 .anim-success .buddy-arm-pair-right .buddy-arm-base,
 .anim-success .buddy-arm-pair-right .buddy-hand-base { opacity: 0; }
@@ -218,6 +213,24 @@
 .mood-sleepy .buddy-mouth { transform: scaleX(.72); }
 .mood-happy .buddy-eye { transform: scaleY(.72); }
 .anim-idle .buddy-sleep-mark { opacity: 0; }
+.ambient-blink .buddy-eyelid { opacity: 1; }
+.mascot-art .buddy-head,
+.mascot-art .buddy-body,
+.mascot-art .buddy-arm-pair { transition: transform 180ms cubic-bezier(.23, 1, .32, 1); }
+.mascot-art .buddy-eyelid { transition: opacity 70ms ease-out; }
+.ambient-breathe .buddy-body { transform-origin: 50% 95%; animation: buddy-breathe 2.2s ease-in-out 1; }
+.ambient-look .buddy-head { transform: rotate(2deg); }
+.ambient-look .buddy-eye { transform: translateX(1px); }
+.ambient-stretch .buddy-body { transform: translateY(-1px) scaleY(1.01); }
+.ambient-stretch .buddy-arm-pair-left { transform: rotate(-5deg); }
+.ambient-stretch .buddy-arm-pair-right { transform: rotate(5deg); }
+.ambient-wave .buddy-arm-pair-left { transform: rotate(-12deg); }
+.ambient-wave .buddy-hand-base { opacity: 0; }
+.ambient-wave .buddy-wave-hand { opacity: 1; }
+.personality-professional .ambient-wave { visibility: hidden; }
+.personality-professional .anim-idle .buddy-head { transition: transform 180ms cubic-bezier(.23, 1, .32, 1); }
+.mascot-art.is-paused * { animation-play-state: paused !important; }
+.mascot-art.is-reduced-motion * { animation: none !important; transition: none !important; }
 .mascot-art.is-paused * { animation-play-state: paused !important; }
 
 @keyframes buddy-breathe { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-1px) scaleY(1.012); } }

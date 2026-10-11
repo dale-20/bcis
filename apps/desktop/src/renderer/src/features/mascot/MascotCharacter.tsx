@@ -1,5 +1,6 @@
 import type { MascotMood } from './mascot-model';
 import type { MascotAnimationName } from './mascot-animation';
+import type { MascotIdleBehavior } from './mascot-behavior';
 
 function Cap() {
   return <g className="buddy-cap">
@@ -102,8 +103,8 @@ function CharacterArt() {
   </>;
 }
 
-export function MascotCharacter({ mood, animation = 'idle', compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
-  return <svg className={`mascot-art mood-${mood} anim-${animation}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
+export function MascotCharacter({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+  return <svg className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
     <g className="buddy-character"><CharacterArt /><Head mood={mood} /></g>
   </svg>;
 }

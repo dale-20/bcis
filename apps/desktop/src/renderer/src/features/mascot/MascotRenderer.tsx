@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import type { MascotMood } from './mascot-model';
 import type { MascotAnimationName } from './mascot-animation';
+import type { MascotIdleBehavior } from './mascot-behavior';
 import { MascotCharacter } from './MascotCharacter';
 
 type BoundaryProps = { children: ReactNode; compact: boolean; mood: MascotMood };
@@ -37,8 +38,8 @@ function FallbackMascot({ mood, compact }: { mood: MascotMood; compact: boolean 
   </svg>;
 }
 
-export function MascotRenderer({ mood, animation = 'idle', compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
-  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter mood={mood} animation={animation} compact={compact} paused={paused} reducedMotion={reducedMotion} /></MascotAssetBoundary>;
+export function MascotRenderer({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean }) {
+  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter mood={mood} animation={animation} idleBehavior={idleBehavior} compact={compact} paused={paused} reducedMotion={reducedMotion} /></MascotAssetBoundary>;
 }
 
 export { MascotAssetBoundary };
