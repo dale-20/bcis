@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Wifi } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, LockKeyhole } from 'lucide-react';
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form';
 import type { AuthenticatedUser } from '@bcis/shared';
 import { Button } from '../../components/ui/button';
+import bcisMark from '../../assets/bcis-mark.png';
+import loginBuddy from '../../assets/bcis-mascot-login.png';
 
 interface LoginValues { username: string; password: string }
 interface ChangeValues { currentPassword: string; newPassword: string; confirmPassword: string }
@@ -28,8 +30,44 @@ export function AuthScreen({ user, pending, error, onLogin, onChangePassword }: 
 
   return <main className="auth-layout">
     <section className="auth-brand-panel" aria-label="BCIS application introduction">
-      <div className="auth-brand"><span className="brand-mark"><Wifi aria-hidden="true" /></span><span>BCIS<small>Subscription Billing &amp; Collection</small></span></div>
-      <div className="auth-message"><h1>One reliable view of every subscriber.</h1><p>Manage services, installation addresses, plans, routes, and assigned collectors from the secure office network.</p></div>
+      <div className="auth-network" aria-hidden="true">
+        <svg viewBox="0 0 1200 1000" preserveAspectRatio="xMidYMid slice" focusable="false">
+          <defs>
+            <radialGradient id="auth-network-glow"><stop stopColor="#55baff" stopOpacity=".22" /><stop offset="1" stopColor="#55baff" stopOpacity="0" /></radialGradient>
+          </defs>
+          <circle cx="825" cy="500" r="330" fill="url(#auth-network-glow)" />
+          <g className="auth-network-orbits" fill="none" stroke="currentColor">
+            <ellipse cx="825" cy="500" rx="278" ry="338" strokeDasharray="2 12" />
+            <ellipse cx="825" cy="500" rx="224" ry="278" strokeDasharray="1 10" />
+          </g>
+          <g className="auth-network-routes" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M520 244h128l76 76h174l92-92h142" />
+            <path d="M485 672h156l82-82h174l94 94h134" />
+            <path d="M704 180v96l-62 62v128" />
+            <path d="M1004 404h-92l-55 55h-98" />
+            <path d="M1092 552h-122l-66-66h-82" />
+            <path d="M849 806v-86l-68-68v-76" />
+          </g>
+          <g className="auth-network-nodes">
+            <circle cx="520" cy="244" r="4" /><circle cx="648" cy="244" r="4" />
+            <circle cx="902" cy="320" r="5" /><circle cx="1032" cy="228" r="4" />
+            <circle cx="485" cy="672" r="4" /><circle cx="641" cy="672" r="4" />
+            <circle cx="897" cy="590" r="5" /><circle cx="1066" cy="760" r="4" />
+            <circle cx="704" cy="180" r="4" /><circle cx="704" cy="446" r="4" />
+            <circle cx="1004" cy="404" r="4" /><circle cx="759" cy="459" r="5" />
+            <circle cx="1092" cy="552" r="4" /><circle cx="822" cy="486" r="4" />
+            <circle cx="849" cy="806" r="4" /><circle cx="781" cy="576" r="4" />
+          </g>
+        </svg>
+      </div>
+      <div className="auth-brand">
+        <span className="auth-brand-logo"><img src={bcisMark} alt="" /></span>
+        <span className="auth-brand-copy"><strong>BCIS</strong><small>Subscription billing &amp; collection</small></span>
+      </div>
+      <div className="auth-hero-stage">
+        <div className="auth-message"><h1>One reliable view of every subscriber.</h1><p>Manage services, installation addresses, plans, routes, and assigned collectors from the secure office network.</p></div>
+        <div className="auth-hero-art"><img src={loginBuddy} alt="Buddy, the BCIS mascot, welcomes you." /></div>
+      </div>
       <p className="auth-footnote">Bukidnon Cable and Internet Services</p>
     </section>
     <section className="auth-form-panel">
