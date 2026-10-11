@@ -320,7 +320,7 @@ export function BCISMascot() {
       <span>{message}</span>
       {message && <button type="button" className="mascot-bubble-dismiss" aria-label="Dismiss BCIS Buddy message" onClick={() => { if (dialogueTimer.current) clearTimeout(dialogueTimer.current); dialogueTimer.current = null; setMessage(''); }}>×</button>}
     </div>
-    <MascotRenderer mood={mood} animation={animationState.name} idleBehavior={idleBehavior} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} handingOff={handingOff} />
+    <MascotRenderer mood={mood} animation={animationState.name} animationRequestId={animationState.requestId} idleBehavior={idleBehavior} paused={animationPaused || !visible} reducedMotion={reducedMotion || !preferences.animationsEnabled} handingOff={handingOff} />
     <MascotControls preferencesOpen={preferencesOpen} preferencesButtonRef={preferencesTrigger} onOpenPreferences={() => setPreferencesOpen((open) => !open)} onTip={showTip} onMinimize={() => persist({ ...preferences, minimized: true })} onPointerDown={startDrag} onKeyboardMove={moveByKeyboard} />
     {preferencesOpen && <MascotPreferences preferences={preferences} reducedMotion={reducedMotion} onUpdate={updatePreferences} onTip={showTip} onResetPosition={resetPosition} onClose={closePreferences} />}
   </div>;

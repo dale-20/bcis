@@ -38,9 +38,9 @@ function FallbackMascot({ mood, compact }: { mood: MascotMood; compact: boolean 
   </svg>;
 }
 
-export function MascotRenderer({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false, handingOff = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean; handingOff?: boolean }) {
+export function MascotRenderer({ mood, animation = 'idle', animationRequestId = 0, idleBehavior = null, compact = false, paused = false, reducedMotion = false, handingOff = false }: { mood: MascotMood; animation?: MascotAnimationName; animationRequestId?: number; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean; handingOff?: boolean }) {
   // Keep the SVG rig mounted across state changes so independent layers retain their pose.
-  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter mood={mood} animation={animation} idleBehavior={idleBehavior} compact={compact} paused={paused} reducedMotion={reducedMotion} handingOff={handingOff} /></MascotAssetBoundary>;
+  return <MascotAssetBoundary mood={mood} compact={compact}><MascotCharacter mood={mood} animation={animation} animationRequestId={animationRequestId} idleBehavior={idleBehavior} compact={compact} paused={paused} reducedMotion={reducedMotion} handingOff={handingOff} /></MascotAssetBoundary>;
 }
 
 export { MascotAssetBoundary };

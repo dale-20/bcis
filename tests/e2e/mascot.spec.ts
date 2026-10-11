@@ -2,6 +2,7 @@ import { test, expect, _electron as electron, type Page } from '@playwright/test
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { config } from 'dotenv';
@@ -17,6 +18,18 @@ function runNode(script: string, environment: NodeJS.ProcessEnv): Promise<void> 
     child.once('error', reject);
     child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`${script} exited with ${code}`)));
   });
+}
+
+async function availableLocalPort(): Promise<number> {
+  const socket = createNetServer();
+  await new Promise<void>((resolve, reject) => {
+    socket.once('error', reject);
+    socket.listen(0, '127.0.0.1', resolve);
+  });
+  const address = socket.address();
+  if (!address || typeof address === 'string') throw new Error('Could not allocate a local API port');
+  await new Promise<void>((resolve, reject) => socket.close((error) => error ? reject(error) : resolve()));
+  return address.port;
 }
 
 // These are renderer feedback checks, not evidence of a financial posting.
@@ -39,7 +52,8 @@ test('Buddy displays messages, replays motion, and respects reduced motion in bu
   const testUrl = new URL(databaseUrl);
   testUrl.pathname = `/${databaseName}`;
   const manager = new pg.Client({ connectionString: databaseUrl });
-  const endpoint = 'http://127.0.0.1:3102';
+  const port = await availableLocalPort();
+  const endpoint = `http://127.0.0.1:${port}`;
   const password = 'Synthetic-buddy-test-1';
   const environment = { ...process.env, DATABASE_URL: testUrl.href, NODE_ENV: 'test', DEMO_ACCOUNT_PASSWORD: password, PAYMENT_PROOF_DIR: path.join(profile, 'proofs') };
   let server: ReturnType<typeof spawn> | undefined;
@@ -53,10 +67,16 @@ test('Buddy displays messages, replays motion, and respects reduced motion in bu
     await runNode('apps/api/dist/db/migrate.js', environment);
     await runNode('apps/api/dist/db/seed-demo.js', environment);
     server = spawn(process.execPath, ['apps/api/dist/server.js'], {
-      env: { ...environment, API_HOST: '127.0.0.1', API_PORT: '3102', LOG_LEVEL: 'silent' },
+      env: { ...environment, API_HOST: '127.0.0.1', API_PORT: String(port), LOG_LEVEL: 'silent' },
       stdio: 'ignore', windowsHide: true,
     });
     await expect.poll(async () => { try { return (await fetch(`${endpoint}/health/ready`)).status; } catch { return 0; } }, { timeout: 20_000, intervals: [250, 500, 1_000] }).toBe(200);
+    const seededLogin = await fetch(`${endpoint}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'admin.demo', password }),
+    });
+    expect(seededLogin.status).toBe(200);
     const desktopEnvironment: Record<string, string> = { BCIS_API_URL: endpoint };
     for (const [key, value] of Object.entries(process.env)) {
       if (value !== undefined && !['ELECTRON_RUN_AS_NODE', 'ELECTRON_RENDERER_URL', 'BCIS_API_URL'].includes(key)) desktopEnvironment[key] = value;
@@ -90,7 +110,7 @@ test('Buddy displays messages, replays motion, and respects reduced motion in bu
     await expect(body).toHaveCSS('animation-name', 'buddy-finish');
     await expect.poll(() => body.evaluate((element) => Number(element.getAnimations()[0]?.currentTime ?? 0)), { intervals: [50], timeout: 2_000 }).toBeGreaterThan(300);
     await announce(page, 'payment-posted');
-    expect(await body.evaluate((element) => Number(element.getAnimations()[0]?.currentTime ?? 0))).toBeLessThan(300);
+    await expect.poll(() => body.evaluate((element) => Number(element.getAnimations()[0]?.currentTime ?? 0)), { intervals: [20, 50, 100], timeout: 1_000 }).toBeLessThan(300);
     await expect(page.getByText('Payment recorded successfully!')).toBeVisible();
     await page.screenshot({ path: 'test-results/buddy-message.png' });
 

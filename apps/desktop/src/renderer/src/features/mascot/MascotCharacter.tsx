@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import type { MascotMood } from './mascot-model';
 import type { MascotAnimationName } from './mascot-animation';
 import type { MascotIdleBehavior } from './mascot-behavior';
@@ -130,11 +130,24 @@ function CharacterArt({ mood, shadeId, lidId }: { mood: MascotMood; shadeId: str
   </>;
 }
 
-export function MascotCharacter({ mood, animation = 'idle', idleBehavior = null, compact = false, paused = false, reducedMotion = false, handingOff = false }: { mood: MascotMood; animation?: MascotAnimationName; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean; handingOff?: boolean }) {
+export function MascotCharacter({ mood, animation = 'idle', animationRequestId = 0, idleBehavior = null, compact = false, paused = false, reducedMotion = false, handingOff = false }: { mood: MascotMood; animation?: MascotAnimationName; animationRequestId?: number; idleBehavior?: MascotIdleBehavior | null; compact?: boolean; paused?: boolean; reducedMotion?: boolean; handingOff?: boolean }) {
   const id = useId().replaceAll(':', '');
   const shadeId = `${id}-cap-shade`;
   const lidId = `${id}-lid-shade`;
-  return <svg className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}${handingOff ? ' is-handing-off' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
+  const artRef = useRef<SVGSVGElement>(null);
+  const previousRequest = useRef({ animation, requestId: animationRequestId });
+
+  useLayoutEffect(() => {
+    const previous = previousRequest.current;
+    previousRequest.current = { animation, requestId: animationRequestId };
+    if (previous.animation !== animation || previous.requestId === animationRequestId) return;
+    for (const runningAnimation of artRef.current?.getAnimations({ subtree: true }) ?? []) {
+      runningAnimation.currentTime = 0;
+      runningAnimation.play();
+    }
+  }, [animation, animationRequestId]);
+
+  return <svg ref={artRef} className={`mascot-art mood-${mood} anim-${animation}${idleBehavior ? ` ambient-${idleBehavior}` : ''}${compact ? ' mascot-art-compact' : ''}${paused ? ' is-paused' : ''}${reducedMotion ? ' is-reduced-motion' : ''}${handingOff ? ' is-handing-off' : ''}`} viewBox="0 0 180 216" role="img" aria-hidden={compact || undefined} aria-label={`BCIS Buddy, ${mood}`}>
     <defs>
       <linearGradient id={shadeId} x1=".15" y1="0" x2=".8" y2="1"><stop stopColor="#53baff" /><stop offset=".52" stopColor="#1674c9" /><stop offset="1" stopColor="#14529b" /></linearGradient>
       <linearGradient id={lidId} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#fff8f0" /><stop offset="1" stopColor="#f0d8c8" /></linearGradient>
