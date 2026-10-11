@@ -1,0 +1,1 @@
+CREATE INDEX "invoices_open_receivable_due_idx" ON "invoices" USING btree ("due_date","invoice_number","balance_centavos","subscriber_id","service_account_id","id") WHERE "invoices"."balance_centavos" > 0 AND "invoices"."status" IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE');

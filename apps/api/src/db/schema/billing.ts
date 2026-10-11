@@ -46,6 +46,9 @@ export const invoices = pgTable('invoices', {
   uniqueIndex('invoices_service_cycle_uq').on(table.serviceAccountId, table.billingCycleId),
   index('invoices_subscriber_status_idx').on(table.subscriberId, table.status),
   index('invoices_due_status_idx').on(table.dueDate, table.status),
+  index('invoices_open_receivable_due_idx')
+    .on(table.dueDate, table.invoiceNumber, table.balanceCentavos, table.subscriberId, table.serviceAccountId, table.id)
+    .where(sql`${table.balanceCentavos} > 0 AND ${table.status} IN ('UNPAID', 'PARTIALLY_PAID', 'OVERDUE')`),
   // Posted debit adjustments can raise the collectible balance above the immutable original invoice total.
   check('invoices_amounts_valid', sql`${table.totalCentavos} >= 0 AND ${table.balanceCentavos} >= 0`),
   check('invoices_finalization_consistent', sql`(${table.status} = 'DRAFT' AND ${table.finalizedAt} IS NULL AND ${table.finalizedByUserId} IS NULL) OR (${table.status} <> 'DRAFT' AND ${table.finalizedAt} IS NOT NULL AND ${table.finalizedByUserId} IS NOT NULL)`),

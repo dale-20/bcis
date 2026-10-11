@@ -2,9 +2,9 @@
   "test": "AT-12",
   "status": "PASSED",
   "approvedBy": "owner.demo",
-  "backupId": "47f30b52-4542-419f-b667-3a527ff72351",
-  "sha256": "0a3a5d88ff99fce0e874c198b4eaa4b4c084cd19c071fa527f219566c7f72400",
-  "sizeBytes": 43930,
+  "backupId": "d5cbdd17-5dec-4d2b-a7bf-fb3cb93beed2",
+  "sha256": "9657080f1164f6483b31c650d228c9869a1f0c7efdd363c9df1ad9b6035561e0",
+  "sizeBytes": 44154,
   "proofCount": 1,
   "proofHashesVerified": true,
   "baseline": {
@@ -23,5 +23,5 @@
   },
   "mutationAbsentAfterRestore": true,
   "pgAmcheck": true,
-  "verifiedAt": "2026-10-10T21:43:10.573Z"
+  "verifiedAt": "2026-10-11T04:04:40.918Z"
 }

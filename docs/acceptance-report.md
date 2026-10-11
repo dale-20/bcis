@@ -31,6 +31,8 @@ No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 re
 | `npm run test:integration` | Passed: 7 PostgreSQL integration files, 69 tests. |
 | `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. |
 | `npm run reports:samples` | Passed: 8 integration tests; six synthetic PDF/XLSX pairs generated and data-checked. |
+| `npm run perf:scale` | Passed: isolated synthetic scale of 20,000 subscribers, 500,375 invoices, 500,375 payments, and 1,000,750 ledger entries. Seven measured runs per API repository path; median final subscriber page 74.26 ms, AR aging page 423.99 ms. `EXPLAIN (ANALYZE, BUFFERS)` used `subscribers_account_number_uq` and `invoices_open_receivable_due_idx`; detailed JSON is in `tests/evidence/scale-query-benchmark.json`. Temporary database was dropped. |
+| `npm run db:migrate -w @bcis/api` | Passed on the configured isolated `bcis_dev`; additive index migration applied, and the already-running API readiness endpoint returned `database: connected`. |
 | `npm run release:windows` | Passed: x64 NSIS installer rebuilt from current source. |
 | Temporary installer smoke | Passed on this development workstation: silent install to a unique TEMP directory, executable stayed open after launch, then uninstall and temporary-directory cleanup succeeded. This is not a clean-machine test. |
 | `npm run dev:desktop` launcher smoke | Electron processes stayed alive with inherited `ELECTRON_RUN_AS_NODE=1`; API readiness returned HTTP 200 from the existing local API. The native window was not visually confirmed in this session. |
@@ -51,7 +53,7 @@ The E2E workflow covers login/password change, dashboard, subscriber search/prof
 
 Verified: password hashing and session handling, server-side RBAC and denial audit, input validation, transaction rollback, database uniqueness/immutability, IPC sender validation, Electron sandbox/context isolation/no Node integration, navigation and permission denial, credential log redaction, isolated backup restore, and production dependency audit.
 
-Still untested: external penetration test, production HTTPS/certificate and firewall setup, Windows service hardening, three physical LAN clients, production restore/restart, power-loss recovery, maximum-volume performance and query plans, clean-workstation install/migration/seed, installer upgrade/uninstall on a maintained installation, and antivirus reputation. Report PDF page layout has automated signature/data checks but still needs a visual review of the six files in `reports-samples/`.
+Still untested: external penetration test, production HTTPS/certificate and firewall setup, Windows service hardening, three physical LAN clients, production restore/restart, power-loss recovery, concurrent/throughput performance beyond the measured final-page repository query paths, clean-workstation install/migration/seed, installer upgrade/uninstall on a maintained installation, and antivirus reputation. Report PDF page layout has automated signature/data checks but still needs a visual review of the six files in `reports-samples/`.
 
 ## Defects found and corrected
 
@@ -61,13 +63,14 @@ Still untested: external penetration test, production HTTPS/certificate and fire
 | Restore integrity check included unrelated databases | `pg_amcheck --all` examined databases without the extension. | Restrict integrity check to the restored database. | AT-12 isolated restore evidence records `pgAmcheck: true`. |
 | E2E expected Subscribers after login | Dashboard is the authorized default. | Assert dashboard and navigate through the accessible sidebar. | Built Electron E2E passes. |
 | Electron exited when started by IDE terminal | The IDE inherited `ELECTRON_RUN_AS_NODE=1`; Electron entered Node mode. | Route desktop dev/preview scripts through `scripts/run-electron-vite.mjs`, which removes only that variable. | Regression test passes; `npm run dev:desktop` process launch completed. |
+| AR aging query timed out at target volume | Its outstanding-balance predicate and due-date ordering had no partial index that covered the paginated invoice fields. | Add the reviewed `invoices_open_receivable_due_idx` partial index and benchmark it with the real repository method under the configured 2-second statement timeout. | At 500,375 invoices, API repository path median 423.99 ms; PostgreSQL chose an index-only scan. |
 
 The full `npm run dev` command could not bind its API because a pre-existing development server already owned port 3001. That service was left untouched; the desktop-only command was used against its healthy API.
 
 ## Requirements not yet complete
 
 - AT-09 physical LAN clients and AT-12 production service restart are partial, as listed above.
-- Maximum-volume load and query-plan testing have not been run.
+- The 20,000/500,000/500,000/1,000,000 synthetic row-volume target and two representative page query plans are measured in the isolated benchmark. Sustained throughput, concurrent load, physical-client performance, and larger/heavier report queries remain untested.
 - PDF visual review, clean-workstation deployment, TLS/firewall hardening, and the full operator demo remain pending.
 - A signed installer requires an Authenticode certificate and a controlled release-signing process.
 
