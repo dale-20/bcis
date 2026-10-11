@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BCISMascot } from './BCISMascot';
+import { MascotCharacter } from './MascotCharacter';
 import { announceMascotEvent } from './mascot-events';
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
@@ -12,7 +13,7 @@ describe('BCIS Buddy', () => {
     render(<BCISMascot />);
     act(() => announceMascotEvent('payment-posted'));
     expect(screen.getByText('Payment posted successfully.')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'BCIS Buddy, success' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'BCIS Buddy, celebrating' })).toBeInTheDocument();
   });
 
   it('announces connection loss without claiming financial success', () => {
@@ -80,5 +81,10 @@ describe('BCIS Buddy', () => {
     const stored = JSON.parse(localStorage.getItem('bcis.mascot.preferences.v2') ?? '{}') as { x?: number };
     expect(stored.x).toBeGreaterThan(0);
     expect(stored.x).toBeLessThanOrEqual(window.innerWidth - 184 - 12);
+  });
+
+  it.each(['neutral', 'happy', 'thinking', 'surprised', 'concerned', 'sleepy', 'celebrating'] as const)('renders the %s expression', (mood) => {
+    const { container } = render(<div><MascotCharacter mood={mood} /></div>);
+    expect(container.querySelector(`.mascot-art.mood-${mood}`)).toBeInTheDocument();
   });
 });

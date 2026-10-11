@@ -1,0 +1,46 @@
+.mascot-preview {
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 72% 28%, #e2f3ff 0, transparent 39%), var(--color-canvas);
+  color: var(--color-foreground);
+  padding: 24px clamp(20px, 5vw, 72px) 20px;
+}
+.mascot-preview-header, .mascot-preview-brand, .mascot-preview-footer { display: flex; align-items: center; justify-content: space-between; }
+.mascot-preview-brand { justify-content: flex-start; gap: 11px; }
+.mascot-preview-brand > span { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 13px; background: var(--color-primary); color: white; font-size: 23px; font-weight: 800; }
+.mascot-preview-brand strong, .mascot-preview-brand small { display: block; }
+.mascot-preview-brand strong { color: var(--color-navy); font-size: 14px; }
+.mascot-preview-brand small { margin-top: 3px; color: var(--color-secondary); font-size: 11px; }
+.mascot-preview-badge { border: 1px solid var(--color-border); border-radius: 999px; padding: 7px 11px; color: var(--color-secondary); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+.mascot-preview-stage { display: grid; min-height: min(68vh, 560px); grid-template-columns: 1fr .85fr; align-items: center; margin: 28px 0 16px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 26px; background: rgb(255 255 255 / 76%); box-shadow: 0 16px 50px rgb(15 39 71 / 7%); }
+.mascot-preview-copy { padding: 40px 0 40px clamp(28px, 6vw, 80px); }
+.mascot-preview-eyebrow { color: var(--color-primary); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.mascot-preview-copy h1 { max-width: 390px; margin: 12px 0; color: var(--color-navy); font-size: clamp(30px, 4.5vw, 54px); letter-spacing: -.045em; line-height: 1.02; }
+.mascot-preview-copy > p:not(.mascot-preview-eyebrow) { max-width: 390px; color: var(--color-secondary); font-size: 14px; line-height: 1.65; }
+.mascot-preview-selected { display: grid; grid-template-columns: 9px auto; align-items: center; gap: 3px 10px; margin-top: 28px; }
+.mascot-preview-dot { width: 8px; height: 8px; border-radius: 50%; background: #159b77; box-shadow: 0 0 0 4px #e1f5ed; }
+.mascot-preview-selected strong { color: var(--color-navy); font-size: 13px; }
+.mascot-preview-selected > span:last-child { grid-column: 2; color: var(--color-secondary); font-size: 11px; }
+.mascot-preview-hero { position: relative; display: grid; min-height: 390px; place-items: center; isolation: isolate; }
+.mascot-preview-hero::before { position: absolute; width: min(32vw, 330px); aspect-ratio: 1; border: 1px solid rgb(33 137 224 / 13%); border-radius: 50%; background: radial-gradient(circle, rgb(255 255 255 / 74%), rgb(214 239 255 / 58%) 63%, transparent 64%); content: ''; }
+.mascot-preview-hero .mascot-art { position: relative; z-index: 1; width: 250px; height: 300px; filter: drop-shadow(0 13px 11px rgb(14 49 95 / 12%)); }
+.mascot-preview-ground { position: absolute; z-index: 0; bottom: 55px; width: 150px; height: 17px; border-radius: 50%; background: rgb(15 39 71 / 10%); filter: blur(5px); }
+.mascot-pose-list { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+.mascot-pose-list button { display: grid; min-width: 0; justify-items: center; gap: 7px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); padding: 10px 6px 12px; color: var(--color-secondary); cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease; }
+.mascot-pose-list button:hover { transform: translateY(-2px); border-color: var(--color-primary); }
+.mascot-pose-list button:focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; }
+.mascot-pose-list button.is-selected { border-color: var(--color-primary); background: var(--color-info-muted); color: var(--color-navy); }
+.mascot-pose-thumbnail { display: grid; width: 68px; height: 68px; place-items: center; overflow: hidden; border-radius: 14px; background: linear-gradient(145deg, #f1f8ff, #e7f2ff); }
+.mascot-pose-thumbnail .mascot-art { width: 60px; height: 72px; margin-top: 7px; }
+.mascot-pose-label { font-size: 11px; font-weight: 700; }
+.mascot-preview-footer { margin-top: 15px; color: var(--color-secondary); font-size: 10px; }
+.mascot-preview-footer kbd { border: 1px solid var(--color-border); border-radius: 4px; background: white; padding: 2px 4px; color: var(--color-navy); font: inherit; }
+@media (max-width: 760px) {
+  .mascot-preview { padding: 16px; }
+  .mascot-preview-stage { grid-template-columns: 1fr; }
+  .mascot-preview-copy { padding: 28px 26px 0; }
+  .mascot-preview-hero { min-height: 310px; }
+  .mascot-preview-hero .mascot-art { width: 210px; height: 252px; }
+  .mascot-pose-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .mascot-preview-footer { align-items: flex-start; gap: 12px; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { .mascot-pose-list button { transition: none; } .mascot-pose-list button:hover { transform: none; } }
