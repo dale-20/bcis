@@ -517,6 +517,13 @@
   .line-items > div > span { @apply flex flex-col; }
   .line-items small { @apply mt-1 text-[10px] font-semibold tracking-wide text-secondary; }
   .line-items footer { @apply border-b border-border text-base; }
+  .invoice-adjustment-history { @apply border-t border-border px-6 py-5; }
+  .invoice-adjustment-history h3 { @apply mb-3 text-sm; }
+  .invoice-adjustment-history ul { @apply m-0 list-none p-0; }
+  .invoice-adjustment-history li { @apply flex items-center justify-between gap-5 border-t border-border py-3 text-sm; }
+  .invoice-adjustment-history li span { @apply flex min-w-0 flex-col; }
+  .invoice-adjustment-history li strong { @apply break-words; }
+  .invoice-adjustment-history li small { @apply mt-1 text-[10px] font-semibold tracking-wide text-secondary; }
   .ledger-link { @apply mx-6 mb-6 flex flex-col rounded-lg border border-border bg-muted p-4; }
   .ledger-link span, .ledger-link small { @apply text-xs text-secondary; }
   .ledger-link strong { @apply my-1 text-sm; }
