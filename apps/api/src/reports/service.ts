@@ -22,12 +22,15 @@ export class ReportService {
 
   async dashboard(query: DashboardQuery): Promise<Dashboard> {
     const args = [query.from, query.to];
-    const [summary, monthly, methods, aging, recent] = await Promise.all([
+    const [summary, monthly, methods, aging, recent, collectorPerformance] = await Promise.all([
       this.database.pool.query(`select
         coalesce((select sum(amount_centavos) from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day'),0)::bigint collected,
+        coalesce((select sum(total_centavos) from invoices where status <> 'VOID' and status <> 'DRAFT' and invoice_date >= $1::date and invoice_date <= $2::date),0)::bigint billed,
         (select count(*) from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day')::int payment_count,
         coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint outstanding,
         coalesce((select sum(balance_centavos) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')),0)::bigint overdue,
+        (select count(*) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_invoice_count,
+        (select count(distinct subscriber_id) from invoices where balance_centavos > 0 and due_date < current_date and status in ('UNPAID','PARTIALLY_PAID','OVERDUE'))::int overdue_subscriber_count,
         (select count(*) from subscribers where status='ACTIVE')::int active_subscribers`, args),
       this.database.pool.query(`select to_char(date_trunc('month', payment_date),'YYYY-MM') collection_month, sum(amount_centavos)::bigint amount, count(*)::int count from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by 1 order by 1`, args),
       this.database.pool.query(`select method, sum(amount_centavos)::bigint amount, count(*)::int count from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by method order by amount desc`, args),
@@ -39,13 +42,21 @@ export class ReportService {
         coalesce(sum(case when current_date-due_date > 90 then balance_centavos else 0 end),0)::bigint b4
         from invoices where balance_centavos > 0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')`),
       this.database.pool.query(`select p.id, r.receipt_number, ${displayNameSql} subscriber_name, p.method, p.amount_centavos amount, p.payment_date from payments p join subscribers s on s.id=p.subscriber_id join receipts r on r.payment_id=p.id where p.status='POSTED' order by p.payment_date desc limit 8`),
+      this.database.pool.query(`select c.id collector_id,c.name collector_name,
+        (select count(*)::int from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date) assigned_accounts,
+        (select count(*)::int from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date and a.payment_id is not null) collected_accounts,
+        coalesce((select sum(p.amount_centavos) from collection_batches cb join collection_batch_accounts a on a.batch_id=cb.id join payments p on p.id=a.payment_id and p.status='POSTED' where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date),0)::bigint amount,
+        coalesce((select sum(cr.difference_centavos) from collection_batches cb join collector_remittances cr on cr.batch_id=cb.id where cb.collector_id=c.id and cb.collection_date between $1::date and $2::date),0)::bigint variance
+        from collectors c where c.status='ACTIVE' order by c.collector_number`, args),
     ]);
     const s = summary.rows[0] as Row; const a = aging.rows[0] as Row;
     return {
-      range: query, collectedCentavos: cents(s.collected), outstandingCentavos: cents(s.outstanding), overdueCentavos: cents(s.overdue),
+      range: query, billedCentavos: cents(s.billed), collectedCentavos: cents(s.collected), outstandingCentavos: cents(s.outstanding), overdueCentavos: cents(s.overdue),
+      overdueInvoiceCount: Number(s.overdue_invoice_count), overdueSubscriberCount: Number(s.overdue_subscriber_count),
       activeSubscribers: Number(s.active_subscribers), postedPaymentCount: Number(s.payment_count),
       monthlyCollections: monthly.rows.map((r: Row) => ({ month: text(r.collection_month), amountCentavos: cents(r.amount), count: Number(r.count) })),
       paymentMethods: methods.rows.map((r: Row) => ({ method: text(r.method), amountCentavos: cents(r.amount), count: Number(r.count) })),
+      collectorPerformance: collectorPerformance.rows.map((r: Row) => ({ collectorId: text(r.collector_id), collectorName: text(r.collector_name), assignedAccounts: Number(r.assigned_accounts), collectedAccounts: Number(r.collected_accounts), amountCentavos: cents(r.amount), varianceCentavos: cents(r.variance) })),
       aging: { CURRENT: cents(a.current_amount), '1_30': cents(a.b1), '31_60': cents(a.b2), '61_90': cents(a.b3), '90_PLUS': cents(a.b4) },
       recentPayments: recent.rows.map((r: Row) => ({ id: text(r.id), receiptNumber: text(r.receipt_number), subscriberName: text(r.subscriber_name), method: text(r.method), amountCentavos: cents(r.amount), paymentDate: iso(r.payment_date) })),
     };
@@ -53,15 +64,103 @@ export class ReportService {
 
   async report(request: ReportRequest): Promise<ReportData> {
     const generatedAt = new Date().toISOString();
-    if (request.report === 'MONTHLY_COLLECTIONS') {
-      const result = await this.database.pool.query(`select to_char(date_trunc('month',payment_date),'Mon YYYY') period, count(*)::int transactions, sum(amount_centavos)::bigint amount from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by date_trunc('month',payment_date) order by date_trunc('month',payment_date)`, [request.from, request.to]);
+    if (request.report === 'DAILY_COLLECTIONS' || request.report === 'WEEKLY_COLLECTIONS' || request.report === 'MONTHLY_COLLECTIONS' || request.report === 'ANNUAL_COLLECTIONS') {
+      const collectionPeriods = {
+        DAILY_COLLECTIONS: { trunc: 'day', format: 'YYYY-MM-DD', title: 'Daily collections', label: 'Date' },
+        WEEKLY_COLLECTIONS: { trunc: 'week', format: 'IYYY-"W"IW', title: 'Weekly collections', label: 'ISO week' },
+        MONTHLY_COLLECTIONS: { trunc: 'month', format: 'Mon YYYY', title: 'Monthly collections', label: 'Month' },
+        ANNUAL_COLLECTIONS: { trunc: 'year', format: 'YYYY', title: 'Annual collections', label: 'Year' },
+      } as const;
+      const period = collectionPeriods[request.report];
+      const result = await this.database.pool.query(`with scoped_payments as (
+        select amount_centavos, payment_date at time zone 'Asia/Manila' as business_date
+        from payments
+        where status='POSTED'
+          and payment_date >= ($1::date::timestamp at time zone 'Asia/Manila')
+          and payment_date < (($2::date + 1)::timestamp at time zone 'Asia/Manila')
+      )
+      select to_char(date_trunc('${period.trunc}',business_date),'${period.format}') period,
+        count(*)::int transactions, sum(amount_centavos)::bigint amount
+      from scoped_payments group by date_trunc('${period.trunc}',business_date)
+      order by date_trunc('${period.trunc}',business_date)`, [request.from, request.to]);
       const rows = result.rows.map((r: Row) => ({ period: text(r.period), transactions: text(r.transactions), amount: money(cents(r.amount)) }));
-      return this.data(request, 'Monthly collections', rows, [{ label: 'Total collected', value: money(result.rows.reduce((n: bigint, r: Row) => n + BigInt(cents(r.amount)), 0n).toString()) }], [{key:'period',label:'Month'},{key:'transactions',label:'Payments',align:'right'},{key:'amount',label:'Collected',align:'right'}], generatedAt);
+      return this.data(request, period.title, rows, [{ label: 'Total collected', value: money(result.rows.reduce((n: bigint, r: Row) => n + BigInt(cents(r.amount)), 0n).toString()) }], [{key:'period',label:period.label},{key:'transactions',label:'Payments',align:'right'},{key:'amount',label:'Collected',align:'right'}], generatedAt);
+    }
+    if (request.report === 'BILLING_VS_COLLECTION') {
+      const [billing, collections] = await Promise.all([
+        this.database.pool.query(`select count(*)::int transactions,coalesce(sum(total_centavos),0)::bigint amount
+          from invoices where status not in ('DRAFT','VOID') and invoice_date between $1::date and $2::date`, [request.from, request.to]),
+        this.database.pool.query(`select count(*)::int transactions,coalesce(sum(amount_centavos),0)::bigint amount
+          from payments where status='POSTED'
+            and payment_date >= ($1::date::timestamp at time zone 'Asia/Manila')
+            and payment_date < (($2::date + 1)::timestamp at time zone 'Asia/Manila')`, [request.from, request.to]),
+      ]);
+      const billed = billing.rows[0] as Row;
+      const collected = collections.rows[0] as Row;
+      const billedAmount = BigInt(cents(billed.amount));
+      const collectedAmount = BigInt(cents(collected.amount));
+      const rows = [
+        { basis: 'Finalized invoices', dateBasis: 'Invoice date', transactions: text(billed.transactions), amount: money(billedAmount.toString()) },
+        { basis: 'Posted payments', dateBasis: 'Payment date (Manila)', transactions: text(collected.transactions), amount: money(collectedAmount.toString()) },
+      ];
+      return this.data(request, 'Billing versus collection', rows, [
+        { label: 'Billed', value: money(billedAmount.toString()) },
+        { label: 'Collected', value: money(collectedAmount.toString()) },
+        { label: 'Billed less collected', value: money((billedAmount - collectedAmount).toString()) },
+      ], [
+        { key: 'basis', label: 'Measure' }, { key: 'dateBasis', label: 'Date basis' },
+        { key: 'transactions', label: 'Transactions', align: 'right' }, { key: 'amount', label: 'Amount', align: 'right' },
+      ], generatedAt);
+    }
+    if (request.report === 'REVENUE_BY_PLAN' || request.report === 'REVENUE_BY_SERVICE' || request.report === 'REVENUE_BY_AREA') {
+      const dimension = {
+        REVENUE_BY_PLAN: { expression: "split_part(ii.description, ' monthly subscription - ', 1)", title: 'Billed subscription revenue by plan', label: 'Plan' },
+        REVENUE_BY_SERVICE: { expression: 'st.name', title: 'Billed subscription revenue by service', label: 'Service type' },
+        REVENUE_BY_AREA: { expression: "coalesce(ca.name, 'Unassigned area')", title: 'Billed subscription revenue by current area', label: 'Current area' },
+      } as const;
+      const selected = dimension[request.report];
+      const result = await this.database.pool.query(`select ${selected.expression} dimension,
+          count(distinct i.id)::int invoices,coalesce(sum(ii.amount_centavos),0)::bigint amount
+        from invoice_items ii join invoices i on i.id=ii.invoice_id
+        join service_accounts sa on sa.id=i.service_account_id
+        join service_plans sp on sp.id=sa.plan_id join service_types st on st.id=sp.service_type_id
+        left join collection_areas ca on ca.id=sa.collection_area_id
+        where ii.type='SUBSCRIPTION' and i.status not in ('DRAFT','VOID') and i.invoice_date between $1::date and $2::date
+        group by ${selected.expression} order by sum(ii.amount_centavos) desc,${selected.expression}`, [request.from, request.to]);
+      const rows = result.rows.map((row: Row) => ({ dimension: text(row.dimension), invoices: text(row.invoices), amount: money(cents(row.amount)) }));
+      const total = result.rows.reduce((sum: bigint, row: Row) => sum + BigInt(cents(row.amount)), 0n);
+      return this.data(request, selected.title, rows, [
+        { label: 'Subscription invoices', value: String(result.rows.reduce((sum: number, row: Row) => sum + Number(row.invoices), 0)) },
+        { label: 'Billed subscription amount', value: money(total.toString()) },
+      ], [
+        { key: 'dimension', label: selected.label }, { key: 'invoices', label: 'Invoices', align: 'right' }, { key: 'amount', label: 'Billed', align: 'right' },
+      ], generatedAt);
+    }
+    if (request.report === 'SUBSCRIBER_MASTER_LIST') {
+      const result = await this.database.pool.query(`select s.account_number,${displayNameSql} subscriber,s.status,
+          count(sa.id)::int service_accounts,count(sa.id) filter (where sa.status='ACTIVE')::int active_services,
+          coalesce(string_agg(distinct ca.name, ', ' order by ca.name),'Unassigned') areas,
+          coalesce(balance.outstanding,0)::bigint outstanding
+        from subscribers s
+        left join service_accounts sa on sa.subscriber_id=s.id
+        left join collection_areas ca on ca.id=sa.collection_area_id
+        left join lateral (select sum(i.balance_centavos)::bigint outstanding from invoices i where i.subscriber_id=s.id and i.balance_centavos>0 and i.status in ('UNPAID','PARTIALLY_PAID','OVERDUE')) balance on true
+        group by s.id,balance.outstanding order by s.account_number`);
+      const rows = result.rows.map((row: Row) => ({ account: text(row.account_number), subscriber: text(row.subscriber), status: text(row.status), serviceAccounts: text(row.service_accounts), activeServices: text(row.active_services), areas: text(row.areas), outstanding: money(cents(row.outstanding)) }));
+      return this.data(request, 'Subscriber master list', rows, [
+        { label: 'Subscribers', value: String(rows.length) },
+        { label: 'Outstanding', value: money(result.rows.reduce((sum: bigint, row: Row) => sum + BigInt(cents(row.outstanding)), 0n).toString()) },
+      ], [
+        { key: 'account', label: 'Account' }, { key: 'subscriber', label: 'Subscriber' }, { key: 'status', label: 'Status' },
+        { key: 'serviceAccounts', label: 'Services', align: 'right' }, { key: 'activeServices', label: 'Active', align: 'right' },
+        { key: 'areas', label: 'Areas' }, { key: 'outstanding', label: 'Outstanding', align: 'right' },
+      ], generatedAt);
     }
     if (request.report === 'PAYMENT_METHODS') {
       const result = await this.database.pool.query(`select method, count(*)::int transactions, sum(amount_centavos)::bigint amount from payments where status='POSTED' and payment_date >= $1::date and payment_date < $2::date + interval '1 day' group by method order by amount desc`, [request.from, request.to]);
       const rows = result.rows.map((r: Row) => ({ method: text(r.method).replaceAll('_',' '), transactions: text(r.transactions), amount: money(cents(r.amount)) }));
-      return this.data(request, 'Payment method summary', rows, [], [{key:'method',label:'Method'},{key:'transactions',label:'Payments',align:'right'},{key:'amount',label:'Amount',align:'right'}], generatedAt);
+      const total = result.rows.reduce((sum: bigint, row: Row) => sum + BigInt(cents(row.amount)), 0n);
+      return this.data(request, 'Payment method summary', rows, [{ label: 'Total collected', value: money(total.toString()) }], [{key:'method',label:'Method'},{key:'transactions',label:'Payments',align:'right'},{key:'amount',label:'Amount',align:'right'}], generatedAt);
     }
     if (request.report === 'OUTSTANDING_BALANCES' || request.report === 'AR_AGING') {
       const result = await this.database.pool.query(`select i.invoice_number, s.account_number, ${displayNameSql} subscriber, sa.service_account_number, i.due_date::text,

@@ -74,7 +74,9 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 **Increment 8 recovery verification (2026-10-11):** `npm run check` passed (97 tests); `npm run test:integration` passed (7 files, 69 PostgreSQL tests); `npm run test:e2e` passed (1 built Electron test). The recovery integration creates a synthetic proof backup, restores the dump and attachment into a staged database, checks SHA-256/size and database integrity, switches the isolated `_test` database, confirms gate clearance and restore audit, and removes the rollback test database. Authorization tests deny Cashier/Admin restore approval and prove Owner maintenance-gate/cancel behavior. Production service-manager restart and recovery on a production deployment remain untested.
 
-**Increment 8 report verification (2026-10-11):** User activity, billing adjustment, payment reversal, and voided receipt reports query preserved audit/financial rows. Integration tests assert synthetic records and status/reason/amount details; user activity requires `audit.view`; PDF and XLSX exports cover the added types. Dashboard KPI completeness, additional operational report breadth, and dense-report pagination remain separately tracked under Increment 9.
+**Increment 8 report verification (2026-10-11):** User activity, billing adjustment, payment reversal, and voided receipt reports query preserved audit/financial rows. Integration tests assert synthetic records and status/reason/amount details; user activity requires `audit.view`; PDF and XLSX exports cover the added types. Increment 9 extends this with management dashboards, collection intervals, billing/revenue reports, subscriber master data, and collector performance. Dense operational-table pagination remains separately tracked below.
+
+**Increment 9 verification (2026-10-11):** Dashboard and report workflows include billed/collected KPIs, overdue counts, collector performance, daily/ISO-weekly/monthly/annual collections, billing comparison, revenue grouping, subscriber master list, and six sample pairs under `reports-samples/`. The PostgreSQL suite reconciles interval grouping, billing, AR aging, and statement closing balances to source queries. `npm run reports:samples` passed (8 integration tests) and checks every XLSX title/date/totals against the API plus each PDF signature/size. `npm run check` passed (106 tests); `npm run test:integration` passed (69 PostgreSQL tests); `npm run test:e2e` passed (1 built Electron test, including report selection and print-media navigation). Final PDF visual review is untested because the environment has no local PDF renderer; the sample files and review steps are documented in `reports-samples/README.md`.
 
 ## Milestone 7 — Receivables and service control (PDF §§3.9–3.10)
 
@@ -87,12 +89,13 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 
 ## Milestone 8 — Dashboard and reporting (PDF §§3.11, 4.1–4.3)
 
-- [ ] 4–6 compact genuine KPIs; billing vs collection, payment methods, aging, collector performance, overdue alerts, recent payments.
+- [x] 4–6 compact genuine KPIs; billing vs collection, payment methods, aging, collector performance, overdue alerts, recent payments.
 - [x] Required permission-aware navigation: Dashboard; Subscribers (all/new/services); Billing (current/generate/invoices); Payments (receive/history/GCash); Collections (collectors/areas/routes/batches/remittance); Receivables (outstanding/overdue/aging/suspension); Services; Reports; Administration. Operational controls remain tracked in their workflow milestones.
-- [ ] Daily/weekly/monthly/annual collections, cash/GCash/method summaries, billing vs collection, revenue by plan/service/area, AR.
-- [ ] Subscriber master list/ledger/SOA; collector assignment/collection/remittance/shortage-overage/performance.
+- [x] Daily/weekly/monthly/annual collection reports with Manila-local grouping, bounded date filters, and reconciled exact-centavo totals; PDF/XLSX export.
+- [x] Cash/GCash/method summaries, billing versus collection, billed subscription totals by plan/service/current area, and AR report coverage.
+- [x] Subscriber master list/ledger/SOA; collector assignment/collection/remittance/shortage-overage/performance.
 - [x] Adjustment, reversal, voided-receipt, user-activity, and audit reports. At least six report types have PDF/XLSX export evidence; user activity is additionally restricted to `audit.view`.
-- [ ] ExcelJS/pdfmake exports from authoritative data; clean print layouts without navigation.
+- [x] ExcelJS/pdfmake exports from authoritative data; clean print layouts without navigation.
 - [ ] Dense tables: sticky headers, search/filter/sort, server pagination or virtualization, export/status badges.
 - [x] Visible form labels/required markers/grouping/inline errors; accessible GCash two-pane review.
 - [ ] Navy/blue/light neutral palette, professional typography, right-aligned tabular money, text+color statuses; no fabricated dashboards/decorative counters.
@@ -122,21 +125,21 @@ Source: supplied `requirements.pdf`, sections 1–16 (18 PDF pages; printed numb
 - [ ] Live demo: login; subscriber/service; invoice/ledger; cash/receipt; verified GCash/duplicates; SOA; overdue; collector/remittance; reversal/audit; exports; permissions; tested restore; simultaneous clients.
 - [ ] Developer can explain all code, financial rules, API boundaries, concurrency, rollback and restore. AI use does not replace accountability.
 
-## Mandatory acceptance matrix — all pending after Milestone 1
+## Mandatory acceptance matrix — verified status (2026-10-11)
 
-| ID | Scenario | Required result |
-| --- | --- | --- |
-| AT-01 | ₱999 invoice / ₱999 payment | Zero due, PAID, balanced ledger, receipt |
-| AT-02 | ₱999 invoice / ₱500 payment | ₱499 due, PARTIALLY_PAID, correct allocation/ledger |
-| AT-03 | ₱1,000 monthly / ₱3,000 payment | Documented allocation/credit preserves all value |
-| AT-04 | August + September ₱999 each / ₱1,200 | August cleared; September ₱798 due |
-| AT-05 | Reused verified GCash reference | Blocked or controlled audited duplicate handling |
-| AT-06 | Reverse posted payment | Original retained; linked reversal; balances restored; actor/reason audit |
-| AT-07 | ₱20,000 collected/remitted | Zero difference; authorized reconcile/close |
-| AT-08 | ₱20,000 collected / ₱19,500 remitted | Visible ₱500 shortage, never silently balanced |
-| AT-09 | Two/three concurrent clients | No corruption, duplicate numbering, or cross-session authorization leak |
-| AT-10 | Cashier calls admin API directly | Server denies user/backup operation |
-| AT-11 | Generate same service/period twice | No duplicate finalized invoices |
-| AT-12 | Backup, mutate, approved restore | Verified integrity and expected restored records |
+| ID | Scenario | Required result | Current status |
+| --- | --- | --- | --- |
+| AT-01 | ₱999 invoice / ₱999 payment | Zero due, PAID, balanced ledger, receipt | PASSED — real PostgreSQL integration test |
+| AT-02 | ₱999 invoice / ₱500 payment | ₱499 due, PARTIALLY_PAID, correct allocation/ledger | PASSED — real PostgreSQL integration test |
+| AT-03 | ₱1,000 monthly / ₱3,000 payment | Documented allocation/credit preserves all value | PASSED — real PostgreSQL integration test |
+| AT-04 | August + September ₱999 each / ₱1,200 | August cleared; September ₱798 due | PASSED — real PostgreSQL integration test |
+| AT-05 | Reused verified GCash reference | Blocked or controlled audited duplicate handling | PASSED — real PostgreSQL integration test |
+| AT-06 | Reverse posted payment | Original retained; linked reversal; balances restored; actor/reason audit | PASSED — real PostgreSQL integration test |
+| AT-07 | ₱20,000 collected/remitted | Zero difference; authorized reconcile/close | PASSED — real PostgreSQL integration test |
+| AT-08 | ₱20,000 collected / ₱19,500 remitted | Visible ₱500 shortage, never silently balanced | PASSED — real PostgreSQL integration test |
+| AT-09 | Two/three concurrent clients | No corruption, duplicate numbering, or cross-session authorization leak | PARTIAL — three concurrent API sessions pass; physical LAN clients untested |
+| AT-10 | Cashier calls admin API directly | Server denies user/backup operation | PASSED — Fastify injection and audit assertions |
+| AT-11 | Generate same service/period twice | No duplicate finalized invoices | PASSED — concurrent real PostgreSQL integration test |
+| AT-12 | Backup, mutate, approved restore | Verified integrity and expected restored records | PARTIAL — isolated restore/cutover passes; production service restart untested |
 
-Foundation-only concurrency reads and centavo validation **do not satisfy** financial AT-01–12. Optional enhancements (mobile/offline, reminders, portal, gateway, QR/GIS, technician inventory, predictive analytics) stay out of scope until mandatory work is complete.
+`npm run check` passed (107 tests), `npm run test:integration` passed (69 PostgreSQL tests), and `npm run test:e2e` passed (1 built-Electron test) on 2026-10-11. The six report sample export check passed 8 integration tests. `npm run dev:desktop` launched Electron with inherited `ELECTRON_RUN_AS_NODE=1` after the new guard; the existing API returned HTTP 200. Full `npm run dev` hit the already occupied API port 3001, so the existing server was left untouched. Release and deployment limits are recorded in `docs/acceptance-report.md`. Foundation-only concurrency reads and centavo validation **do not satisfy** financial AT-01–12. Optional enhancements (mobile/offline, reminders, portal, gateway, QR/GIS, technician inventory, predictive analytics) stay out of scope until mandatory work is complete.

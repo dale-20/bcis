@@ -1,0 +1,150 @@
+{
+  "source": "synthetic isolated _test database",
+  "pdfVisualReview": "pending - requires a local PDF renderer",
+  "samples": [
+    {
+      "files": [
+        "daily-collections.pdf",
+        "daily-collections.xlsx"
+      ],
+      "report": "DAILY_COLLECTIONS",
+      "title": "Daily collections",
+      "subtitle": "2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:40.522Z",
+      "rowCount": 3,
+      "totals": [
+        {
+          "label": "Total collected",
+          "value": "₱56,485.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    },
+    {
+      "files": [
+        "billing-versus-collection.pdf",
+        "billing-versus-collection.xlsx"
+      ],
+      "report": "BILLING_VS_COLLECTION",
+      "title": "Billing versus collection",
+      "subtitle": "2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:40.669Z",
+      "rowCount": 2,
+      "totals": [
+        {
+          "label": "Billed",
+          "value": "₱406,685.00"
+        },
+        {
+          "label": "Collected",
+          "value": "₱56,485.00"
+        },
+        {
+          "label": "Billed less collected",
+          "value": "₱350,200.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    },
+    {
+      "files": [
+        "payment-method-summary.pdf",
+        "payment-method-summary.xlsx"
+      ],
+      "report": "PAYMENT_METHODS",
+      "title": "Payment method summary",
+      "subtitle": "2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:40.721Z",
+      "rowCount": 1,
+      "totals": [
+        {
+          "label": "Total collected",
+          "value": "₱56,485.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    },
+    {
+      "files": [
+        "accounts-receivable-aging.pdf",
+        "accounts-receivable-aging.xlsx"
+      ],
+      "report": "AR_AGING",
+      "title": "Accounts receivable aging",
+      "subtitle": "2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:40.764Z",
+      "rowCount": 280,
+      "totals": [
+        {
+          "label": "Outstanding",
+          "value": "₱362,470.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    },
+    {
+      "files": [
+        "subscriber-statement.pdf",
+        "subscriber-statement.xlsx"
+      ],
+      "report": "SUBSCRIBER_STATEMENT",
+      "title": "Subscriber statement · Amihan Abad",
+      "subtitle": "BCIS-00001 · 2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:41.040Z",
+      "rowCount": 11,
+      "totals": [
+        {
+          "label": "Opening balance",
+          "value": "₱0.00"
+        },
+        {
+          "label": "Closing balance",
+          "value": "-₱12,260.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    },
+    {
+      "files": [
+        "collector-remittance-performance.pdf",
+        "collector-remittance-performance.xlsx"
+      ],
+      "report": "COLLECTOR_REMITTANCE",
+      "title": "Collector remittance and performance",
+      "subtitle": "2026-01-01 to 2026-12-31",
+      "generatedAt": "2026-10-11T00:54:41.086Z",
+      "rowCount": 2,
+      "totals": [
+        {
+          "label": "Assigned accounts",
+          "value": "22"
+        },
+        {
+          "label": "Collected accounts",
+          "value": "2"
+        },
+        {
+          "label": "Uncollected accounts",
+          "value": "20"
+        },
+        {
+          "label": "Collected amount",
+          "value": "₱40,000.00"
+        }
+      ],
+      "xlsxMetadataVerified": true,
+      "xlsxTotalsVerified": true,
+      "pdfSignatureVerified": true
+    }
+  ]
+}

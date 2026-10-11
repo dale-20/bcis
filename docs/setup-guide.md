@@ -41,7 +41,7 @@ Integration and E2E tests reset only the configured database ending in `_test`. 
 
 ## Desktop installation
 
-The x64 installer is `release/BCIS-Setup-0.1.0-x64.exe`. Its tested SHA-256 is `7F61EA3D473547CCB5558E565AE464DC39EB00B9129F2542CEB16508D1C07B98`. The laboratory build is not Authenticode-signed.
+The x64 installer is `release/BCIS-Setup-0.1.0-x64.exe`. Current SHA-256: `6CC2C774B1859A74D93FD0D6E885780E8D971AF9F99B52D44BFC0ACDABB2C656`. A temporary install/launch/uninstall smoke passed on the development workstation; clean-workstation install is untested. The laboratory build is not Authenticode-signed and may show an unknown-publisher warning. See `docs/acceptance-report.md` for release details.
 
 Before starting a client, configure its API origin through the deployment environment:
 

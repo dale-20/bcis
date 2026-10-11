@@ -5,10 +5,10 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "node ../../scripts/run-electron-vite.mjs dev",
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "electron-vite preview"
+    "start": "node ../../scripts/run-electron-vite.mjs preview"
   },
   "dependencies": {
     "@bcis/shared": "0.1.0",

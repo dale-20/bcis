@@ -14,6 +14,7 @@ export const reportPlugin:FastifyPluginAsync<Options>=async(app,options)=>{
   const activityPermission=async(request:Parameters<typeof auth>[0])=>{
     const query=request.query;
     if(typeof query==='object'&&query!==null&&'report' in query&&query.report==='USER_ACTIVITY') await requirePermission(options.authService,'audit.view')(request);
+    if(typeof query==='object'&&query!==null&&'report' in query&&query.report==='SUBSCRIBER_MASTER_LIST') await requirePermission(options.authService,'subscriber.view')(request);
   };
   app.get('/dashboard',{preHandler:[auth,requirePermission(options.authService,'dashboard.view')],schema:{response:{200:response,401:error,403:error}}},async request=>dashboardSchema.parse(await service.dashboard(dashboardQuerySchema.parse(request.query))));
   app.get('/reports/data',{preHandler:[auth,requirePermission(options.authService,'report.view'),activityPermission],schema:{response:{200:response,401:error,403:error}}},async request=>reportDataSchema.parse(await service.report(reportRequestSchema.parse(request.query))));

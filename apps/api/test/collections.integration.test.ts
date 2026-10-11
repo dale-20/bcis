@@ -24,15 +24,23 @@ const accounts: readonly DemoAccount[] = [
   { username: 'collections.demo', displayName: 'Demo Collection Supervisor', role: 'COLLECTION_SUPERVISOR' },
   { username: 'auditor.demo', displayName: 'Demo Auditor', role: 'AUDITOR' },
   { username: 'technician.demo', displayName: 'Demo Technician', role: 'TECHNICIAN' },
+  { username: 'viewer.demo', displayName: 'Demo Read-only Viewer', role: 'VIEWER' },
 ];
 const database = createDatabase({ DATABASE_URL: url, DATABASE_POOL_MAX: 5 });
 const authService = new AuthService(database, hasher);
 const app = await buildApp({ database, authService, probeDatabase: database.probe, logLevel: process.env.BCIS_TEST_LOG_LEVEL ?? 'silent' });
 const migrationsFolder = fileURLToPath(new URL('../drizzle', import.meta.url));
-const tokens = { admin: '', cashier: '', collections: '', auditor: '', technician: '' };
+const tokens = { admin: '', cashier: '', collections: '', auditor: '', technician: '', viewer: '' };
 let collectorId = '';
 let areaId = '';
 let subscriberId = '';
+const moneyToCentavos = (value: string) => {
+  const normalized = value.replace(/[^\d.-]/g, '');
+  const negative = normalized.startsWith('-');
+  const [whole = '0', fraction = '0'] = normalized.replace('-', '').split('.');
+  const amount = BigInt(whole.replaceAll(',', '')) * 100n + BigInt(fraction.padEnd(2, '0').slice(0, 2));
+  return negative ? -amount : amount;
+};
 
 async function activate(username: string) {
   const login = await app.inject({ method: 'POST', url: '/auth/login', payload: { username, password } });
@@ -93,6 +101,7 @@ beforeAll(async () => {
   tokens.collections = await activate('collections.demo');
   tokens.auditor = await activate('auditor.demo');
   tokens.technician = await activate('technician.demo');
+  tokens.viewer = await activate('viewer.demo');
   for (const period of ['2026-07', '2026-08', '2026-09', '2026-10', '2026-11']) {
     const generated = await app.inject({ method: 'POST', url: '/billing/cycles/generate', headers: { authorization: `Bearer ${tokens.admin}` }, payload: { period } });
     expect(generated.statusCode).toBe(200);
@@ -195,13 +204,67 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(dashboard.statusCode, dashboard.body).toBe(200);
     const summary = dashboard.json<Dashboard>();
     expect(BigInt(summary.collectedCentavos)).toBeGreaterThan(0n);
+    expect(BigInt(summary.billedCentavos)).toBeGreaterThan(0n);
     expect(summary.postedPaymentCount).toBeGreaterThan(0);
+    expect(summary.overdueInvoiceCount).toBeGreaterThanOrEqual(0);
+    expect(summary.overdueSubscriberCount).toBeGreaterThanOrEqual(0);
     expect(summary.monthlyCollections.length).toBeGreaterThan(0);
     expect(summary.paymentMethods.some((row) => row.method === 'CASH')).toBe(true);
+    expect(summary.collectorPerformance).toEqual(expect.arrayContaining([expect.objectContaining({ collectorId, assignedAccounts: expect.any(Number), collectedAccounts: expect.any(Number), amountCentavos: expect.any(String), varianceCentavos: expect.any(String) })]));
 
     const monthly = await app.inject({ method: 'GET', url: '/reports/data?report=MONTHLY_COLLECTIONS&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(monthly.statusCode, monthly.body).toBe(200);
-    expect(monthly.json<ReportData>()).toMatchObject({ report: 'MONTHLY_COLLECTIONS', title: 'Monthly collections', columns: expect.any(Array), rows: expect.any(Array) });
+    const monthlyReport = monthly.json<ReportData>();
+    expect(monthlyReport).toMatchObject({ report: 'MONTHLY_COLLECTIONS', title: 'Monthly collections', subtitle: '2026-01-01 to 2026-12-31', columns: expect.any(Array), rows: expect.any(Array) });
+    const methodSummary = await app.inject({ method: 'GET', url: '/reports/data?report=PAYMENT_METHODS&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(methodSummary.statusCode, methodSummary.body).toBe(200);
+    expect(methodSummary.json<ReportData>().totals.find((total) => total.label === 'Total collected')?.value)
+      .toBe(monthlyReport.totals.find((total) => total.label === 'Total collected')?.value);
+    for (const [report, title, label] of [
+      ['DAILY_COLLECTIONS', 'Daily collections', 'Date'],
+      ['WEEKLY_COLLECTIONS', 'Weekly collections', 'ISO week'],
+      ['ANNUAL_COLLECTIONS', 'Annual collections', 'Year'],
+    ] as const) {
+      const response = await app.inject({ method: 'GET', url: `/reports/data?report=${report}&from=2026-01-01&to=2026-12-31`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+      expect(response.statusCode, response.body).toBe(200);
+      const reportData = response.json<ReportData>();
+      expect(reportData).toMatchObject({ report, title, subtitle: monthlyReport.subtitle });
+      expect(reportData.columns[0]).toMatchObject({ key: 'period', label });
+      expect(reportData.totals.find((total) => total.label === 'Total collected')?.value)
+        .toBe(monthlyReport.totals.find((total) => total.label === 'Total collected')?.value);
+      expect(reportData.rows.reduce((count, row) => count + Number(row.transactions), 0))
+        .toBe(monthlyReport.rows.reduce((count, row) => count + Number(row.transactions), 0));
+    }
+    let revenueTotal: string | undefined;
+    for (const report of ['REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA'] as const) {
+      const response = await app.inject({ method: 'GET', url: `/reports/data?report=${report}&from=2026-01-01&to=2026-12-31`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+      expect(response.statusCode, response.body).toBe(200);
+      const revenue = response.json<ReportData>();
+      expect(revenue.rows.length).toBeGreaterThan(0);
+      const total = revenue.totals.find((item) => item.label === 'Billed subscription amount')?.value;
+      expect(total).toBeTruthy();
+      if (revenueTotal === undefined) revenueTotal = total;
+      else expect(total).toBe(revenueTotal);
+    }
+    const billingComparison = await app.inject({ method: 'GET', url: '/reports/data?report=BILLING_VS_COLLECTION&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(billingComparison.statusCode, billingComparison.body).toBe(200);
+    const billingData = billingComparison.json<ReportData>();
+    expect(billingData.rows).toHaveLength(2);
+    expect(billingData.totals.find((total) => total.label === 'Billed')?.value).toBeTruthy();
+    expect(billingData.totals.find((total) => total.label === 'Collected')?.value).toBe(monthlyReport.totals.find((total) => total.label === 'Total collected')?.value);
+    const billedSource = await database.pool.query<{ amount: string }>("select coalesce(sum(total_centavos),0)::text amount from invoices where status not in ('DRAFT','VOID') and invoice_date between '2026-01-01' and '2026-12-31'");
+    const billedTotal = billingData.totals.find((total) => total.label === 'Billed')?.value;
+    expect(moneyToCentavos(billedTotal ?? '')).toBe(BigInt(billedSource.rows[0]?.amount ?? '0'));
+    const masterList = await app.inject({ method: 'GET', url: '/reports/data?report=SUBSCRIBER_MASTER_LIST&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(masterList.statusCode, masterList.body).toBe(200);
+    expect(masterList.json<ReportData>().rows).toEqual(expect.arrayContaining([expect.objectContaining({ account: expect.any(String), subscriber: expect.any(String), outstanding: expect.any(String) })]));
+    const aging = await app.inject({ method: 'GET', url: '/reports/data?report=AR_AGING&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(aging.statusCode, aging.body).toBe(200);
+    const agingTotal = aging.json<ReportData>().totals.find((total) => total.label === 'Outstanding')?.value;
+    const agingSource = await database.pool.query<{ amount: string }>("select coalesce(sum(balance_centavos),0)::text amount from invoices where balance_centavos>0 and status in ('UNPAID','PARTIALLY_PAID','OVERDUE')");
+    expect(moneyToCentavos(agingTotal ?? '')).toBe(BigInt(agingSource.rows[0]?.amount ?? '0'));
+    const viewerMasterList = await app.inject({ method: 'GET', url: '/reports/data?report=SUBSCRIBER_MASTER_LIST&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.viewer}` } });
+    expect(viewerMasterList.statusCode).toBe(403);
     const remittanceReport = await app.inject({ method: 'GET', url: '/reports/data?report=COLLECTOR_REMITTANCE&from=2026-01-01&to=2026-12-31', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(remittanceReport.statusCode, remittanceReport.body).toBe(200);
     expect(remittanceReport.json<ReportData>()).toMatchObject({ title: 'Collector remittance and performance', columns: expect.arrayContaining([expect.objectContaining({ key: 'uncollectedAccounts' }), expect.objectContaining({ key: 'difference' })]), totals: expect.arrayContaining([expect.objectContaining({ label: 'Collected amount' })]) });
@@ -210,7 +273,12 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(assignmentReport.json<ReportData>()).toMatchObject({ title: 'Collector assignment history', columns: expect.arrayContaining([expect.objectContaining({ key: 'effectiveFrom' }), expect.objectContaining({ key: 'effectiveTo' })]), rows: expect.arrayContaining([expect.objectContaining({ collector: expect.any(String), effectiveTo: 'Current' })]) });
     const statement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-01-01&to=2026-12-31&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(statement.statusCode, statement.body).toBe(200);
-    expect(statement.json<ReportData>().title).toContain('Subscriber statement');
+    const statementData = statement.json<ReportData>();
+    expect(statementData.title).toContain('Subscriber statement');
+    const statementClosing = statementData.totals.find((total) => total.label === 'Closing balance')?.value;
+    const statementSource = await database.pool.query<{ balance: string }>('select coalesce(sum(debit_centavos-credit_centavos),0)::text balance from ledger_entries where subscriber_id=$1', [subscriberId]);
+    expect(moneyToCentavos(statementClosing ?? '')).toBe(BigInt(statementSource.rows[0]?.balance ?? '0'));
+    if (statementData.rows.length > 0) expect(statementData.rows.at(-1)?.balance).toBe(statementClosing);
     const rangedStatement = await app.inject({ method: 'GET', url: `/reports/data?report=SUBSCRIBER_STATEMENT&from=2026-09-01&to=2026-09-30&subscriberId=${subscriberId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(rangedStatement.statusCode, rangedStatement.body).toBe(200);
     expect(rangedStatement.json<ReportData>().totals).toEqual(expect.arrayContaining([
@@ -344,6 +412,14 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     const xlsx = await app.inject({ method: 'GET', url: '/reports/export?report=PAYMENT_METHODS&from=2026-01-01&to=2026-12-31&format=XLSX', headers: { authorization: `Bearer ${tokens.auditor}` } });
     expect(xlsx.statusCode, xlsx.body).toBe(200);
     expect(xlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    const dailyPdf = await app.inject({ method: 'GET', url: '/reports/export?report=DAILY_COLLECTIONS&from=2026-01-01&to=2026-12-31&format=PDF', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(dailyPdf.statusCode, dailyPdf.body).toBe(200);
+    expect(dailyPdf.rawPayload.subarray(0, 4).toString()).toBe('%PDF');
+    expect(dailyPdf.headers['content-disposition']).toContain('bcis-daily-collections-2026-12-31.pdf');
+    const annualXlsx = await app.inject({ method: 'GET', url: '/reports/export?report=ANNUAL_COLLECTIONS&from=2026-01-01&to=2026-12-31&format=XLSX', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(annualXlsx.statusCode, annualXlsx.body).toBe(200);
+    expect(annualXlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
+    expect(annualXlsx.headers['content-disposition']).toContain('bcis-annual-collections-2026-12-31.xlsx');
 
     const actor = await database.pool.query<{ id: string }>("select id from users where username='admin.demo'");
     const service = await database.pool.query<{ id: string }>("select id from service_accounts where service_account_number='SVC-00001-1'");
@@ -355,6 +431,6 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(history.statusCode, history.body).toBe(200);
     expect(history.json<ServiceHistory>().events.map((event) => event.type)).toEqual(['RECONNECTION', 'SUSPENSION']);
     const exports = await database.pool.query("select count(*)::int count from audit_logs where action='report.exported'");
-    expect(exports.rows[0]?.count).toBe(2);
+    expect(exports.rows[0]?.count).toBe(4);
   });
 });

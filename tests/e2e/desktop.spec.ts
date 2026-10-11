@@ -74,7 +74,28 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await expect(page.getByRole('link', { name: 'Collections', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Receivables', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Administration', exact: true })).toBeVisible();
+    await expect(page.getByText('Billed YTD')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Collector performance' })).toBeVisible();
     await page.screenshot({ path: 'test-results/dashboard.png' });
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+    for (const [report, heading] of ([
+      ['DAILY_COLLECTIONS', 'Daily collections'],
+      ['WEEKLY_COLLECTIONS', 'Weekly collections'],
+      ['ANNUAL_COLLECTIONS', 'Annual collections'],
+      ['BILLING_VS_COLLECTION', 'Billing versus collection'],
+      ['REVENUE_BY_PLAN', 'Billed subscription revenue by plan'],
+      ['REVENUE_BY_SERVICE', 'Billed subscription revenue by service'],
+      ['REVENUE_BY_AREA', 'Billed subscription revenue by current area'],
+      ['SUBSCRIBER_MASTER_LIST', 'Subscriber master list'],
+    ] as const)) {
+      await page.getByLabel('Report', { exact: true }).selectOption(report);
+      await expect(page.locator('.report-paper h2')).toHaveText(heading);
+    }
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.sidebar')).toBeHidden();
+    await expect(page.locator('.report-paper')).toBeVisible();
+    await page.emulateMedia({ media: 'screen' });
     await page.getByRole('link', { name: 'Subscribers', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Subscribers' })).toBeVisible();
     await expect(page.getByText(/of \d+ subscribers/)).toBeVisible();

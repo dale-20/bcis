@@ -1,60 +1,74 @@
-# BCIS acceptance and security report
+# BCIS acceptance and release report
 
-Test date: 2026-10-10  
-Environment: Windows, Node 24.18.0, PostgreSQL 18 isolated test cluster, Electron 44.7.0  
-Data: synthetic only
+Test date: 2026-10-11
+Environment: Windows 10.0.26200, Node 24, PostgreSQL 18 isolated project cluster, Electron 44.7.0
+Data: synthetic test/demo records only
 
 ## Acceptance results
 
-| ID | Status | Automated evidence | Result |
+| ID | Status | Evidence | Result and remaining limit |
 | --- | --- | --- | --- |
-| AT-01 | PASSED | `payments.integration.test.ts` | ₱999 exact Cash payment leaves zero, PAID, balanced ledger and receipt |
-| AT-02 | PASSED | `payments.integration.test.ts` | ₱500 leaves ₱499 and PARTIALLY_PAID with exact allocation/ledger |
-| AT-03 | PASSED | `payments.integration.test.ts` | ₱3,000 preserves ₱1,000 allocation and ₱2,000 unapplied credit |
-| AT-04 | PASSED | `payments.integration.test.ts` | August cleared first; September retains ₱798 |
-| AT-05 | PASSED | `payments.integration.test.ts` | Pending GCash is not posted; verified duplicate reference returns conflict |
-| AT-06 | PASSED | `payments.integration.test.ts` | Original retained, reversal linked, receipt voided, balances restored and audit written |
-| AT-07 | PASSED | `collections.integration.test.ts` | ₱20,000 expected/remitted yields zero and authorized close |
-| AT-08 | PASSED | `collections.integration.test.ts` | ₱500 shortage remains visible; silent close rejected |
-| AT-09 | PARTIAL | `payments.integration.test.ts` | Three simultaneous sessions passed: two postings, unique receipts, Viewer denied. Three physical PCs remain untested |
-| AT-10 | PASSED | `authorization.integration.test.ts` | Cashier receives HTTP 403 for direct user, backup list/create/download calls; all denials audited |
-| AT-11 | PASSED | `billing.integration.test.ts` | Concurrent duplicate billing returns one created run and one skipped run; no duplicate invoices |
-| AT-12 | PARTIAL | `backup.integration.test.ts`, `tests/evidence/at12-backup-restore.json`, `tests/evidence/at12-offline-cutover.json` | Approved disposable-clone restore and the full offline staged cutover workflow pass against `_test`; database integrity, expected counts, 1 synthetic proof SHA-256/size, maintenance-gate clearing, restore audit, and rollback retention are verified. Production recovery and deployment-specific API restart remain untested. |
+| AT-01 | PASSED | `apps/api/test/payments.integration.test.ts` | Exact ₱999 Cash payment leaves zero due, PAID status, balanced ledger, and unique receipt. |
+| AT-02 | PASSED | `apps/api/test/payments.integration.test.ts` | ₱500 payment leaves ₱499 due with exact allocation and ledger values. |
+| AT-03 | PASSED | `apps/api/test/payments.integration.test.ts` | ₱3,000 payment preserves ₱1,000 allocation and ₱2,000 unapplied credit. |
+| AT-04 | PASSED | `apps/api/test/payments.integration.test.ts` | Oldest invoice clears first; the next retains ₱798. |
+| AT-05 | PASSED | `apps/api/test/payments.integration.test.ts` | Pending GCash cannot post; a reused verified reference is rejected. |
+| AT-06 | PASSED | `apps/api/test/payments.integration.test.ts` | Original payment remains; linked reversal, void receipt, restored balances, actor/reason audit are checked. |
+| AT-07 | PASSED | `apps/api/test/collections.integration.test.ts` | ₱20,000 expected and remitted reconciles to zero; authorized close succeeds. |
+| AT-08 | PASSED | `apps/api/test/collections.integration.test.ts` | ₱500 shortage stays visible; silent close is denied and acknowledged close retains variance. |
+| AT-09 | PARTIAL | `apps/api/test/payments.integration.test.ts` | Three simultaneous API sessions prove concurrent posting, unique receipts, and Viewer denial. Three physical Windows LAN clients are untested. |
+| AT-10 | PASSED | `apps/api/test/authorization.integration.test.ts` | Cashier direct calls to Admin and backup operations return 403 and are audited. |
+| AT-11 | PASSED | `apps/api/test/billing.integration.test.ts` | Concurrent same-period billing creates one run and skips the duplicate; no duplicate invoices. |
+| AT-12 | PARTIAL | `apps/api/test/backup.integration.test.ts`, `tests/evidence/at12-*.json` | Isolated approved backup/restore and staged cutover verify database integrity, mutation removal, proof hashes, audit, maintenance-gate clearing, and rollback. Production service-manager restart remains untested. |
 
-No acceptance test remains failed after corrections. AT-09 is not marked fully passed because physical LAN workstations were unavailable.
+No automated AT-01–AT-12 case is currently reported failed. AT-09 and AT-12 remain partial because their physical/deployment acceptance environments are unavailable.
 
-## Commands and outcomes
+## Verification run
 
 | Command | Result |
 | --- | --- |
-| `npm run typecheck` | Passed |
-| `npm run lint` | Passed |
-| `npm test` | 81 passed |
-| `npm run test:integration` | 7 files, 47 passed |
-| `npm run test:e2e` | Passed; 1 built-Electron workflow including accessibility and security checks |
-| `npm run release:windows` | Passed; NSIS x64 installer produced |
-| `npm audit --omit=dev` | Passed; zero production advisories |
-| `npm audit` | 12 moderate development-tool advisories; zero high/critical after electron-builder 26.15.3 update |
+| `npm run check` | Passed: typecheck, lint, 15 unit/API/component/script files, 107 tests. |
+| `npm run test:integration` | Passed: 7 PostgreSQL integration files, 69 tests. |
+| `npm run test:e2e` | Passed: 1 built-Electron E2E workflow against real API/PostgreSQL. |
+| `npm run reports:samples` | Passed: 8 integration tests; six synthetic PDF/XLSX pairs generated and data-checked. |
+| `npm run release:windows` | Passed: x64 NSIS installer rebuilt from current source. |
+| Temporary installer smoke | Passed on this development workstation: silent install to a unique TEMP directory, executable stayed open after launch, then uninstall and temporary-directory cleanup succeeded. This is not a clean-machine test. |
+| `npm run dev:desktop` launcher smoke | Electron processes stayed alive with inherited `ELECTRON_RUN_AS_NODE=1`; API readiness returned HTTP 200 from the existing local API. The native window was not visually confirmed in this session. |
+| `npm audit --omit=dev --offline` | Passed: 0 reported production vulnerabilities from the local npm audit data. Offline mode limits freshness. |
+| `git diff --check` | Passed. |
 
-## Defects found and fixed
+The E2E workflow covers login/password change, dashboard, subscriber search/profile and maintenance, reports/print media, verified database/proof backup, connection recovery, accessibility, and Electron boundary checks. The complete acceptance sequence has not been rehearsed end to end by an operator.
 
-| Defect | Root cause | Fix | Regression evidence |
+## Release artifact
+
+- Installer: `release/BCIS-Setup-0.1.0-x64.exe`
+- Size: 112,223,672 bytes
+- SHA-256: `6CC2C774B1859A74D93FD0D6E885780E8D971AF9F99B52D44BFC0ACDABB2C656`
+- Authenticode: `NotSigned`; Windows may show an unknown-publisher warning.
+- Build warnings: Zod annotation comments are removed by Rollup; renderer JavaScript chunk is 794.58 kB and exceeds the 500 kB advisory threshold.
+
+## Security and operational status
+
+Verified: password hashing and session handling, server-side RBAC and denial audit, input validation, transaction rollback, database uniqueness/immutability, IPC sender validation, Electron sandbox/context isolation/no Node integration, navigation and permission denial, credential log redaction, isolated backup restore, and production dependency audit.
+
+Still untested: external penetration test, production HTTPS/certificate and firewall setup, Windows service hardening, three physical LAN clients, production restore/restart, power-loss recovery, maximum-volume performance and query plans, clean-workstation install/migration/seed, installer upgrade/uninstall on a maintained installation, and antivirus reputation. Report PDF page layout has automated signature/data checks but still needs a visual review of the six files in `reports-samples/`.
+
+## Defects found and corrected
+
+| Defect | Cause | Correction | Regression evidence |
 | --- | --- | --- | --- |
-| AT-09 first request returned 401 | Test rotated the Cashier password, correctly revoking the earlier session | Create another login session without rotating the password | AT-09 passes with two Cashier sessions and one Viewer session |
-| Restore integrity check inspected unrelated databases | `pg_amcheck --all` included databases without the extension | Target restored database and use `--install-missing` | AT-12 passes and reports `pgAmcheck: true` |
-| Desktop E2E expected Subscribers after login | Dashboard became the authorized default screen | Assert dashboard, then navigate using accessible sidebar control | Final E2E rerun recorded below |
-| Initial packager version had high/critical build advisories | electron-builder 26.5.0 included vulnerable build dependencies | Updated to 26.15.3 | No high/critical advisories; production audit clean |
+| AT-09 first request returned 401 | Test rotated Cashier password, revoking its earlier session. | Create distinct sessions without rotating the shared test password. | Concurrent AT-09 test passes with two Cashier sessions and a Viewer session. |
+| Restore integrity check included unrelated databases | `pg_amcheck --all` examined databases without the extension. | Restrict integrity check to the restored database. | AT-12 isolated restore evidence records `pgAmcheck: true`. |
+| E2E expected Subscribers after login | Dashboard is the authorized default. | Assert dashboard and navigate through the accessible sidebar. | Built Electron E2E passes. |
+| Electron exited when started by IDE terminal | The IDE inherited `ELECTRON_RUN_AS_NODE=1`; Electron entered Node mode. | Route desktop dev/preview scripts through `scripts/run-electron-vite.mjs`, which removes only that variable. | Regression test passes; `npm run dev:desktop` process launch completed. |
 
-## Security checks
+The full `npm run dev` command could not bind its API because a pre-existing development server already owned port 3001. That service was left untouched; the desktop-only command was used against its healthy API.
 
-Passed: secure password hashing, generic login failure, lockout, session expiry/revocation, bearer hashing, server RBAC, denied-action audit, immutable audit/financial records, Zod input rejection, transaction rollback, unique constraints, IPC sender validation, Electron sandbox/context isolation/no Node integration, navigation/popup/permission denial, credential log redaction, production dependency audit.
+## Requirements not yet complete
 
-Not met: installer Authenticode signature. The release is usable for laboratory evaluation but reports `NotSigned` and may show an unknown-publisher warning.
+- AT-09 physical LAN clients and AT-12 production service restart are partial, as listed above.
+- Maximum-volume load and query-plan testing have not been run.
+- PDF visual review, clean-workstation deployment, TLS/firewall hardening, and the full operator demo remain pending.
+- A signed installer requires an Authenticode certificate and a controlled release-signing process.
 
-Untested: external penetration test, production TLS/certificate configuration, Windows service hardening, firewall rules, three physical PCs, power-loss recovery, maximum-volume performance, installer upgrade/uninstall migration and antivirus reputation.
-
-Final E2E rerun: **PASSED** (1/1). It exercised the built Electron application against the real API/PostgreSQL test database, login/password rotation, dashboard, subscriber search/profile/form, reports, verified database/proof backup creation, connection degradation/recovery, exact preload surface, sandbox preferences, axe accessibility, minimum-window overflow and API outage handling.
-
-## Functional requirements still incomplete
-
-The activity, adjustment, reversal, and voided-receipt reports now have real PostgreSQL coverage and PDF/XLSX exports; user activity requires `audit.view`. Remaining requirements include fuller dashboard/report coverage and a production deployment recovery rehearsal. AT-12's isolated approved restore, cutover and attachment integrity pass; production recovery and service-manager restart remain untested. Other unchecked requirements stay explicitly marked in `docs/implementation-checklist.md`.
+See `docs/implementation-checklist.md` for the requirement-level passed/partial/untested matrix and `docs/feature-delivery-plan.md` for the remaining delivery gates.

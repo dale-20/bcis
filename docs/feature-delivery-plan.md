@@ -171,7 +171,9 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - Export applicable reports to PDF and XLSX and add navigation-free accessible print layouts.
 - Verify exported totals against source queries and preserve filter/date metadata in every output.
 
-**Gate:** At least six required reports have checked PDF/XLSX samples; printed and exported totals equal API/database totals.
+**Delivered slices:** The dashboard reports billed and collected totals, overdue invoice/subscriber counts, aging, payment mix, route performance, and recent receipts. Reports include daily, ISO-weekly, monthly, and annual collections; billing versus collection; billed subscription revenue by plan, service type, and current area; a permission-gated subscriber master list; AR, statements, and collector reports. The new collections reports use Manila business dates, reconcile transaction counts and exact-centavo totals across grouping levels, and export through the existing audited PDF/XLSX path. Six synthetic PDF/XLSX sample pairs are in `reports-samples/`. Database tests reconcile billing, aging, and statement values to PostgreSQL; the sample script reads each XLSX back and checks its title, date range, and totals against the API response. The PDF files are generated from that same report response and pass signature/size checks. The code and data checks pass; final visual PDF review remains open because this environment has no PDF renderer.
+
+**Gate:** Data and export checks pass for six report pairs; final PDF visual inspection is pending. See `reports-samples/README.md` for the sample list and local review requirement.
 
 ## Increment 10 - Acceptance, scale, deployment, and submission
 
@@ -187,6 +189,8 @@ Delivered: the preview serializes against posting for the selected subscriber an
 - Clearly label passed, failed, and untested requirements. Do not count API-only workflows as completed desktop requirements.
 
 **Gate:** AT-01 through AT-12 pass with retained evidence; clean install, migration, seed, launch, backup/restore, and demo rehearsal succeed.
+
+**Progress (2026-10-11):** `npm run check` (107 tests), `npm run test:integration` (69 PostgreSQL tests), and `npm run test:e2e` (1 built Electron test) pass. The x64 installer was rebuilt and passed a temporary install/launch/uninstall smoke on the development workstation. A regression fix clears IDE-inherited `ELECTRON_RUN_AS_NODE` for desktop dev/preview; `npm run dev:desktop` launched Electron against an already-running API. Full `npm run dev` encountered the pre-existing listener on API port 3001. AT-09 physical clients, production AT-12 restart, required-volume load/query plans, clean-workstation installation, full demo rehearsal, and the Step 9 PDF visual review remain untested. See `docs/acceptance-report.md` for exact status and artifact hash.
 
 ## Role completion map
 

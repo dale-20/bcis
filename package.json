@@ -45,6 +45,7 @@
     "build": "npm run build -w @bcis/shared && npm run build -w @bcis/api && npm run build -w @bcis/desktop",
     "release:windows": "npm run build && electron-builder --config electron-builder.yml --win nsis",
     "verify:restore": "node scripts/verify-backup-restore.mjs --approved-by owner.demo",
+    "reports:samples": "npm run build -w @bcis/shared && vitest run --config vitest.integration.config.ts apps/api/test/collections.integration.test.ts && npm run build -w @bcis/api && node scripts/generate-report-samples.mjs",
     "restore:approved": "node scripts/restore-approved.mjs",
     "typecheck": "npm run build -w @bcis/shared && npm run typecheck --workspaces --if-present && tsc -p tsconfig.tooling.json",
     "lint": "eslint . --max-warnings 0",

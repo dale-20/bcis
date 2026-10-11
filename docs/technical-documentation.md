@@ -32,8 +32,8 @@ The monorepo contains `apps/desktop`, `apps/api`, and `packages/shared`. Shared 
 | Payments | Posting, GCash review, allocation, credits, receipts, reversal and compensating ledger entries |
 | Collections | Route-sheet snapshots, recorded collections, remittance, variance and authorized close |
 | Receivables | Outstanding balances, overdue filters and exact AR aging buckets |
-| Reports | Dashboard queries, six tabular reports, audited PDF/XLSX export and print views |
-| System | Company/billing settings, user administration, immutable audit search, verified backup history/create/download, isolated restore verification |
+| Reports | Dashboard queries, collections/billing/revenue/subscriber/receivables/remittance/audit reports, audited PDF/XLSX export and print views |
+| System | Company/billing settings, user administration, immutable audit search, verified backup history/create/download, Owner-authorized recovery approval and isolated restore/cutover verification |
 
 ## Financial invariants
 
@@ -68,16 +68,16 @@ The preload exposes only named operations: session/authentication, connection st
 - Attachments: proof metadata validates MIME type, size, SHA-256 and safe storage key. Backup creation includes all proof rows and verifies their file hashes before marking the archive verified.
 - Transport: HTTP is development-only. Production LAN deployment requires HTTPS termination and a trusted certificate.
 
-`npm audit --omit=dev` reported zero shipped production dependency vulnerabilities on 2026-10-10. The complete development tree reported 12 moderate findings in build/migration tooling; no high or critical findings remained after updating electron-builder to 26.15.3. The generated installer is not Authenticode-signed.
+`npm audit --omit=dev --offline` reported zero production dependency vulnerabilities using the local npm audit data on 2026-10-11. Offline mode limits advisory freshness. A full development-tree audit previously reported 12 moderate findings in build/migration tooling; no high or critical findings remained after updating electron-builder to 26.15.3. The generated installer is not Authenticode-signed.
 
 ## Backup and restore
 
-The desktop backup service creates a PostgreSQL custom-format dump, includes database-referenced GCash proofs and a SHA-256 manifest, verifies the dump and every proof after archive extraction, and records/audits status. Download rechecks the archive. `npm run verify:restore` accepts only a disposable `_test` source, restores to a separate derived database, verifies proof hashes, checks records and foreign keys, proves a post-backup mutation is absent, and writes evidence. Live replacement still requires an Owner-approved maintenance gate and controlled API stop/restart and is not exposed by the app; see `docs/backup-restore.md`.
+The desktop backup service creates a PostgreSQL custom-format dump, includes database-referenced GCash proofs and a SHA-256 manifest, verifies the dump and every proof after archive extraction, and records/audits status. Download rechecks the archive. `npm run verify:restore` accepts only a disposable `_test` source, restores to a separate derived database, verifies proof hashes, checks records and foreign keys, proves a post-backup mutation is absent, and writes evidence. The Owner can approve a checksum-bound maintenance gate in the app; an operator command performs the staged database cutover. This flow is rehearsed only against `_test`; production service-manager restart remains deployment-specific and untested. See `docs/backup-restore.md`.
 
 ## Known limits
 
-- Automated live database replacement and distributed maintenance controls are not implemented.
+- Production recovery and service-manager restart are not tested; the restore rehearsal targets only the isolated `_test` database.
 - Three physical Windows clients and production HTTPS/firewall configuration are not laboratory-tested here.
 - Installer is unsigned; Windows may show an unknown-publisher warning.
-- Performance at the required maximum dataset has not been load-tested with 500,000 invoices/payments.
-- Physical three-PC LAN deployment and production-volume performance remain untested.
+- Performance at the required maximum dataset has not been load-tested with 20,000 subscribers, 500,000 invoices/payments, and 1,000,000 ledger entries.
+- Clean-workstation installation, full operator acceptance rehearsal, and PDF visual review remain pending.
