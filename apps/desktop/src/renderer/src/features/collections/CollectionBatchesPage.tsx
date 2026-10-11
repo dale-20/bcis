@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Printer, Route as RouteIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ChevronLeft, ChevronRight, Printer, Route as RouteIcon, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { AuthenticatedUser, CollectionBatch } from '@bcis/shared';
+import type { AuthenticatedUser, CollectionBatch, CollectionBatchListQuery } from '@bcis/shared';
 import { PageError, PageLoading } from '../../components/PageFeedback';
 import { Button } from '../../components/ui/button';
 import { closeCollectionBatch, createCollectionBatch, getCollectionBatch, getCollectionReferences, getEligibleCollectionPayments, listCollectionBatches, recordCollection, reconcileCollectionBatch, remitCollectionBatch, submitCollectionBatch } from '../../services/api';
@@ -18,6 +18,27 @@ const toCentavos = (amount: string) => {
   if (!parsed) throw new Error('Enter a valid Peso amount with up to two decimal places.');
   return (BigInt(parsed[1] ?? '0') * 100n + BigInt((parsed[2] ?? '').padEnd(2, '0') || '0')).toString();
 };
+type BatchSort = CollectionBatchListQuery['sort'];
+type BatchDirection = CollectionBatchListQuery['direction'];
+
+function useDebouncedValue(value: string, delay: number): string {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [delay, value]);
+  return debounced;
+}
+
+function BatchSortButton({ label, field, sort, direction, onSort }: { label: string; field: BatchSort; sort: BatchSort; direction: BatchDirection; onSort: (field: BatchSort) => void }) {
+  const active = sort === field;
+  return <button className="table-sort" aria-label={active ? `${label}, sorted ${direction === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`} onClick={() => onSort(field)}>{label}{active ? direction === 'asc' ? ' ↑' : ' ↓' : ''}</button>;
+}
+
+function batchSortOrder(field: BatchSort, sort: BatchSort, direction: BatchDirection): 'ascending' | 'descending' | 'none' {
+  if (field !== sort) return 'none';
+  return direction === 'asc' ? 'ascending' : 'descending';
+}
 const localDate = () => new Date().toISOString().slice(0, 10);
 const statuses: Record<CollectionBatch['status'], string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', SUBMITTED: 'Submitted', REMITTED: 'Remitted', RECONCILED: 'Reconciled', CLOSED: 'Closed' };
 
@@ -91,11 +112,81 @@ export function CollectionBatchesPage({ user, batchId }: { user: AuthenticatedUs
   const navigate = useNavigate();
   const client = useQueryClient();
   const [page, setPage] = useState(1);
-  const batches = useQuery({ queryKey: ['collection-batches', page], queryFn: () => listCollectionBatches({ page, pageSize: 20, exceptionsOnly: false }), enabled: !batchId });
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const [status, setStatus] = useState<CollectionBatchListQuery['status'] | ''>('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [collectorId, setCollectorId] = useState('');
+  const [collectionAreaId, setCollectionAreaId] = useState('');
+  const [sort, setSort] = useState<BatchSort>('date');
+  const [direction, setDirection] = useState<BatchDirection>('desc');
+  const references = useQuery({ queryKey: ['collection-reference-data'], queryFn: getCollectionReferences, enabled: !batchId });
+  const filters: CollectionBatchListQuery = {
+    query: debouncedSearch,
+    ...(status ? { status } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(collectorId ? { collectorId } : {}),
+    ...(collectionAreaId ? { collectionAreaId } : {}),
+    sort,
+    direction,
+    page,
+    pageSize: 20,
+    exceptionsOnly: false,
+  };
+  const batches = useQuery({ queryKey: ['collection-batches', filters], queryFn: () => listCollectionBatches(filters), enabled: !batchId, placeholderData: keepPreviousData });
+  const resetPage = () => setPage(1);
+  const handleSort = (field: BatchSort) => {
+    if (sort === field) setDirection((value) => value === 'asc' ? 'desc' : 'asc');
+    else { setSort(field); setDirection(field === 'date' ? 'desc' : 'asc'); }
+    resetPage();
+  };
   if (batchId) return <BatchDetail id={batchId} user={user} onBack={() => navigate('/collections/batches')} />;
+  if (references.isPending) return <PageLoading label="Loading collection filters…" />;
+  if (references.isError) return <PageError title="Collection filters unavailable" message={references.error.message} onRetry={() => void references.refetch()} />;
   if (batches.isPending) return <PageLoading label="Loading collection batches…" />;
   if (batches.isError) return <PageError title="Collection batches unavailable" message={batches.error.message} onRetry={() => void batches.refetch()} />;
-  return <div className="content-enter collection-workspace"><header className="page-heading"><div><h1>Collection batches</h1><p>Prepare route snapshots, track field results, and reconcile remittance variances.</p></div></header><BatchCreate user={user} onCreated={(id) => { void client.invalidateQueries({ queryKey: ['collection-batches'] }); navigate(`/collections/batches/${id}`); }} /><section className="list-surface"><div className="section-heading"><div><h2>Recent route batches</h2><p>{batches.data.total} total · showing page {batches.data.page} of {Math.max(1, batches.data.pageCount)}</p></div></div><div className="report-table-wrap">{batches.data.items.length === 0 ? <p className="empty-inline">No route batches have been created yet.</p> : <table className="report-table" aria-label="Recent collection batches"><thead><tr><th>Batch</th><th>Route date</th><th>Collector / area</th><th>Status</th><th className="numeric">Route amount</th><th>Progress</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{batches.data.items.map((batch) => <tr key={batch.id}><td><strong>{batch.batchNumber}</strong></td><td>{new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(`${batch.collectionDate}T00:00:00`))}</td><td>{batch.collectorName}<small>{batch.collectionAreaName}</small></td><td><span className={`status-badge status-${batch.status.toLowerCase()}`}>{statuses[batch.status]}</span></td><td className="numeric">{money(batch.expectedReceivableCentavos)}</td><td>{batch.recordedAccountCount}/{batch.accountCount} collected{batch.remittance && <small>Cash variance {money(batch.remittance.differenceCentavos.replace('-', ''))}</small>}</td><td><Button size="sm" variant="outline" onClick={() => navigate(`/collections/batches/${batch.id}`)}>Open</Button></td></tr>)}</tbody></table>}</div><footer className="table-pagination"><span>{batches.data.total} batches</span><div><Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</Button><Button variant="outline" size="sm" disabled={page >= batches.data.pageCount} onClick={() => setPage((value) => value + 1)}>Next</Button></div></footer></section></div>;
+  const updateFilters = (setter: (value: string) => void, value: string) => { setter(value); resetPage(); };
+  return <div className="content-enter collection-workspace">
+    <header className="page-heading"><div><h1>Collection batches</h1><p>Prepare route snapshots, track field results, and reconcile remittance variances.</p></div></header>
+    <BatchCreate user={user} onCreated={(id) => { void client.invalidateQueries({ queryKey: ['collection-batches'] }); navigate(`/collections/batches/${id}`); }} />
+    <section className="list-surface">
+      <div className="section-heading"><div><h2>Recent route batches</h2><p>{batches.data.total} total · showing page {batches.data.page} of {Math.max(1, batches.data.pageCount)}{batches.isFetching ? ' · Updating…' : ''}</p></div></div>
+      <div className="list-toolbar collection-batch-filters">
+        <label className="search-field"><Search aria-hidden="true" /><span className="sr-only">Search batches</span><input value={search} onChange={(event) => updateFilters(setSearch, event.target.value)} placeholder="Search batch, collector, or area…" /></label>
+        <label className="filter-field"><span>Status</span><select value={status} onChange={(event) => { setStatus(event.target.value as CollectionBatchListQuery['status'] | ''); resetPage(); }}><option value="">All statuses</option>{['OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED'].map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
+        <label className="filter-field"><span>From</span><input type="date" value={from} onChange={(event) => updateFilters(setFrom, event.target.value)} /></label>
+        <label className="filter-field"><span>To</span><input type="date" value={to} onChange={(event) => updateFilters(setTo, event.target.value)} /></label>
+        <label className="filter-field"><span>Collector</span><select value={collectorId} onChange={(event) => updateFilters(setCollectorId, event.target.value)}><option value="">All collectors</option>{references.data.collectors.map((collector) => <option key={collector.id} value={collector.id}>{collector.name}</option>)}</select></label>
+        <label className="filter-field"><span>Area</span><select value={collectionAreaId} onChange={(event) => updateFilters(setCollectionAreaId, event.target.value)}><option value="">All areas</option>{references.data.areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select></label>
+      </div>
+      <div className="report-table-wrap">
+        {batches.data.items.length === 0 ? <p className="empty-inline">No route batches match these filters.</p> : <table className="report-table" aria-label="Recent collection batches"><thead><tr>
+          <th aria-sort={batchSortOrder('batch', sort, direction)}><BatchSortButton label="Batch" field="batch" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th aria-sort={batchSortOrder('date', sort, direction)}><BatchSortButton label="Route date" field="date" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th aria-sort={batchSortOrder('collector', sort, direction)}><BatchSortButton label="Collector" field="collector" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th aria-sort={batchSortOrder('area', sort, direction)}><BatchSortButton label="Area" field="area" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th aria-sort={batchSortOrder('status', sort, direction)}><BatchSortButton label="Status" field="status" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th className="numeric" aria-sort={batchSortOrder('amount', sort, direction)}><BatchSortButton label="Route amount" field="amount" sort={sort} direction={direction} onSort={handleSort} /></th>
+          <th>Progress</th><th><span className="sr-only">Actions</span></th>
+        </tr></thead><tbody>{batches.data.items.map((batch) => <tr key={batch.id}>
+          <td><strong>{batch.batchNumber}</strong></td>
+          <td>{new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(`${batch.collectionDate}T00:00:00`))}</td>
+          <td>{batch.collectorName}</td><td>{batch.collectionAreaName}</td>
+          <td><span className={`status-badge status-${batch.status.toLowerCase()}`}>{statuses[batch.status]}</span></td>
+          <td className="numeric">{money(batch.expectedReceivableCentavos)}</td>
+          <td>{batch.recordedAccountCount}/{batch.accountCount} collected{batch.remittance && <small>{batch.remittance.differenceCentavos === '0' ? 'Cash balanced' : batch.remittance.differenceCentavos.startsWith('-') ? `Cash short by ${money(batch.remittance.differenceCentavos.slice(1))}` : `Cash over by ${money(batch.remittance.differenceCentavos)}`}</small>}</td>
+          <td><Button size="sm" variant="outline" onClick={() => navigate(`/collections/batches/${batch.id}`)}>Open</Button></td>
+        </tr>)}</tbody></table>}
+      </div>
+      <footer className="table-pagination"><span>{batches.data.total} batches</span><div>
+        <Button variant="outline" size="sm" disabled={page <= 1 || batches.isFetching} onClick={() => setPage((value) => value - 1)}><ChevronLeft /> Previous</Button>
+        <span>Page {page} of {Math.max(1, batches.data.pageCount)}</span>
+        <Button variant="outline" size="sm" disabled={page >= batches.data.pageCount || batches.isFetching} onClick={() => setPage((value) => value + 1)}>Next <ChevronRight /></Button>
+      </div></footer>
+    </section>
+  </div>;
 }
 
 export function CollectionRemittancePage({ user }: { user: AuthenticatedUser }) {

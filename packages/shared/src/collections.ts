@@ -31,10 +31,22 @@ export const collectionBatchSchema = z.object({
 export type CollectionBatch = z.infer<typeof collectionBatchSchema>;
 
 export const collectionBatchListQuerySchema = z.object({
+  query: z.string().trim().max(100).default(''),
+  status: collectionBatchStatusSchema.optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+  collectorId: z.uuid().optional(),
+  collectionAreaId: z.uuid().optional(),
+  sort: z.enum(['date', 'batch', 'collector', 'area', 'status', 'amount']).default('date'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
   page: z.number().int().positive().default(1),
   pageSize: z.number().int().positive().max(100).default(20),
   exceptionsOnly: z.boolean().default(false),
-}).strict();
+}).strict().superRefine((query, context) => {
+  if (query.from && query.to && query.from > query.to) {
+    context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after start date' });
+  }
+});
 export type CollectionBatchListQuery = z.infer<typeof collectionBatchListQuerySchema>;
 export const collectionBatchListItemSchema = z.object({
   id: z.uuid(), batchNumber: z.string(), collectorId: z.uuid(), collectorName: z.string(),

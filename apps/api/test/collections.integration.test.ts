@@ -130,6 +130,36 @@ describe.sequential('collection batches, remittance, and receivable aging', () =
     expect(references.areas.some((item) => item.code === 'TEST-AREA')).toBe(true);
   });
 
+  it('filters collection batches on the server and sorts them with stable paging', async () => {
+    const earlier = await createBatch('2026-11-18');
+    const later = await createBatch('2026-11-19');
+    const sharedFilters = new URLSearchParams({ from: '2026-11-18', to: '2026-11-19', status: 'OPEN', collectorId, collectionAreaId: areaId, page: '1', pageSize: '1', sort: 'date', direction: 'asc' });
+    const ascending = await app.inject({ method: 'GET', url: `/collection-batches?${sharedFilters}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(ascending.statusCode, ascending.body).toBe(200);
+    expect(ascending.json<{ total: number; pageCount: number; items: { id: string; collectionDate: string }[] }>()).toMatchObject({
+      total: 2, pageCount: 2, items: [{ id: earlier.id, collectionDate: '2026-11-18' }],
+    });
+    sharedFilters.set('page', '2');
+    const secondPage = await app.inject({ method: 'GET', url: `/collection-batches?${sharedFilters}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(secondPage.json<{ items: { id: string }[] }>().items.map((item) => item.id)).toEqual([later.id]);
+    sharedFilters.set('page', '1');
+    sharedFilters.set('direction', 'desc');
+    const descending = await app.inject({ method: 'GET', url: `/collection-batches?${sharedFilters}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(descending.json<{ items: { id: string }[] }>().items.map((item) => item.id)).toEqual([later.id]);
+
+    const byBatch = await app.inject({ method: 'GET', url: `/collection-batches?query=${encodeURIComponent(earlier.batchNumber)}&collectorId=${collectorId}&collectionAreaId=${areaId}`, headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(byBatch.json<{ total: number; items: { id: string }[] }>()).toEqual({
+      total: 1,
+      items: expect.arrayContaining([expect.objectContaining({ id: earlier.id })]),
+      page: 1, pageSize: 20, pageCount: 1,
+    });
+
+    const invalidRange = await app.inject({ method: 'GET', url: '/collection-batches?from=2026-11-20&to=2026-11-19', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(invalidRange.statusCode).toBe(400);
+    const invalidSort = await app.inject({ method: 'GET', url: '/collection-batches?sort=untrusted', headers: { authorization: `Bearer ${tokens.auditor}` } });
+    expect(invalidSort.statusCode).toBe(400);
+  });
+
   it('AT-07 records a balanced ₱20,000 remittance and enforces authorized closing', async () => {
     const created = await createBatch('2026-11-15');
     expect(created).toMatchObject({ status: 'OPEN', collectorId, collectionAreaId: areaId });

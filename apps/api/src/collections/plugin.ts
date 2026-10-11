@@ -25,10 +25,15 @@ export const collectionPlugin: FastifyPluginAsync<CollectionPluginOptions> = asy
 
   app.get('/collections/reference-data', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: { response: { 200: permissiveResponse, 401: errorResponse, 403: errorResponse } } }, async () => collectionReferencesSchema.parse(await service.references()));
   app.get('/collection-batches', { preHandler: [authenticate, requirePermission(options.authService, 'collection.view')], schema: {
-    querystring: { type: 'object', additionalProperties: false, properties: { page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 }, exceptionsOnly: { type: 'boolean' } } },
+    querystring: { type: 'object', additionalProperties: false, properties: {
+      query: { type: 'string', maxLength: 100 }, status: { type: 'string', enum: ['OPEN', 'IN_PROGRESS', 'SUBMITTED', 'REMITTED', 'RECONCILED', 'CLOSED'] },
+      from: { type: 'string', format: 'date' }, to: { type: 'string', format: 'date' }, collectorId: { type: 'string', format: 'uuid' }, collectionAreaId: { type: 'string', format: 'uuid' },
+      sort: { type: 'string', enum: ['date', 'batch', 'collector', 'area', 'status', 'amount'] }, direction: { type: 'string', enum: ['asc', 'desc'] },
+      page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 1, maximum: 100 }, exceptionsOnly: { type: 'boolean' },
+    } },
     response: { 200: permissiveResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse },
   } }, async (request) => collectionBatchListSchema.parse(await service.list(collectionBatchListQuerySchema.parse({
-    ...(request.query as { page?: number; pageSize?: number; exceptionsOnly?: boolean }),
+    ...(request.query as Record<string, unknown>),
   }))));
   app.post('/collection-batches', {
     preHandler: [authenticate, requirePermission(options.authService, 'collection.manage')],

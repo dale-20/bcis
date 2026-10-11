@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import type { CollectionBatchListQuery, CreateCollectionBatchInput } from '@bcis/shared';
 import type { Database } from '../db/client.js';
 import {
@@ -22,9 +22,32 @@ export class CollectionRepository {
 
   async list(query: CollectionBatchListQuery) {
     const offset = (query.page - 1) * query.pageSize;
-    const exceptionFilter = query.exceptionsOnly
-      ? or(inArray(collectionBatches.status, ['SUBMITTED', 'REMITTED', 'RECONCILED']), sql`${collectorRemittances.differenceCentavos} <> 0`)
-      : undefined;
+    const filters: SQL[] = [];
+    if (query.exceptionsOnly) {
+      const exceptionFilter = or(inArray(collectionBatches.status, ['SUBMITTED', 'REMITTED', 'RECONCILED']), sql`${collectorRemittances.differenceCentavos} <> 0`);
+      if (exceptionFilter) filters.push(exceptionFilter);
+    }
+    if (query.query) {
+      const search = `%${query.query}%`;
+      const searchFilter = or(ilike(collectionBatches.batchNumber, search), ilike(collectors.name, search), ilike(collectionAreas.name, search));
+      if (searchFilter) filters.push(searchFilter);
+    }
+    if (query.status) filters.push(eq(collectionBatches.status, query.status));
+    if (query.from) filters.push(sql`${collectionBatches.collectionDate} >= ${query.from}::date`);
+    if (query.to) filters.push(sql`${collectionBatches.collectionDate} <= ${query.to}::date`);
+    if (query.collectorId) filters.push(eq(collectionBatches.collectorId, query.collectorId));
+    if (query.collectionAreaId) filters.push(eq(collectionBatches.collectionAreaId, query.collectionAreaId));
+    const filter = filters.length > 0 ? and(...filters) : undefined;
+    const sortColumn = {
+      date: collectionBatches.collectionDate,
+      batch: collectionBatches.batchNumber,
+      collector: collectors.name,
+      area: collectionAreas.name,
+      status: collectionBatches.status,
+      amount: collectionBatches.expectedReceivableCentavos,
+    }[query.sort];
+    const primaryOrder = query.direction === 'asc' ? asc(sortColumn) : desc(sortColumn);
+    const tieBreakOrder = query.direction === 'asc' ? asc(collectionBatches.id) : desc(collectionBatches.id);
     const [rows, [count]] = await Promise.all([
       this.database.db.select({
         id: collectionBatches.id, batchNumber: collectionBatches.batchNumber, collectorId: collectionBatches.collectorId,
@@ -41,11 +64,13 @@ export class CollectionRepository {
       }).from(collectionBatches).innerJoin(collectors, eq(collectionBatches.collectorId, collectors.id))
         .innerJoin(collectionAreas, eq(collectionBatches.collectionAreaId, collectionAreas.id))
         .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId))
-        .where(exceptionFilter)
-        .orderBy(...(query.exceptionsOnly ? [asc(collectionBatches.collectionDate), asc(collectionBatches.createdAt)] : [desc(collectionBatches.collectionDate), desc(collectionBatches.createdAt)]))
+        .where(filter)
+        .orderBy(primaryOrder, tieBreakOrder)
         .limit(query.pageSize).offset(offset),
       this.database.db.select({ total: sql<number>`count(*)::int` }).from(collectionBatches)
-        .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId)).where(exceptionFilter),
+        .innerJoin(collectors, eq(collectionBatches.collectorId, collectors.id))
+        .innerJoin(collectionAreas, eq(collectionBatches.collectionAreaId, collectionAreas.id))
+        .leftJoin(collectorRemittances, eq(collectionBatches.id, collectorRemittances.batchId)).where(filter),
     ]);
     const total = count?.total ?? 0;
     return { items: rows, page: query.page, pageSize: query.pageSize, total, pageCount: Math.ceil(total / query.pageSize) };

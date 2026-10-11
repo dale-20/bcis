@@ -63,7 +63,7 @@ export function DashboardPage({ user }: { user: AuthenticatedUser }) {
   });
   const batchQueue = useQuery({
     queryKey: ['dashboard-attention', 'batches', user.userId],
-    queryFn: () => listCollectionBatches({ page: 1, pageSize: 5, exceptionsOnly: true }),
+    queryFn: () => listCollectionBatches({ query: '', sort: 'date', direction: 'asc', page: 1, pageSize: 5, exceptionsOnly: true }),
     enabled: canViewCollections,
   });
   const gcashQueue = useQuery({
