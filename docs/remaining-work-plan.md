@@ -42,7 +42,7 @@ The desktop E2E KPI assertion was updated to match the current dashboard label, 
 - Reuse existing query patterns and table components where they fit. Keep authorization and filtering on the API; do not fetch full production tables into the renderer.
 - Check sticky headers, tabular financial values, responsive behavior, and accessible focus on the actual screens. The shared palette and typography already exist, so this is a screen-completeness and consistency pass rather than a new theme project.
 
-**Audit result (2026-10-11):** The source/API-contract matrix is recorded in `docs/operational-table-audit.md`. Collection batches are the confirmed P0 functional gap; invoice, payment, and overdue-account sorting/export remain follow-up candidates. Sticky-header and responsive behavior still need live UI verification. Next: implement bounded server-side collection-batch search/filter/sort, then add API/integration coverage before desktop controls.
+**Audit result (2026-10-11):** The source/API-contract matrix is recorded in `docs/operational-table-audit.md`. Collection batches were the confirmed P0 functional gap and now have server-side search/filter/sort plus filtered export. Invoice and payment lists now have server-side sorting and filtered PDF/XLSX export. Sticky-header and responsive behavior still need live UI verification; subscriber, receivable-aging, and overdue/service-control list export and remaining sort gaps need a requirement-by-requirement decision. The latest payment-history increment passed `npm run check`, the payment PostgreSQL integration suite (11 tests), and built Electron E2E (2 tests).
 
 **Exit criteria**
 

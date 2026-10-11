@@ -125,6 +125,18 @@ describe.sequential('AT-01 through AT-06 payment invariants', () => {
     const history = await app.inject({ method: 'GET', url: `/payments?query=${result.receiptNumber}&method=CASH&status=POSTED&page=1&pageSize=10`, headers: { authorization: `Bearer ${cashierToken}` } });
     expect(history.statusCode).toBe(200);
     expect(history.json()).toMatchObject({ total: 1, items: [{ paymentId: result.paymentId, receiptNumber: result.receiptNumber, receiptStatus: 'ISSUED' }] });
+    const sortedHistory = await app.inject({ method: 'GET', url: `/payments?query=${result.receiptNumber}&sort=amount&direction=asc&page=1&pageSize=10`, headers: { authorization: `Bearer ${cashierToken}` } });
+    expect(sortedHistory.statusCode).toBe(200);
+    expect(sortedHistory.json()).toMatchObject({ items: [{ paymentId: result.paymentId, amountCentavos: '99900' }] });
+    const paymentReportQuery = `report=PAYMENT_LIST&from=2026-08-01&to=2026-08-31&paymentQuery=${result.receiptNumber}&paymentMethod=CASH&paymentStatus=POSTED&paymentSort=amount&paymentDirection=asc`;
+    const paymentReport = await app.inject({ method: 'GET', url: `/reports/data?${paymentReportQuery}`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(paymentReport.statusCode).toBe(200);
+    expect(paymentReport.json<ReportData>()).toMatchObject({ report: 'PAYMENT_LIST', rows: [{ receipt: result.receiptNumber, amount: '₱999.00', status: 'POSTED' }], totals: [{ label: 'Matching payments', value: '1' }, { label: 'Listed payment amounts (all statuses)', value: '₱999.00' }] });
+    const paymentExport = await app.inject({ method: 'GET', url: `/reports/export?${paymentReportQuery}&format=XLSX`, headers: { authorization: `Bearer ${adminToken}` } });
+    expect(paymentExport.statusCode).toBe(200);
+    expect(paymentExport.headers['content-type']).toContain('spreadsheetml.sheet');
+    const deniedPaymentExport = await app.inject({ method: 'GET', url: `/reports/data?${paymentReportQuery}`, headers: { authorization: `Bearer ${viewerToken}` } });
+    expect(deniedPaymentExport.statusCode).toBe(403);
     const deniedHistory = await app.inject({ method: 'GET', url: '/payments?page=1&pageSize=10', headers: { authorization: `Bearer ${viewerToken}` } });
     expect(deniedHistory.statusCode).toBe(403);
     const invalidRange = await app.inject({ method: 'GET', url: '/payments?from=2026-08-31&to=2026-08-01&page=1&pageSize=10', headers: { authorization: `Bearer ${cashierToken}` } });

@@ -115,6 +115,7 @@ export const paymentPlugin: FastifyPluginAsync<PaymentPluginOptions> = async (ap
     schema: { querystring: { type: 'object', additionalProperties: false, properties: {
       query: { type: 'string', maxLength: 100 }, method: { type: 'string' }, status: { type: 'string' },
       from: { type: 'string', format: 'date' }, to: { type: 'string', format: 'date' },
+        sort: { type: 'string', enum: ['date', 'subscriber', 'receipt', 'status', 'amount'] }, direction: { type: 'string', enum: ['asc', 'desc'] },
       page: { type: 'integer', minimum: 1 }, pageSize: { type: 'integer', minimum: 10, maximum: 100 },
     } }, response: { 200: paymentListResponse, 400: errorResponse, 401: errorResponse, 403: errorResponse } },
   }, async (request) => paymentListSchema.parse(await service.list(paymentListQuerySchema.parse(request.query))));

@@ -218,6 +218,13 @@ test('built Electron subscriber workflow uses real API/PostgreSQL and keeps a na
     await page.getByRole('link', { name: 'Payment History' }).click();
     await expect(page.getByRole('heading', { name: 'Payment history' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
+    await page.getByRole('button', { name: 'Sort by Amount' }).click();
+    await expect(page.getByRole('button', { name: 'Amount, sorted ascending' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Amount, sorted ascending' }).click();
+    await expect(page.getByRole('button', { name: 'Amount, sorted descending' })).toHaveAttribute('aria-pressed', 'true');
+    await desktop.evaluate(({ dialog }) => { dialog.showSaveDialog = async () => ({ canceled: true, filePath: '' }); });
+    await page.getByRole('button', { name: 'XLSX', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Export canceled. No file was saved.');
     await page.locator('.payment-history-table tbody tr').filter({ hasText: 'E2E-GCASH-' }).first().click();
     await expect(page.getByText('Immutable payment record')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Print receipt' })).toBeVisible();

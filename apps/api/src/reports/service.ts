@@ -81,6 +81,37 @@ export class ReportService {
 
   async report(request: ReportRequest): Promise<ReportData> {
     const generatedAt = new Date().toISOString();
+    if (request.report === 'PAYMENT_LIST') {
+      const values: unknown[] = [request.from, request.to];
+      const filters = ["p.payment_date >= ($1::date::timestamp at time zone 'Asia/Manila')", "p.payment_date < (($2::date + interval '1 day')::timestamp at time zone 'Asia/Manila')"];
+      const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
+      if (request.paymentQuery) {
+        const term = add(`%${request.paymentQuery.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`);
+        filters.push(`(s.account_number ilike ${term} escape '\\' or concat_ws(' ',s.first_name,s.middle_name,s.last_name) ilike ${term} escape '\\' or p.reference_number ilike ${term} escape '\\' or r.receipt_number ilike ${term} escape '\\')`);
+      }
+      if (request.paymentMethod && request.paymentMethod !== 'ALL') filters.push(`p.method=${add(request.paymentMethod)}::payment_method`);
+      if (request.paymentStatus && request.paymentStatus !== 'ALL') filters.push(`p.status=${add(request.paymentStatus)}::payment_status`);
+      const sortColumn = { date: 'p.payment_date', subscriber: "concat_ws(' ',s.first_name,s.middle_name,s.last_name)", receipt: 'r.receipt_number', status: 'p.status', amount: 'p.amount_centavos' }[request.paymentSort ?? 'date'];
+      const direction = request.paymentDirection === 'asc' ? 'asc' : 'desc';
+      const result = await this.database.pool.query<Row>(`select p.payment_date,s.account_number,trim(concat_ws(' ',s.first_name,s.middle_name,s.last_name)) subscriber,
+          p.method::text method,p.status::text status,p.amount_centavos::text amount,p.reference_number,r.receipt_number,r.status::text receipt_status,
+          creator.display_name created_by,poster.display_name posted_by,p.created_at
+        from payments p join subscribers s on s.id=p.subscriber_id join users creator on creator.id=p.created_by_user_id
+        left join users poster on poster.id=p.posted_by_user_id left join receipts r on r.payment_id=p.id
+        where ${filters.join(' and ')} order by ${sortColumn} ${direction} nulls last,p.created_at ${direction},p.id ${direction} limit 10001`, values);
+      if (result.rows.length > 10000) throw new AppError(413, 'EXPORT_TOO_LARGE', 'More than 10,000 payments match. Narrow the date range or filters and try again.');
+      const rows = result.rows.map((row) => ({
+        date: iso(row.payment_date), account: text(row.account_number), subscriber: text(row.subscriber), method: text(row.method), status: text(row.status),
+        amount: money(cents(row.amount)), reference: text(row.reference_number), receipt: text(row.receipt_number), receiptStatus: text(row.receipt_status),
+        createdBy: text(row.created_by), postedBy: text(row.posted_by), recordedAt: iso(row.created_at),
+      }));
+      const total = result.rows.reduce((sum, row) => sum + BigInt(cents(row.amount)), 0n);
+      return this.data(request, 'Payment history', rows, [{ label: 'Matching payments', value: String(rows.length) }, { label: 'Listed payment amounts (all statuses)', value: money(total.toString()) }], [
+        { key: 'date', label: 'Payment date' }, { key: 'account', label: 'Account' }, { key: 'subscriber', label: 'Subscriber' }, { key: 'method', label: 'Method' },
+        { key: 'status', label: 'Status' }, { key: 'amount', label: 'Amount', align: 'right' }, { key: 'reference', label: 'Reference' }, { key: 'receipt', label: 'Receipt' },
+        { key: 'receiptStatus', label: 'Receipt status' }, { key: 'createdBy', label: 'Recorded by' }, { key: 'postedBy', label: 'Posted by' }, { key: 'recordedAt', label: 'Recorded at' },
+      ], generatedAt);
+    }
     if (request.report === 'INVOICE_LIST') {
       const values: unknown[] = [];
       const filters: string[] = [];

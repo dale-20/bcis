@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { centavosSchema, signedCentavosSchema } from './money.js';
 
-export const reportKindSchema = z.enum(['DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS', 'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA', 'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS', 'COLLECTION_BATCH_LIST', 'INVOICE_LIST']);
+export const reportKindSchema = z.enum(['DAILY_COLLECTIONS', 'WEEKLY_COLLECTIONS', 'MONTHLY_COLLECTIONS', 'ANNUAL_COLLECTIONS', 'BILLING_VS_COLLECTION', 'REVENUE_BY_PLAN', 'REVENUE_BY_SERVICE', 'REVENUE_BY_AREA', 'SUBSCRIBER_MASTER_LIST', 'PAYMENT_METHODS', 'OUTSTANDING_BALANCES', 'AR_AGING', 'SUBSCRIBER_STATEMENT', 'COLLECTOR_REMITTANCE', 'COLLECTOR_ASSIGNMENTS', 'USER_ACTIVITY', 'BILLING_ADJUSTMENTS', 'PAYMENT_REVERSALS', 'VOIDED_RECEIPTS', 'COLLECTION_BATCH_LIST', 'INVOICE_LIST', 'PAYMENT_LIST']);
 export const reportFormatSchema = z.enum(['PDF', 'XLSX']);
 export const reportRequestSchema = z.object({
   report: reportKindSchema,
@@ -23,6 +23,11 @@ export const reportRequestSchema = z.object({
   invoiceMaxAmountCentavos: centavosSchema.optional(),
   invoiceSort: z.enum(['invoiceDate', 'invoice', 'subscriber', 'service', 'dueDate', 'status', 'total', 'balance']).optional(),
   invoiceDirection: z.enum(['asc', 'desc']).optional(),
+  paymentQuery: z.string().trim().max(100).optional(),
+  paymentMethod: z.enum(['ALL', 'CASH', 'GCASH', 'BANK_TRANSFER', 'CHEQUE', 'OTHER']).optional(),
+  paymentStatus: z.enum(['ALL', 'PENDING_VERIFICATION', 'POSTED', 'REJECTED', 'REVERSED']).optional(),
+  paymentSort: z.enum(['date', 'subscriber', 'receipt', 'status', 'amount']).optional(),
+  paymentDirection: z.enum(['asc', 'desc']).optional(),
 }).strict().superRefine((value, context) => {
   if (value.from > value.to) context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after start date' });
   if (value.report === 'SUBSCRIBER_STATEMENT' && !value.subscriberId) context.addIssue({ code: 'custom', path: ['subscriberId'], message: 'Subscriber is required' });
@@ -30,6 +35,7 @@ export const reportRequestSchema = z.object({
   if (value.report !== 'INVOICE_LIST' && Object.keys(value).some((key) => key.startsWith('invoice'))) context.addIssue({ code: 'custom', path: ['report'], message: 'Invoice filters only apply to invoice list exports' });
   if (value.invoiceDueFrom && value.invoiceDueTo && value.invoiceDueFrom > value.invoiceDueTo) context.addIssue({ code: 'custom', path: ['invoiceDueTo'], message: 'Invoice due date range is invalid' });
   if (value.invoiceMinAmountCentavos && value.invoiceMaxAmountCentavos && BigInt(value.invoiceMinAmountCentavos) > BigInt(value.invoiceMaxAmountCentavos)) context.addIssue({ code: 'custom', path: ['invoiceMaxAmountCentavos'], message: 'Invoice amount range is invalid' });
+  if (value.report !== 'PAYMENT_LIST' && Object.keys(value).some((key) => key.startsWith('payment'))) context.addIssue({ code: 'custom', path: ['report'], message: 'Payment filters only apply to payment list exports' });
 });
 export type ReportRequest = z.infer<typeof reportRequestSchema>;
 export type ReportKind = z.infer<typeof reportKindSchema>;

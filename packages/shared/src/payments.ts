@@ -128,6 +128,8 @@ export const paymentListQuerySchema = z.object({
   method: z.union([paymentMethodSchema, z.literal('ALL')]).default('ALL'),
   status: z.union([paymentStatusSchema, z.literal('ALL')]).default('ALL'),
   from: z.iso.date().optional(), to: z.iso.date().optional(),
+  sort: z.enum(['date', 'subscriber', 'receipt', 'status', 'amount']).default('date'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(10).max(100).default(20),
 }).superRefine((query, context) => {
   if (query.from && query.to && query.from > query.to) context.addIssue({ code: 'custom', path: ['to'], message: 'End date must be on or after start date' });

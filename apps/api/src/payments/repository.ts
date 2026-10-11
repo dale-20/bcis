@@ -160,8 +160,13 @@ export class PaymentRepository {
     }
     if (query.method !== 'ALL') filters.push(`p.method=${add(query.method)}::payment_method`);
     if (query.status !== 'ALL') filters.push(`p.status=${add(query.status)}::payment_status`);
-    if (query.from) filters.push(`p.payment_date>=${add(query.from)}::date`);
-    if (query.to) filters.push(`p.payment_date<(${add(query.to)}::date + interval '1 day')`);
+    if (query.from) filters.push(`p.payment_date>=(${add(query.from)}::date::timestamp at time zone 'Asia/Manila')`);
+    if (query.to) filters.push(`p.payment_date<((${add(query.to)}::date + interval '1 day')::timestamp at time zone 'Asia/Manila')`);
+    const orderColumn = {
+      date: 'p.payment_date', subscriber: "concat_ws(' ',s.first_name,s.middle_name,s.last_name)",
+      receipt: 'r.receipt_number', status: 'p.status', amount: 'p.amount_centavos',
+    }[query.sort];
+    const direction = query.direction;
     const where = filters.length ? `where ${filters.join(' and ')}` : '';
     const countValues = [...values];
     const limit = add(query.pageSize);
@@ -177,7 +182,7 @@ export class PaymentRepository {
          p.payment_date,p.created_at,p.method::text,p.status::text,p.amount_centavos::text,p.reference_number,creator.display_name created_by,
          poster.display_name posted_by,p.posted_at,r.receipt_number,r.status::text receipt_status,r.issued_at receipt_issued_at,
          coalesce(a.allocated,0)::text allocated_centavos,coalesce(c.remaining,0)::text unapplied_credit_centavos ${from} ${where}
-         order by p.payment_date desc,p.created_at desc,p.id desc limit ${limit} offset ${offset}`,
+         order by ${orderColumn} ${direction} nulls last,p.payment_date ${direction},p.created_at ${direction},p.id ${direction} limit ${limit} offset ${offset}`,
         values,
       ),
     ]);
